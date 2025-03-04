@@ -84,6 +84,7 @@ export default function Page() {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   };
 
+  // Delete one job
   const handleDeleteJob = async (uid: string) => {
     try {
       const res = await fetch(`http://localhost:3000/api/v1/jobs/${uid}`, {
@@ -92,10 +93,37 @@ export default function Page() {
       if (!res.ok) {
         throw new Error(`Failed to delete job ${uid}`);
       }
-      // refresh job list
+      // Refresh job list
       fetchJobs();
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  // Delete all jobs
+  const handleDeleteAllJobs = async () => {
+    if (jobs.length === 0) {
+      alert("No jobs to delete.");
+      return;
+    }
+    // Optional confirmation
+    if (!confirm(`Are you sure you want to delete all ${jobs.length} jobs?`)) {
+      return;
+    }
+
+    try {
+      // Fire off all deletion requests in parallel
+      await Promise.all(
+        jobs.map((job) =>
+          fetch(`http://localhost:3000/api/v1/jobs/${job.uid}`, {
+            method: "DELETE",
+          })
+        )
+      );
+      // Refresh the list
+      fetchJobs();
+    } catch (error) {
+      console.error("Error deleting all jobs:", error);
     }
   };
 
@@ -115,6 +143,13 @@ export default function Page() {
   return (
     <div style={{ padding: "1rem" }}>
       <h1>Auto Render AE Tools - made by rumitx</h1>
+
+      {/* "Delete All" button */}
+      <div style={{ marginBottom: "1rem" }}>
+        <button onClick={handleDeleteAllJobs} style={styles.deleteAllButton}>
+          Delete All Jobs
+        </button>
+      </div>
 
       {/* Job Table */}
       <JobTable
@@ -144,3 +179,15 @@ export default function Page() {
     </div>
   );
 }
+
+const styles = {
+  deleteAllButton: {
+    backgroundColor: "red",
+    color: "#fff",
+    padding: "6px 12px",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontWeight: 500,
+  },
+};
