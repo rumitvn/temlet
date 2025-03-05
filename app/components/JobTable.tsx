@@ -92,9 +92,18 @@ export default function JobTable({
         <div>
           <button
             style={styles.createButton}
-            onClick={() => window.open("http://localhost:3001/create_job", "_blank")}
+            onClick={() => window.open("http://localhost:3001/render_reward_image", "_blank")}
           >
-            Create New Job
+            Render Reward Image
+          </button>
+        </div>
+
+        <div>
+          <button
+            style={styles.createButton}
+            onClick={() => window.open("http://localhost:3001/render_quiz_animals", "_blank")}
+          >
+            Render Quiz Animals
           </button>
         </div>
       </div>

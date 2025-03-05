@@ -222,7 +222,7 @@ export default function CreateJobPage() {
   // --------------------------
   return (
     <div style={{ padding: "1rem" }}>
-      <h1>Batch Create Nexrender Jobs</h1>
+      <h1>Render Reward Image</h1>
 
       {/* Template Source + Composition */}
       <div style={styles.field}>
