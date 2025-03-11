@@ -108,7 +108,11 @@ export default function RenderQuizAnimalsPage() {
         layerName: "quiz_1_header_image",
         src: imagePath(key),
       },
-
+      {
+        type: "image",
+        layerName: "quiz_2_header_image",
+        src: imagePath(key),
+      },
       // ---------------------------
       // Region: Quiz 1
       // ---------------------------
