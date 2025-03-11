@@ -2,75 +2,62 @@
 
 import React, { useState } from "react";
 
-/**
- * Renders a single quiz job from a user-supplied JSON file,
- * building the Nexrender request body from the data.
- */
-export default function RenderQuizAnimalsPage() {
-  // 1) State for the loaded quiz JSON
-  const [quizData, setQuizData] = useState<any | null>(null);
+type QuizResult = {
+  fileName: string;   // e.g. "alligator_1.json"
+  status: "pending" | "creating" | "success" | "error";
+  uid?: string;       // job uid on success
+  error?: string;     // error message if any
+};
 
-  // 2) Some default config values
+export default function RenderQuizAnimalsPage() {
+  // 1) We can store references to the File objects here
+  const [jsonFiles, setJsonFiles] = useState<File[]>([]);
+  const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
+
+  // Some default config values
   const [templateSrc, setTemplateSrc] = useState(
     "file:///C:/Users/youruser/Documents/AEProjects/Envato-Trivia-Quiz-Game-Template/After Effects/Vertical Trivia Quiz Template (converted).aep"
   );
   const [composition, setComposition] = useState("Final");
-  const [outputFolder, setOutputFolder] = useState(
-    "D:/nexrender-output/quiz_animals"
-  );
+  const [outputFolder, setOutputFolder] = useState("D:/nexrender-output/quiz_animals");
 
-  const [loadingJson, setLoadingJson] = useState(false);
-  const [creatingJob, setCreatingJob] = useState(false);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+  const [creatingAll, setCreatingAll] = useState(false);
 
-  // 3) Job creation result
-  const [createdUid, setCreatedUid] = useState<string | null>(null);
-  const [createdState, setCreatedState] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // --------------------------
+  // Handle user selecting multiple .json files
+  // --------------------------
+  const handleJsonFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList) return;
 
-  // --------------------------------------------
-  // Step A: Select and load JSON file
-  // --------------------------------------------
-  const handleJsonFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    // Convert FileList to an array
+    const arr = Array.from(fileList);
+    setJsonFiles(arr);
 
-    setLoadingJson(true);
-    setQuizData(null);
-    setCreatedUid(null);
-    setCreatedState(null);
-    setErrorMessage(null);
-
-    try {
-      const text = await file.text();
-      const json = JSON.parse(text);
-      setQuizData(json);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to parse the JSON file");
-    } finally {
-      setLoadingJson(false);
-    }
+    // Initialize quizResults to "pending" for each file
+    const results = arr.map((f) => ({
+      fileName: f.name,
+      status: "pending" as const,
+    }));
+    setQuizResults(results);
   };
 
-  // --------------------------------------------
-  // Step B: Build the Nexrender request body from the JSON
-  // --------------------------------------------
+  // --------------------------
+  // Build the Nexrender request body from one JSON's data
+  // --------------------------
   function buildRequestBody(data: any) {
-    // data.key => "alligator"
-    // data.order => 1
     const key = data.key || "unknown_key";
     const order = data.order || 1;
-    const keyOrder = `${key}_${order}`; // e.g. "alligator_1"
+    const keyOrder = `${key}_${order}`;
 
-    // Helper to build voice/audio path
+    // Helpers for building paths
     const voicePath = (layer: string) =>
       `file:///C:/Users/youruser/Documents/minimate/animals/voice/${keyOrder}/${layer}.mp3`;
 
-    // Helper for image path
     const imagePath = (name: string) =>
       `file:///C:/Users/youruser/Documents/minimate/animals/image/${name}.jpg`;
 
-    // Helper for video path
     const videoPath = (name: string) =>
       `file:///C:/Users/youruser/Documents/minimate/animals/video/${name}.mp4`;
 
@@ -82,11 +69,8 @@ export default function RenderQuizAnimalsPage() {
     const lesson = data.lesson || {};
     const reward = data.reward || {};
 
-    // We'll build an array of assets
     const assets = [
-      // ---------------------------
-      // Region: Intro
-      // ---------------------------
+      // Intro
       {
         type: "data",
         layerName: "intro_title",
@@ -113,9 +97,8 @@ export default function RenderQuizAnimalsPage() {
         layerName: "quiz_2_header_image",
         src: imagePath(key),
       },
-      // ---------------------------
-      // Region: Quiz 1
-      // ---------------------------
+
+      // Quiz 1
       {
         type: "data",
         layerName: "quiz_1_question_title",
@@ -163,9 +146,7 @@ export default function RenderQuizAnimalsPage() {
         value: quiz1.answer?.position?.toString() || "1",
       },
 
-      // ---------------------------
-      // Region: Quiz 2
-      // ---------------------------
+      // Quiz 2
       {
         type: "data",
         layerName: "quiz_2_question_title",
@@ -201,9 +182,7 @@ export default function RenderQuizAnimalsPage() {
         value: quiz2.answer?.position?.toString() || "1",
       },
 
-      // ---------------------------
-      // Region: Quiz 3
-      // ---------------------------
+      // Quiz 3
       {
         type: "data",
         layerName: "quiz_3_question_title",
@@ -215,7 +194,6 @@ export default function RenderQuizAnimalsPage() {
         layerName: "voice_q3_title",
         src: voicePath("voice_q3_title"),
       },
-      // quiz_3 has image answers instead of text
       {
         type: "image",
         layerName: "quiz_3_ans_1_image",
@@ -248,9 +226,7 @@ export default function RenderQuizAnimalsPage() {
         value: quiz3.answer?.position?.toString() || "1",
       },
 
-      // ---------------------------
-      // Region: Lesson + Reward
-      // ---------------------------
+      // Lesson + Reward
       {
         type: "video",
         layerName: "lesson_video",
@@ -273,8 +249,7 @@ export default function RenderQuizAnimalsPage() {
       },
     ];
 
-    // Build final request body
-    const requestBody = {
+    return {
       template: {
         src: templateSrc,
         composition,
@@ -290,58 +265,77 @@ export default function RenderQuizAnimalsPage() {
         ],
       },
     };
-
-    return requestBody;
   }
 
-  // --------------------------------------------
-  // Step C: Submit job
-  // --------------------------------------------
-  async function handleCreateJob() {
-    if (!quizData) {
-      alert("Please select a JSON file first.");
+  // --------------------------
+  // For each selected JSON, parse it & create a job
+  // --------------------------
+  async function handleCreateAllJobs() {
+    if (!jsonFiles.length) {
+      alert("No JSON files selected!");
       return;
     }
-    setCreatingJob(true);
-    setCreatedUid(null);
-    setCreatedState(null);
-    setErrorMessage(null);
 
-    try {
-      const body = buildRequestBody(quizData);
-      const res = await fetch("http://localhost:3000/api/v1/jobs", {
-        method: "POST",
-        headers: {
-          "nexrender-secret": "myapisecret",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
+    setCreatingAll(true);
 
-      if (!res.ok) {
-        throw new Error(`Failed to create job: ${res.status}`);
+    // We'll store updates in a new array as we go
+    const newResults = [...quizResults];
+
+    for (let i = 0; i < jsonFiles.length; i++) {
+      const file = jsonFiles[i];
+      // Mark "creating"
+      newResults[i] = { ...newResults[i], status: "creating", error: "", uid: "" };
+      setQuizResults([...newResults]);
+
+      try {
+        // 1) Parse the JSON
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        // 2) Build request body
+        const body = buildRequestBody(data);
+
+        // 3) POST to Nexrender
+        const res = await fetch("http://localhost:3000/api/v1/jobs", {
+          method: "POST",
+          headers: {
+            "nexrender-secret": "myapisecret",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Failed to create job: ${res.status}`);
+        }
+        const result = await res.json();
+
+        // 4) Mark success
+        newResults[i] = {
+          ...newResults[i],
+          status: "success",
+          uid: result.uid || "",
+        };
+      } catch (err: any) {
+        console.error(err);
+        newResults[i] = {
+          ...newResults[i],
+          status: "error",
+          error: err.message || "Error creating job",
+        };
       }
-      const result = await res.json();
-      setCreatedUid(result.uid);
-      setCreatedState(result.state || "queued");
-    } catch (error: any) {
-      console.error(error);
-      setErrorMessage(error.message || "Error creating job");
-    } finally {
-      setCreatingJob(false);
-    }
-  }
 
-  // --------------------------------------------
-  // RENDER
-  // --------------------------------------------
-  // If we have quizData, let's build the final request for display
-  const displayRequest = quizData ? buildRequestBody(quizData) : null;
+      setQuizResults([...newResults]);
+    }
+
+    setCreatingAll(false);
+  }
 
   return (
     <div style={{ padding: "1rem" }}>
-      <h1>Render Quiz Animals</h1>
+      <h1>Batch Render Quiz Animals</h1>
 
+      {/* Template Source, Composition, Output Folder */}
       <div style={styles.field}>
         <label style={styles.label}>Template Source (AEP path):</label>
         <input
@@ -361,9 +355,7 @@ export default function RenderQuizAnimalsPage() {
         />
       </div>
       <div style={styles.field}>
-        <label style={styles.label}>
-          Output Folder (e.g. D:/nexrender-output/quiz_animals):
-        </label>
+        <label style={styles.label}>Output Folder (e.g. D:/nexrender-output/quiz_animals):</label>
         <input
           style={styles.input}
           type="text"
@@ -374,53 +366,57 @@ export default function RenderQuizAnimalsPage() {
 
       <hr style={{ margin: "1rem 0" }} />
 
+      {/* Select multiple .json files */}
       <div style={styles.field}>
-        <label style={styles.label}>Select Quiz JSON:</label>
+        <label style={styles.label}>Select Multiple Quiz JSON Files:</label>
         <input
           type="file"
           accept=".json"
-          onChange={handleJsonFileChange}
-          disabled={loadingJson}
+          multiple
+          onChange={handleJsonFilesChange}
+          disabled={loadingFiles || creatingAll}
         />
-        {loadingJson && <p>Loading JSON...</p>}
-        {quizData && (
-          <p style={{ marginTop: "0.5rem" }}>
-            Loaded quiz for <strong>{quizData.key}</strong> (order: {quizData.order})
-          </p>
+        {!!jsonFiles.length && (
+          <p style={{ marginTop: "0.5rem" }}>Selected {jsonFiles.length} JSON file(s)</p>
         )}
       </div>
 
-      <button style={styles.button} onClick={handleCreateJob} disabled={creatingJob}>
-        {creatingJob ? "Creating job..." : "Create Job"}
+      {/* Create All Jobs Button */}
+      <button style={styles.button} onClick={handleCreateAllJobs} disabled={!jsonFiles.length || creatingAll}>
+        {creatingAll ? "Creating Jobs..." : "Create All Jobs"}
       </button>
 
-      {errorMessage && <p style={{ color: "red" }}>{errorMessage}</p>}
-
-      {/* Show job creation result */}
-      {createdUid && (
-        <div style={{ marginTop: "1rem" }}>
-          <p>
-            <strong>Job created!</strong> UID: {createdUid}, state: {createdState}
-          </p>
-        </div>
-      )}
-
-      {/* For clarity, let's show the final "assets" array */}
-      {displayRequest && (
+      {/* Table of results */}
+      {!!quizResults.length && (
         <div style={{ marginTop: "2rem" }}>
-          <h2>Request Body Preview</h2>
-          <pre style={styles.pre}>
-            {JSON.stringify(displayRequest, null, 2)}
-          </pre>
+          <h2>Job Creation Results</h2>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>File</th>
+                <th style={styles.th}>Status</th>
+                <th style={styles.th}>UID</th>
+                <th style={styles.th}>Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {quizResults.map((res, index) => (
+                <tr key={index}>
+                  <td style={styles.td}>{res.fileName}</td>
+                  <td style={styles.td}>{res.status}</td>
+                  <td style={styles.td}>{res.uid || "-"}</td>
+                  <td style={styles.td}>{res.error || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   );
 }
 
-// --------------------------------------------
-// Some inline styles
-// --------------------------------------------
+// Inline styles
 const styles = {
   field: {
     marginBottom: "1rem",
@@ -428,7 +424,7 @@ const styles = {
   label: {
     display: "block",
     marginBottom: "0.25rem",
-    fontWeight: "bold",
+    fontWeight: "bold" as const,
   },
   input: {
     width: "100%",
@@ -449,11 +445,19 @@ const styles = {
     color: "#fff",
     fontWeight: 500,
   },
-  pre: {
-    backgroundColor: "#333",
-    color: "#eee",
-    padding: "1rem",
-    overflowX: "auto" as const,
-    maxHeight: "400px",
+  table: {
+    width: "100%",
+    borderCollapse: "collapse" as const,
+  },
+  th: {
+    border: "1px solid #fff",
+    padding: "8px",
+    backgroundColor: "#222",
+    color: "#fff",
+    textAlign: "left" as const,
+  },
+  td: {
+    border: "1px solid #ccc",
+    padding: "8px",
   },
 };
