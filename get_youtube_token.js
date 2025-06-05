@@ -4,8 +4,8 @@ const destroyer = require("server-destroy");
 
 const open = (...args) => import('open').then(mod => mod.default(...args));
 
-const CLIENT_ID = "290912996260-3k7pmehqimcgkfak93f20v5pur2rkahc.apps.googleusercontent.com";
-const CLIENT_SECRET = "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";
+const CLIENT_ID = "";
+const CLIENT_SECRET = "";
 const REDIRECT_URI = "http://localhost:5173";
 
 const oauth2Client = new google.auth.OAuth2(
