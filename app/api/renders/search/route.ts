@@ -6,6 +6,8 @@ export async function GET(req: NextRequest) {
     try {
         const searchParams = req.nextUrl.searchParams;
         const query = searchParams.get('q');
+        const type = searchParams.get('type');
+        const topic = searchParams.get('topic');
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '10');
         const skip = (page - 1) * limit;
@@ -17,25 +19,25 @@ export async function GET(req: NextRequest) {
             );
         }
 
+        const where: any = {
+            fileName: {
+                contains: query,
+                mode: 'insensitive'
+            }
+        };
+
+        if (type) where.type = type;
+        if (topic) where.topic = topic;
+
         const [items, total] = await Promise.all([
             prisma.renderItem.findMany({
-                where: {
-                    fileName: {
-                        contains: query,
-                        mode: 'insensitive'
-                    }
-                },
+                where,
                 skip,
                 take: limit,
                 orderBy: { createdAt: 'desc' }
             }),
             prisma.renderItem.count({
-                where: {
-                    fileName: {
-                        contains: query,
-                        mode: 'insensitive'
-                    }
-                }
+                where
             })
         ]);
 

@@ -11,21 +11,36 @@ datasource db {
 }
 
 model RenderItem {
-  id              String   @id @default(cuid())
-  fileName        String   @unique
-  nexrenderUid    String
-  jsonContent     Json
-  mp4Link         String
-  youtubeMetadata Json?
-  status          String
-  renderTime      Int?
-  metadataTime    Int?
-  uploadTime      Int?
-  youtubeLink     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  fileName              String   @unique
+  nexrenderUid          String
+  type                  String   // short or long
+  topic                 String   // animal, plant, philosophy, etc.
+  channelName           String
+  channelId             String
+  templateAeUrl         String
+  templateAeComposition String
+  autoRender            Boolean  @default(false)
+  autoCreateMetadata    Boolean  @default(false)
+  autoUpload            Boolean  @default(false)
+  uploadScheduleStart   DateTime?
+  uploadFromHour        Int?     // 0-23
+  uploadToHour          Int?     // 0-23
+  videosPerDay          Int?     @default(1)
+  jsonContent           Json
+  mp4Link               String
+  youtubeMetadata       Json?
+  status                String
+  renderTime            Int?
+  metadataTime          Int?
+  uploadTime            Int?
+  youtubeLink           String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   @@index([fileName])
   @@index([status])
   @@index([nexrenderUid])
+  @@index([type])
+  @@index([topic])
 } 

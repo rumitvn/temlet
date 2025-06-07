@@ -7,6 +7,8 @@ export type RenderStatus =
     | 'declined'
     | 'approved';
 
+export type RenderType = 'short' | 'long';
+
 export interface YouTubeMetadata {
     title: string;
     description: string;
@@ -17,10 +19,30 @@ export interface YouTubeMetadata {
     scheduleDate: string;
 }
 
+export interface UploadConfig {
+    scheduleStart: Date;
+    fromHour: number;
+    toHour: number;
+    videosPerDay: number;
+}
+
 export interface RenderItem {
     id: string;
     fileName: string;
     nexrenderUid: string;
+    type: RenderType;
+    topic: string;
+    channelName: string;
+    channelId: string;
+    templateAeUrl: string;
+    templateAeComposition: string;
+    autoRender: boolean;
+    autoCreateMetadata: boolean;
+    autoUpload: boolean;
+    uploadScheduleStart: Date | null;
+    uploadFromHour: number | null;
+    uploadToHour: number | null;
+    videosPerDay: number;
     jsonContent: any;
     mp4Link: string;
     youtubeMetadata: YouTubeMetadata | null;
@@ -36,11 +58,37 @@ export interface RenderItem {
 export interface CreateRenderItemDto {
     fileName: string;
     nexrenderUid: string;
+    type: RenderType;
+    topic: string;
+    channelName: string;
+    channelId: string;
+    templateAeUrl: string;
+    templateAeComposition: string;
+    autoRender: boolean;
+    autoCreateMetadata: boolean;
+    autoUpload: boolean;
+    uploadScheduleStart?: Date;
+    uploadFromHour?: number;
+    uploadToHour?: number;
+    videosPerDay?: number;
     jsonContent: any;
     mp4Link: string;
 }
 
 export interface UpdateRenderItemDto {
+    type?: RenderType;
+    topic?: string;
+    channelName?: string;
+    channelId?: string;
+    templateAeUrl?: string;
+    templateAeComposition?: string;
+    autoRender?: boolean;
+    autoCreateMetadata?: boolean;
+    autoUpload?: boolean;
+    uploadScheduleStart?: Date;
+    uploadFromHour?: number;
+    uploadToHour?: number;
+    videosPerDay?: number;
     youtubeMetadata?: YouTubeMetadata;
     status?: RenderStatus;
     renderTime?: number;

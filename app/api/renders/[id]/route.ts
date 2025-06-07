@@ -1,26 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
-import { UpdateRenderItemDto } from "@/app/types/render";
 
 // GET /api/renders/[id] - Get a single render item
 export async function GET(
     req: NextRequest,
-    context: { params: Promise<{ id: string }> }
+    { params }: { params: { id: string } }
 ) {
     try {
-        const { id } = await context.params;
-        const item = await prisma.renderItem.findUnique({
-            where: { id }
+        const renderItem = await prisma.renderItem.findUnique({
+            where: { id: params.id }
         });
 
-        if (!item) {
+        if (!renderItem) {
             return NextResponse.json(
                 { error: 'Render item not found' },
                 { status: 404 }
             );
         }
 
-        return NextResponse.json(item);
+        return NextResponse.json(renderItem);
     } catch (error) {
         console.error('Error fetching render item:', error);
         return NextResponse.json(
@@ -33,21 +31,70 @@ export async function GET(
 // PATCH /api/renders/[id] - Update a render item
 export async function PATCH(
     req: NextRequest,
-    context: { params: Promise<{ id: string }> }
+    { params }: { params: { id: string } }
 ) {
     try {
-        const { id } = await context.params;
-        const body: UpdateRenderItemDto = await req.json();
-        
-        const item = await prisma.renderItem.update({
-            where: { id },
+        const body = await req.json();
+        const {
+            fileName,
+            type,
+            topic,
+            status,
+            metadata,
+            outputPath,
+            youtubeUrl,
+            error,
+            processingTime,
+            fileSize,
+            resolution,
+            duration,
+            format,
+            codec,
+            bitrate,
+            fps,
+            audioCodec,
+            audioBitrate,
+            audioChannels,
+            audioSampleRate,
+            tags,
+            description,
+            title,
+            thumbnailUrl,
+            customFields
+        } = body;
+
+        const renderItem = await prisma.renderItem.update({
+            where: { id: params.id },
             data: {
-                ...body,
-                youtubeMetadata: body.youtubeMetadata ? body.youtubeMetadata : undefined
+                ...(fileName && { fileName }),
+                ...(type && { type }),
+                ...(topic && { topic }),
+                ...(status && { status }),
+                ...(metadata && { metadata }),
+                ...(outputPath && { outputPath }),
+                ...(youtubeUrl && { youtubeUrl }),
+                ...(error && { error }),
+                ...(processingTime && { processingTime }),
+                ...(fileSize && { fileSize }),
+                ...(resolution && { resolution }),
+                ...(duration && { duration }),
+                ...(format && { format }),
+                ...(codec && { codec }),
+                ...(bitrate && { bitrate }),
+                ...(fps && { fps }),
+                ...(audioCodec && { audioCodec }),
+                ...(audioBitrate && { audioBitrate }),
+                ...(audioChannels && { audioChannels }),
+                ...(audioSampleRate && { audioSampleRate }),
+                ...(tags && { tags }),
+                ...(description && { description }),
+                ...(title && { title }),
+                ...(thumbnailUrl && { thumbnailUrl }),
+                ...(customFields && { customFields })
             }
         });
 
-        return NextResponse.json(item);
+        return NextResponse.json(renderItem);
     } catch (error) {
         console.error('Error updating render item:', error);
         return NextResponse.json(
@@ -60,12 +107,11 @@ export async function PATCH(
 // DELETE /api/renders/[id] - Delete a render item
 export async function DELETE(
     req: NextRequest,
-    context: { params: Promise<{ id: string }> }
+    { params }: { params: { id: string } }
 ) {
     try {
-        const { id } = await context.params;
         await prisma.renderItem.delete({
-            where: { id }
+            where: { id: params.id }
         });
 
         return NextResponse.json({ success: true });

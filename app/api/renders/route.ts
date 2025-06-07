@@ -1,26 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
-import { CreateRenderItemDto, UpdateRenderItemDto } from "@/app/types/render";
 
-// GET /api/renders - Get all render items
+// GET /api/renders - List render items with filtering and sorting
 export async function GET(req: NextRequest) {
     try {
         const searchParams = req.nextUrl.searchParams;
+        const type = searchParams.get('type');
+        const topic = searchParams.get('topic');
         const status = searchParams.get('status');
+        const sortBy = searchParams.get('sortBy') || 'createdAt';
+        const sortOrder = searchParams.get('sortOrder') || 'desc';
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '10');
         const skip = (page - 1) * limit;
 
-        const where = status ? { status } : {};
+        // Build the where clause
+        const whereClause: any = {};
         
+        if (type) {
+            whereClause.type = type;
+        }
+        if (topic) {
+            whereClause.topic = topic;
+        }
+        if (status) {
+            whereClause.status = status;
+        }
+
         const [items, total] = await Promise.all([
             prisma.renderItem.findMany({
-                where,
+                where: whereClause,
                 skip,
                 take: limit,
-                orderBy: { createdAt: 'desc' }
+                orderBy: {
+                    [sortBy]: sortOrder
+                }
             }),
-            prisma.renderItem.count({ where })
+            prisma.renderItem.count({
+                where: whereClause
+            })
         ]);
 
         return NextResponse.json({
@@ -30,9 +48,9 @@ export async function GET(req: NextRequest) {
             totalPages: Math.ceil(total / limit)
         });
     } catch (error) {
-        console.error('Error fetching render items:', error);
+        console.error('Error listing render items:', error);
         return NextResponse.json(
-            { error: 'Failed to fetch render items' },
+            { error: 'Failed to list render items' },
             { status: 500 }
         );
     }
@@ -41,11 +59,47 @@ export async function GET(req: NextRequest) {
 // POST /api/renders - Create a new render item
 export async function POST(req: NextRequest) {
     try {
-        const body: CreateRenderItemDto = await req.json();
+        const body = await req.json();
+        const {
+            fileName,
+            nexrenderUid,
+            type,
+            topic,
+            channelName,
+            channelId,
+            templateAeUrl,
+            templateAeComposition,
+            autoRender,
+            autoCreateMetadata,
+            autoUpload,
+            uploadScheduleStart,
+            uploadFromHour,
+            uploadToHour,
+            videosPerDay,
+            jsonContent,
+            mp4Link,
+            youtubeMetadata,
+            status
+        } = body;
+
+        // Validate required fields
+        const requiredFields = [
+            'fileName', 'nexrenderUid', 'type', 'topic', 
+            'channelName', 'channelId', 'templateAeUrl', 
+            'templateAeComposition', 'jsonContent', 'mp4Link'
+        ];
         
+        const missingFields = requiredFields.filter(field => !body[field]);
+        if (missingFields.length > 0) {
+            return NextResponse.json(
+                { error: `Missing required fields: ${missingFields.join(', ')}` },
+                { status: 400 }
+            );
+        }
+
         // Check if fileName already exists
         const existing = await prisma.renderItem.findUnique({
-            where: { fileName: body.fileName }
+            where: { fileName }
         });
 
         if (existing) {
@@ -55,15 +109,31 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const item = await prisma.renderItem.create({
+        const renderItem = await prisma.renderItem.create({
             data: {
-                ...body,
-                status: 'new',
-                jsonContent: body.jsonContent
+                fileName,
+                nexrenderUid,
+                type,
+                topic,
+                channelName,
+                channelId,
+                templateAeUrl,
+                templateAeComposition,
+                autoRender: autoRender || false,
+                autoCreateMetadata: autoCreateMetadata || false,
+                autoUpload: autoUpload || false,
+                uploadScheduleStart,
+                uploadFromHour,
+                uploadToHour,
+                videosPerDay: videosPerDay || 1,
+                jsonContent,
+                mp4Link,
+                youtubeMetadata,
+                status: status || 'new'
             }
         });
 
-        return NextResponse.json(item);
+        return NextResponse.json(renderItem);
     } catch (error) {
         console.error('Error creating render item:', error);
         return NextResponse.json(
