@@ -1,6 +1,6 @@
 # RumitX Studio: AI-Powered Video Automation Suite
 
-**Created by [rumitx](https://github.com/rumitx)**
+**Created by [rumitx](https://github.com/rumitvn)**
 
 ---
 
