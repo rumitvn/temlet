@@ -1,0 +1,303 @@
+{
+	"info": {
+		"_postman_id": "nexrender-manager",
+		"name": "NexRender Manager",
+		"description": "API collection for managing render items and YouTube uploads",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Render Items",
+			"item": [
+				{
+					"name": "List Render Items",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/renders?status=new&page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"renders"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "new",
+									"description": "Filter by status (optional)"
+								},
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number"
+								},
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Items per page"
+								}
+							]
+						},
+						"description": "Get a paginated list of render items with optional status filtering"
+					}
+				},
+				{
+					"name": "Create Render Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"fileName\": \"alligator_1\",\n    \"nexrenderUid\": \"uid123\",\n    \"jsonContent\": {\n        \"template\": \"template1\",\n        \"assets\": []\n    },\n    \"mp4Link\": \"https://example.com/videos/alligator_1.mp4\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/renders",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"renders"
+							]
+						},
+						"description": "Create a new render item"
+					}
+				},
+				{
+					"name": "Get Render Item",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/renders/{{renderItemId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"renders",
+								"{{renderItemId}}"
+							]
+						},
+						"description": "Get a single render item by ID"
+					}
+				},
+				{
+					"name": "Update Render Item",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"processing_metadata\",\n    \"youtubeMetadata\": {\n        \"title\": \"Test Video Title\",\n        \"description\": \"Test video description\",\n        \"tags\": \"test,video,tags\",\n        \"categoryId\": \"27\",\n        \"defaultLanguage\": \"vi\",\n        \"defaultAudioLanguage\": \"vi\",\n        \"scheduleDate\": \"2025-06-08 08:00\"\n    },\n    \"renderTime\": 120,\n    \"metadataTime\": 5,\n    \"uploadTime\": 180,\n    \"youtubeLink\": \"https://youtube.com/watch?v=test123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/renders/{{renderItemId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"renders",
+								"{{renderItemId}}"
+							]
+						},
+						"description": "Update a render item's status, metadata, and timing information"
+					}
+				},
+				{
+					"name": "Delete Render Item",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/renders/{{renderItemId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"renders",
+								"{{renderItemId}}"
+							]
+						},
+						"description": "Delete a render item"
+					}
+				},
+				{
+					"name": "Search Render Items",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/renders/search?q=alligator&page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"renders",
+								"search"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "alligator",
+									"description": "Search query"
+								},
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number"
+								},
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Items per page"
+								}
+							]
+						},
+						"description": "Search render items by file name"
+					}
+				}
+			]
+		},
+		{
+			"name": "YouTube Integration",
+			"item": [
+				{
+					"name": "Generate YouTube Metadata",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"json\": {\n        \"template\": \"template1\",\n        \"assets\": [],\n        \"order\": 1\n    }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/youtube-metadata",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"youtube-metadata"
+							]
+						},
+						"description": "Generate YouTube metadata (title, description, tags) from render JSON"
+					}
+				},
+				{
+					"name": "Upload to YouTube",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "mp4",
+									"type": "file",
+									"src": "/path/to/video.mp4"
+								},
+								{
+									"key": "title",
+									"value": "Test Video Title"
+								},
+								{
+									"key": "description",
+									"value": "Test video description"
+								},
+								{
+									"key": "tags",
+									"value": "test,video,tags"
+								},
+								{
+									"key": "playlistId",
+									"value": ""
+								},
+								{
+									"key": "categoryId",
+									"value": "27"
+								},
+								{
+									"key": "defaultLanguage",
+									"value": "vi"
+								},
+								{
+									"key": "defaultAudioLanguage",
+									"value": "vi"
+								},
+								{
+									"key": "scheduleDate",
+									"value": "2025-06-08 08:00"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/youtube-upload",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"youtube-upload"
+							]
+						},
+						"description": "Upload a video to YouTube with metadata"
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "renderItemId",
+			"value": "your-render-item-id",
+			"type": "string"
+		}
+	]
+} 

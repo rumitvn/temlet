@@ -1,0 +1,31 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model RenderItem {
+  id              String   @id @default(cuid())
+  fileName        String   @unique
+  nexrenderUid    String
+  jsonContent     Json
+  mp4Link         String
+  youtubeMetadata Json?
+  status          String
+  renderTime      Int?
+  metadataTime    Int?
+  uploadTime      Int?
+  youtubeLink     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([fileName])
+  @@index([status])
+  @@index([nexrenderUid])
+} 

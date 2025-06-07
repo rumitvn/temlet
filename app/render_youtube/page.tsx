@@ -3,94 +3,228 @@
 
 import React, { useState } from "react";
 
+interface FilePair {
+    jsonFile: File;
+    mp4File: File;
+    videoData: any;
+    aiResult: { title: string; description: string; tags: string } | null;
+    uploadResult: string | null;
+    status: 'pending' | 'processing' | 'uploading' | 'completed' | 'error';
+}
+
 export default function RenderYouTubePage() {
-    const [jsonFile, setJsonFile] = useState<File | null>(null);
-    const [mp4File, setMp4File] = useState<File | null>(null);
-    const [videoData, setVideoData] = useState<any>(null);
-    const [aiResult, setAiResult] = useState<{ title: string; description: string; tags: string } | null>(null);
+    const [filePairs, setFilePairs] = useState<FilePair[]>([]);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [uploadResult, setUploadResult] = useState<string | null>(null);
 
-    const handleJsonChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setJsonFile(file);
-        file.text().then((text) => setVideoData(JSON.parse(text)));
-    };
+    const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        const jsonFiles = files.filter(f => f.name.endsWith('.json'));
+        const mp4Files = files.filter(f => f.name.endsWith('.mp4'));
 
-    const handleMp4Change = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) setMp4File(file);
-    };
+        const newPairs: FilePair[] = [];
 
-    const handleGenerateMetadata = async () => {
-        if (!videoData) return;
-        setLoading(true);
-        setAiResult(null);
-        const res = await fetch("/api/youtube-metadata", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ json: videoData })
+        jsonFiles.forEach(jsonFile => {
+            const baseName = jsonFile.name.replace('.json', '');
+            const matchingMp4 = mp4Files.find(mp4 => mp4.name === `${baseName}.mp4`);
+
+            if (matchingMp4) {
+                newPairs.push({
+                    jsonFile,
+                    mp4File: matchingMp4,
+                    videoData: null,
+                    aiResult: null,
+                    uploadResult: null,
+                    status: 'pending'
+                });
+            }
         });
-        const data = await res.json();
-        setAiResult(data);
+
+        setFilePairs(prev => [...prev, ...newPairs]);
+
+        // Load JSON data for new pairs
+        newPairs.forEach(async (pair, index) => {
+            const text = await pair.jsonFile.text();
+            const videoData = JSON.parse(text);
+            setFilePairs(prev => {
+                const newPairs = [...prev];
+                newPairs[prev.length - newPairs.length + index].videoData = videoData;
+                return newPairs;
+            });
+        });
+    };
+
+    const handleGenerateMetadata = async (index: number) => {
+        const pair = filePairs[index];
+        if (!pair.videoData) return;
+
+        setFilePairs(prev => {
+            const newPairs = [...prev];
+            newPairs[index].status = 'processing';
+            return newPairs;
+        });
+
+        try {
+            const res = await fetch("/api/youtube-metadata", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ json: pair.videoData })
+            });
+            const data = await res.json();
+            
+            setFilePairs(prev => {
+                const newPairs = [...prev];
+                newPairs[index].aiResult = data;
+                newPairs[index].status = 'pending';
+                return newPairs;
+            });
+        } catch (error) {
+            setFilePairs(prev => {
+                const newPairs = [...prev];
+                newPairs[index].status = 'error';
+                return newPairs;
+            });
+        }
+    };
+
+    const handleUpload = async (index: number) => {
+        const pair = filePairs[index];
+        if (!pair.aiResult) return;
+
+        setFilePairs(prev => {
+            const newPairs = [...prev];
+            newPairs[index].status = 'uploading';
+            return newPairs;
+        });
+
+        try {
+            const form = new FormData();
+            form.append("mp4", pair.mp4File);
+            form.append("title", pair.aiResult.title);
+            form.append("description", pair.aiResult.description);
+            form.append("playlistId", "");
+            form.append("tags", pair.aiResult.tags);
+            form.append("categoryId", "27");
+            form.append("defaultLanguage", "vi");
+            form.append("defaultAudioLanguage", "vi");
+            form.append("scheduleDate", "2025-06-08 08:00");
+
+            const res = await fetch("/api/youtube-upload", {
+                method: "POST",
+                body: form
+            });
+            const data = await res.json();
+            
+            setFilePairs(prev => {
+                const newPairs = [...prev];
+                newPairs[index].uploadResult = data.videoId ? `Uploaded with ID: ${data.videoId}` : "Upload failed";
+                newPairs[index].status = 'completed';
+                return newPairs;
+            });
+        } catch (error) {
+            setFilePairs(prev => {
+                const newPairs = [...prev];
+                newPairs[index].status = 'error';
+                return newPairs;
+            });
+        }
+    };
+
+    const handleGenerateAllMetadata = async () => {
+        setLoading(true);
+        for (let i = 0; i < filePairs.length; i++) {
+            await handleGenerateMetadata(i);
+        }
         setLoading(false);
     };
 
-    const handleUpload = async () => {
-        if (!aiResult || !mp4File) return;
+    const handleUploadAll = async () => {
         setUploading(true);
-        const form = new FormData();
-        form.append("mp4", mp4File);
-        form.append("title", aiResult.title);
-        form.append("description", aiResult.description);
-        form.append("playlistId", "");
-        form.append("tags", aiResult.tags);
-        form.append("categoryId", "27");
-        form.append("defaultLanguage", "vi");
-        form.append("defaultAudioLanguage", "vi");
-        form.append("scheduleDate", "2025-06-08 08:00");
-
-        const res = await fetch("/api/youtube-upload", {
-            method: "POST",
-            body: form
-        });
-        const data = await res.json();
-        setUploadResult(data.videoId ? `Uploaded with ID: ${data.videoId}` : "Upload failed");
+        for (let i = 0; i < filePairs.length; i++) {
+            if (filePairs[i].aiResult) {
+                await handleUpload(i);
+            }
+        }
         setUploading(false);
     };
 
     return (
-        <div style={{ padding: 20, maxWidth: 600 }}>
-            <h1>🎬 Upload One Quiz Video</h1>
+        <div style={{ padding: 20, maxWidth: 800 }}>
+            <h1>🎬 Upload Multiple Quiz Videos</h1>
 
             <div style={{ marginBottom: 20 }}>
-                <label>📄 JSON File:</label>
-                <input type="file" accept=".json" onChange={handleJsonChange} />
+                <label>📄 Select JSON and MP4 Files:</label>
+                <input 
+                    type="file" 
+                    accept=".json,.mp4" 
+                    onChange={handleFilesChange}
+                    multiple 
+                />
             </div>
 
-            <div style={{ marginBottom: 20 }}>
-                <label>🎥 MP4 File:</label>
-                <input type="file" accept=".mp4" onChange={handleMp4Change} />
-            </div>
-
-            <button style={styles.button} onClick={handleGenerateMetadata} disabled={!jsonFile || loading}>
-                {loading ? "Generating..." : "Generate Title & Description & Tags"}
-            </button>
-
-            {aiResult && (
-                <div style={{ marginTop: 20 }}>
-                    <h3>📝 AI Result:</h3>
-                    <p><strong>Title:</strong> {aiResult.title}</p>
-                    <p><strong>Description:</strong><br />{aiResult.description}</p>
-                    <p><strong>Tag:</strong><br />{aiResult.tags}</p>
-                    <button onClick={handleGenerateMetadata} style={{ marginRight: 10 }}>🔁 Retry</button>
-                    <button style={styles.button} onClick={handleUpload} disabled={uploading}>📤 Upload to YouTube</button>
+            {filePairs.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                    <button 
+                        style={styles.button} 
+                        onClick={handleGenerateAllMetadata} 
+                        disabled={loading}
+                    >
+                        {loading ? "Generating All..." : "Generate All Metadata"}
+                    </button>
+                    <button 
+                        style={styles.button} 
+                        onClick={handleUploadAll} 
+                        disabled={uploading}
+                    >
+                        {uploading ? "Uploading All..." : "Upload All to YouTube"}
+                    </button>
                 </div>
             )}
 
-            {uploadResult && <p style={{ marginTop: 20, color: 'green' }}>{uploadResult}</p>}
+            {filePairs.map((pair, index) => (
+                <div key={index} style={styles.filePair}>
+                    <h3>File Pair {index + 1}</h3>
+                    <p>JSON: {pair.jsonFile.name}</p>
+                    <p>MP4: {pair.mp4File.name}</p>
+                    <p>Status: {pair.status}</p>
+
+                    {pair.videoData && !pair.aiResult && (
+                        <button 
+                            style={styles.button} 
+                            onClick={() => handleGenerateMetadata(index)} 
+                            disabled={pair.status === 'processing'}
+                        >
+                            {pair.status === 'processing' ? "Generating..." : "Generate Metadata"}
+                        </button>
+                    )}
+
+                    {pair.aiResult && (
+                        <div>
+                            <h4>📝 AI Result:</h4>
+                            <p><strong>Title:</strong> {pair.aiResult.title}</p>
+                            <p><strong>Description:</strong><br />{pair.aiResult.description}</p>
+                            <p><strong>Tags:</strong><br />{pair.aiResult.tags}</p>
+                            <button 
+                                onClick={() => handleGenerateMetadata(index)} 
+                                style={{ marginRight: 10 }}
+                            >
+                                🔁 Retry
+                            </button>
+                            <button 
+                                style={styles.button} 
+                                onClick={() => handleUpload(index)} 
+                                disabled={pair.status === 'uploading'}
+                            >
+                                📤 Upload to YouTube
+                            </button>
+                        </div>
+                    )}
+
+                    {pair.uploadResult && (
+                        <p style={{ color: 'green' }}>{pair.uploadResult}</p>
+                    )}
+                </div>
+            ))}
         </div>
     );
 }
@@ -123,21 +257,13 @@ const styles = {
         backgroundColor: "#007bff",
         color: "#fff",
         fontWeight: 500,
+        marginRight: "10px",
     },
-    table: {
-        width: "100%",
-        borderCollapse: "collapse" as const,
-    },
-    th: {
-        border: "1px solid #fff",
-        padding: "8px",
-        backgroundColor: "#222",
-        color: "#fff",
-        textAlign: "left" as const,
-    },
-    td: {
+    filePair: {
         border: "1px solid #ccc",
-        padding: "8px",
+        padding: "20px",
+        marginBottom: "20px",
+        borderRadius: "4px",
     },
 };
 
