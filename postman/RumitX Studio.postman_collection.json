@@ -1,9 +1,10 @@
 {
 	"info": {
-		"_postman_id": "nexrender-manager",
-		"name": "NexRender Manager",
+		"_postman_id": "d5b14a2d-b247-406b-9f5b-e8da12dbb53b",
+		"name": "RumitX Studio",
 		"description": "API collection for managing render items and YouTube uploads",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "4563140"
 	},
 	"item": [
 		{
@@ -15,7 +16,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/renders?type=video&topic=animals&status=new&sortBy=createdAt&sortOrder=desc&page=1&limit=10",
+							"raw": "{{baseUrl}}/api/renders?type=video&topic=animals&sortBy=createdAt&sortOrder=desc&page=1&limit=10",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -37,7 +38,8 @@
 								{
 									"key": "status",
 									"value": "new",
-									"description": "Filter by status (optional)"
+									"description": "Filter by status (optional)",
+									"disabled": true
 								},
 								{
 									"key": "sortBy",
@@ -62,7 +64,8 @@
 							]
 						},
 						"description": "Get a paginated list of render items with filtering and sorting options"
-					}
+					},
+					"response": []
 				},
 				{
 					"name": "Create Render Item",
@@ -76,7 +79,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"fileName\": \"alligator_1\",\n    \"type\": \"video\",\n    \"topic\": \"animals\",\n    \"status\": \"new\",\n    \"metadata\": {\n        \"template\": \"template1\",\n        \"assets\": []\n    },\n    \"outputPath\": \"/path/to/output.mp4\",\n    \"youtubeUrl\": null,\n    \"error\": null,\n    \"processingTime\": null,\n    \"tags\": [\"animals\", \"alligator\"],\n    \"description\": \"Video description\",\n    \"title\": \"Video title\",\n    \"thumbnailUrl\": null,\n    \"customFields\": {\n        \"customKey\": \"customValue\"\n    }\n}"
+							"raw": "{\n  \"fileName\": \"alligator_1\",\n  \"nexrenderUid\": \"uid123\",\n  \"type\": \"video\",\n  \"topic\": \"animals\",\n  \"channelName\": \"My Channel\",\n  \"channelId\": \"channel_abc\",\n  \"templateAeUrl\": \"https://example.com/template.aep\",\n  \"templateAeComposition\": \"mainComp\",\n  \"autoRender\": true,\n  \"autoCreateMetadata\": false,\n  \"autoUpload\": false,\n  \"uploadScheduleStart\": null,\n  \"uploadFromHour\": null,\n  \"uploadToHour\": null,\n  \"videosPerDay\": 1,\n  \"jsonContent\": {\n    \"template\": \"template1\",\n    \"assets\": []\n  },\n  \"mp4Link\": \"https://example.com/videos/alligator_1.mp4\",\n  \"youtubeMetadata\": null,\n  \"status\": \"new\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/renders",
@@ -89,7 +92,8 @@
 							]
 						},
 						"description": "Create a new render item with all available fields"
-					}
+					},
+					"response": []
 				},
 				{
 					"name": "Get Render Item",
@@ -108,7 +112,8 @@
 							]
 						},
 						"description": "Get a single render item by ID with all its fields"
-					}
+					},
+					"response": []
 				},
 				{
 					"name": "Update Render Item",
@@ -122,7 +127,12 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"status\": \"processing\",\n    \"processingTime\": 120,\n    \"youtubeUrl\": \"https://youtube.com/watch?v=test123\",\n    \"error\": null,\n    \"tags\": [\"animals\", \"alligator\"],\n    \"description\": \"Updated description\",\n    \"title\": \"Updated title\",\n    \"thumbnailUrl\": \"https://example.com/thumbnail.jpg\",\n    \"customFields\": {\n        \"updatedKey\": \"updatedValue\"\n    }\n}"
+							"raw": "{\n    \"status\": \"processing\",\n    \"renderTime\": 120,\n    \"youtubeLink\": \"https://youtube.com/watch?v=test123\",\n    \"youtubeMetadata\": {\n        \"title\": \"Updated title\",\n        \"description\": \"Updated description\",\n        \"tags\": [\"animals\", \"alligator\"]\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/renders/{{renderItemId}}",
@@ -136,7 +146,8 @@
 							]
 						},
 						"description": "Update a render item's fields (partial update supported)"
-					}
+					},
+					"response": []
 				},
 				{
 					"name": "Delete Render Item",
@@ -155,7 +166,8 @@
 							]
 						},
 						"description": "Delete a render item"
-					}
+					},
+					"response": []
 				},
 				{
 					"name": "Search Render Items",
@@ -201,7 +213,8 @@
 							]
 						},
 						"description": "Search render items by file name with optional type and topic filtering"
-					}
+					},
+					"response": []
 				}
 			]
 		},
@@ -233,7 +246,8 @@
 							]
 						},
 						"description": "Generate YouTube metadata (title, description, tags) from render JSON"
-					}
+					},
+					"response": []
 				},
 				{
 					"name": "Upload to YouTube",
@@ -293,7 +307,8 @@
 							]
 						},
 						"description": "Upload a video to YouTube with metadata"
-					}
+					},
+					"response": []
 				}
 			]
 		}
