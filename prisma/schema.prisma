@@ -43,4 +43,15 @@ model RenderItem {
   @@index([nexrenderUid])
   @@index([type])
   @@index([topic])
+}
+
+model Template {
+  id        String   @id @default(cuid())
+  name      String
+  path      String
+  type      String   // builtin or custom
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
 } 

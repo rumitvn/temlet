@@ -84,9 +84,9 @@ export async function POST(req: NextRequest) {
 
         // Validate required fields
         const requiredFields = [
-            'fileName', 'nexrenderUid', 'type', 'topic', 
+            'fileName', 'type', 'topic', 
             'channelName', 'channelId', 'templateAeUrl', 
-            'templateAeComposition', 'jsonContent', 'mp4Link'
+            'templateAeComposition', 'jsonContent'
         ];
         
         const missingFields = requiredFields.filter(field => !body[field]);
@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
         const renderItem = await prisma.renderItem.create({
             data: {
                 fileName,
-                nexrenderUid,
+                nexrenderUid: nexrenderUid || '', // Default to empty string if not provided
                 type,
                 topic,
                 channelName,
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
                 uploadToHour,
                 videosPerDay: videosPerDay || 1,
                 jsonContent,
-                mp4Link,
+                mp4Link: mp4Link || '', // Default to empty string if not provided
                 youtubeMetadata,
                 status: status || 'new'
             }

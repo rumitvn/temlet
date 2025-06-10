@@ -9,6 +9,7 @@ import {
   ChevronUpIcon,
   ChevronDownIcon
 } from "@heroicons/react/24/outline";
+import CreateRenderDialog from './components/CreateRenderDialog';
 
 // Custom debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -101,6 +102,8 @@ export default function Page() {
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [templates, setTemplates] = useState<{ id: string; name: string; path: string }[]>([]);
 
   const getActiveFiltersCount = () => {
     let count = 0;
@@ -162,8 +165,22 @@ export default function Page() {
     }
   };
 
+  const fetchTemplates = async () => {
+    try {
+      const response = await fetch('/api/templates');
+      if (!response.ok) {
+        throw new Error('Failed to fetch templates');
+      }
+      const data = await response.json();
+      setTemplates(data);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+    }
+  };
+
   useEffect(() => {
     fetchItems();
+    fetchTemplates();
   }, [currentPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, sortBy, sortOrder]);
 
   const clearFilters = () => {
@@ -175,6 +192,45 @@ export default function Page() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
+  };
+
+  const handleCreateRender = async (data: any) => {
+    try {
+      const response = await fetch('/api/renders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        // Handle API errors (400, 500, etc.)
+        throw {
+          type: 'api',
+          message: responseData.error || 'Failed to create render item',
+          status: response.status,
+          details: responseData
+        };
+      }
+
+      // Refresh the list
+      fetchItems();
+      return true; // Indicate success
+    } catch (error: any) {
+      console.error('Error creating render item:', error);
+      // If it's not our structured error, wrap it
+      if (!error?.type) {
+        throw {
+          type: 'network',
+          message: 'Network error occurred. Please try again.',
+          originalError: error
+        };
+      }
+      throw error; // Propagate the structured error
+    }
   };
 
   return (
@@ -218,10 +274,12 @@ export default function Page() {
           </motion.div>
         </div>
 
+        {/* New Render Button */}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
+          onClick={() => setIsCreateDialogOpen(true)}
         >
           <PlusIcon className="w-5 h-5" />
           <span>New Render</span>
@@ -501,6 +559,18 @@ export default function Page() {
           </motion.button>
         ))}
       </motion.div>
+
+      {/* Create Render Dialog */}
+      <CreateRenderDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        channels={channels.map(name => ({ id: name, name }))}
+        topics={topics}
+        types={types}
+        templates={templates}
+        onSave={handleCreateRender}
+        onTemplatesChange={fetchTemplates}
+      />
     </div>
   );
 }

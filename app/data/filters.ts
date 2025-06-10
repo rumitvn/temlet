@@ -14,6 +14,7 @@ export const topics = [
 ] as const;
 
 export const channels = [
+  "MiniMate",
   "RumitX Studio",
   "RumitX Shorts",
   "RumitX Nature",
