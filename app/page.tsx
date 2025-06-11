@@ -152,7 +152,8 @@ export default function Page() {
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [templates, setTemplates] = useState<{ id: string; name: string; path: string }[]>([]);
+  const [templates, setTemplates] = useState<{ id: string; path: string }[]>([]);
+  const [outputFolders, setOutputFolders] = useState<{ id: string; path: string }[]>([]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [statusCounts, setStatusCounts] = useState<Partial<Record<RenderStatus, number>>>({});
@@ -175,7 +176,45 @@ export default function Page() {
     }
   };
 
-  const fetchItems = async () => {
+  const fetchStatusCounts = useCallback(async () => {
+    try {
+      setLoadingCounts(true);
+      const response = await fetch('/api/renders/status-counts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch status counts');
+      }
+      const data = await response.json();
+      setStatusCounts(data);
+    } catch (error) {
+      console.error('Error fetching status counts:', error);
+    } finally {
+      setLoadingCounts(false);
+    }
+  }, []);
+
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const response = await fetch('/api/templates');
+      if (!response.ok) throw new Error('Failed to fetch templates');
+      const data = await response.json();
+      setTemplates(data);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+    }
+  }, []);
+
+  const fetchOutputFolders = useCallback(async () => {
+    try {
+      const response = await fetch('/api/output-folders');
+      if (!response.ok) throw new Error('Failed to fetch output folders');
+      const data = await response.json();
+      setOutputFolders(data);
+    } catch (error) {
+      console.error('Error fetching output folders:', error);
+    }
+  }, []);
+
+  const fetchItems = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -217,42 +256,25 @@ export default function Page() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, selectedStatus, sortBy, sortOrder]);
 
-  const fetchTemplates = async () => {
-    try {
-      const response = await fetch('/api/templates');
-      if (!response.ok) {
-        throw new Error('Failed to fetch templates');
-      }
-      const data = await response.json();
-      setTemplates(data);
-    } catch (error) {
-      console.error('Error fetching templates:', error);
-    }
-  };
+  // Initial data fetch
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      await Promise.all([
+        fetchItems(),
+        fetchStatusCounts(),
+        fetchTemplates(),
+        fetchOutputFolders()
+      ]);
+    };
+    fetchInitialData();
+  }, [fetchItems, fetchStatusCounts, fetchTemplates, fetchOutputFolders]);
 
-  const fetchStatusCounts = async () => {
-    try {
-      setLoadingCounts(true);
-      const response = await fetch('/api/renders/status-counts');
-      if (!response.ok) {
-        throw new Error('Failed to fetch status counts');
-      }
-      const data = await response.json();
-      setStatusCounts(data);
-    } catch (error) {
-      console.error('Error fetching status counts:', error);
-    } finally {
-      setLoadingCounts(false);
-    }
-  };
-
+  // Effect for refreshing data when filters change
   useEffect(() => {
     fetchItems();
-    fetchTemplates();
-    fetchStatusCounts();
-  }, [currentPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, sortBy, sortOrder, selectedStatus]);
+  }, [fetchItems]);
 
   const clearFilters = () => {
     setSelectedType(null);
@@ -881,8 +903,10 @@ export default function Page() {
         topics={topics}
         types={types}
         templates={templates}
+        outputFolders={outputFolders}
         onSave={handleCreateRender}
         onTemplatesChange={fetchTemplates}
+        onOutputFoldersChange={fetchOutputFolders}
       />
     </div>
   );

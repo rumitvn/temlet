@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
             channelId,
             templateAeUrl,
             templateAeComposition,
+            renderOutputFolder,
             autoRender,
             autoCreateMetadata,
             autoUpload,
@@ -86,7 +87,8 @@ export async function POST(req: NextRequest) {
         const requiredFields = [
             'fileName', 'type', 'topic', 
             'channelName', 'channelId', 'templateAeUrl', 
-            'templateAeComposition', 'jsonContent'
+            'templateAeComposition', 'renderOutputFolder',
+            'jsonContent'
         ];
         
         const missingFields = requiredFields.filter(field => !body[field]);
@@ -119,6 +121,7 @@ export async function POST(req: NextRequest) {
                 channelId,
                 templateAeUrl,
                 templateAeComposition,
+                renderOutputFolder,
                 autoRender: autoRender || false,
                 autoCreateMetadata: autoCreateMetadata || false,
                 autoUpload: autoUpload || false,

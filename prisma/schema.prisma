@@ -20,6 +20,7 @@ model RenderItem {
   channelId             String
   templateAeUrl         String
   templateAeComposition String
+  renderOutputFolder    String?
   autoRender            Boolean  @default(false)
   autoCreateMetadata    Boolean  @default(false)
   autoUpload            Boolean  @default(false)
@@ -46,6 +47,17 @@ model RenderItem {
 }
 
 model Template {
+  id        String   @id @default(cuid())
+  name      String
+  path      String
+  type      String   // builtin or custom
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+}
+
+model OutputFolder {
   id        String   @id @default(cuid())
   name      String
   path      String
