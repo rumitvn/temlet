@@ -153,7 +153,6 @@ export default function Page() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; path: string }[]>([]);
-  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [statusCounts, setStatusCounts] = useState<Partial<Record<RenderStatus, number>>>({});
@@ -192,7 +191,7 @@ export default function Page() {
         if (selectedType) params.append("type", selectedType);
         if (selectedTopic) params.append("topic", selectedTopic);
         if (selectedChannel) params.append("channelName", selectedChannel);
-        
+        if (selectedStatus) params.append("status", selectedStatus);
         const res = await fetch(`/api/renders/search?${params.toString()}`);
         const data = await res.json();
         setItems(data.items);
@@ -201,10 +200,11 @@ export default function Page() {
       }
 
       // If no search query but we have filters, use the main endpoint with filters
-      if (selectedType || selectedTopic || selectedChannel) {
+      if (selectedType || selectedTopic || selectedChannel || selectedStatus) {
         if (selectedType) params.append("type", selectedType);
         if (selectedTopic) params.append("topic", selectedTopic);
         if (selectedChannel) params.append("channelName", selectedChannel);
+        if (selectedStatus) params.append("status", selectedStatus);
       }
 
       // Use the main endpoint
@@ -252,7 +252,7 @@ export default function Page() {
     fetchItems();
     fetchTemplates();
     fetchStatusCounts();
-  }, [currentPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, sortBy, sortOrder]);
+  }, [currentPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, sortBy, sortOrder, selectedStatus]);
 
   const clearFilters = () => {
     setSelectedType(null);
@@ -308,25 +308,26 @@ export default function Page() {
     setSelectedStatus(selectedStatus === status ? null : status);
   };
 
-  const handleSelectionModeToggle = () => {
-    setSelectionMode(!selectionMode);
-    if (!selectionMode) {
-      setSelectedItems([]);
+  const handleItemSelect = (itemId: string, event: React.MouseEvent) => {
+    // Don't select if clicking on a button or link
+    if ((event.target as HTMLElement).closest('button, a')) {
+      return;
     }
-  };
 
-  const handleItemSelect = (itemId: string) => {
-    if (selectionMode) {
-      setSelectedItems(prev => 
-        prev.includes(itemId) 
-          ? prev.filter(id => id !== itemId)
-          : [...prev, itemId]
-      );
-    }
+    setSelectedItems(prev => 
+      prev.includes(itemId) 
+        ? prev.filter(id => id !== itemId)
+        : [...prev, itemId]
+    );
   };
 
   const handleDeleteSelected = async () => {
     if (selectedItems.length === 0) return;
+    
+    // Add confirmation dialog
+    if (!confirm(`Are you sure you want to delete ${selectedItems.length} item(s)?`)) {
+      return;
+    }
     
     try {
       const response = await fetch('/api/renders/batch', {
@@ -342,15 +343,26 @@ export default function Page() {
       }
 
       setSelectedItems([]);
-      setSelectionMode(false);
       await Promise.all([fetchItems(), fetchStatusCounts()]);
     } catch (error) {
       console.error('Error deleting items:', error);
+      alert('Failed to delete items. Please try again.');
     }
   };
 
   const handleActionClick = async (action: string) => {
     if (selectedItems.length === 0) return;
+
+    // Add confirmation dialog
+    const actionMap = {
+      render: 'render',
+      metadata: 'create metadata for',
+      upload: 'upload'
+    };
+    
+    if (!confirm(`Are you sure you want to ${actionMap[action as keyof typeof actionMap]} ${selectedItems.length} item(s)?`)) {
+      return;
+    }
 
     try {
       const response = await fetch('/api/renders/batch', {
@@ -369,21 +381,30 @@ export default function Page() {
       }
 
       setSelectedItems([]);
-      setSelectionMode(false);
       await Promise.all([fetchItems(), fetchStatusCounts()]);
     } catch (error) {
       console.error(`Error performing ${action}:`, error);
-      alert(`Action ${action} will be implemented later`);
+      alert(`Failed to ${action} items. Please try again.`);
     }
+  };
+
+  const handleSelectAll = () => {
+    if (!items) return;
+    setSelectedItems(items.map(item => item.id));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedItems([]);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
-      {/* Header */}
+      {/* Header - Sticky */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex justify-between items-center mb-8"
+        className="flex justify-between items-center mb-8 h-24 sticky top-0 z-40 bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-95 backdrop-blur"
+        style={{ backdropFilter: 'blur(8px)' }}
       >
         <div>
           <motion.h1
@@ -430,69 +451,71 @@ export default function Page() {
         </motion.button>
       </motion.div>
 
-      {/* Status Counts Bar */}
+      {/* Status Counts Bar (not sticky) */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="mb-6"
       >
-        {loadingCounts ? (
-          <div className="text-gray-400 text-center">Loading status counts...</div>
-        ) : (
-          <div className="flex flex-col lg:flex-row gap-4">
-            {Object.entries(statusGroups).map(([groupKey, group]) => (
-              <div key={groupKey} className="flex-1 bg-gray-800/50 rounded-xl p-3 mb-4 lg:mb-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <group.icon className="w-6 h-6 text-purple-400" />
-                  <h3 className="text-2xl font-bold text-gray-200">{group.title}</h3>
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  {group.statuses.map((status) => {
-                    const Icon = getStatusIcon(status);
-                    const count = statusCounts[status] || 0;
-                    return (
-                      <motion.button
-                        key={status}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => handleStatusClick(status)}
-                        className={`flex items-center justify-between p-2 rounded-lg text-lg font-medium transition-all ${
-                          statusColors[status]
-                        } ${selectedStatus === status ? 'ring-2 ring-white' : ''}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Icon className="w-5 h-5" />
-                          <span>{status.replace(/_/g, ' ')}</span>
-                        </div>
-                        <span className="text-2xl font-extrabold">{count}</span>
-                      </motion.button>
-                    );
-                  })}
-                </div>
+        <div className="flex flex-col lg:flex-row gap-4">
+          {Object.entries(statusGroups).map(([groupKey, group]) => (
+            <div key={groupKey} className="flex-1 bg-gray-800/50 rounded-xl p-3 mb-4 lg:mb-0">
+              <div className="flex items-center gap-2 mb-2">
+                <group.icon className="w-6 h-6 text-purple-400" />
+                <h3 className="text-2xl font-bold text-gray-200 flex items-center">
+                  {group.title}
+                  {loadingCounts && (
+                    <svg className="animate-spin ml-2 h-4 w-4 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                    </svg>
+                  )}
+                </h3>
+                {/* Clear Status Filter Button */}
+                {selectedStatus && (
+                  <button
+                    onClick={() => setSelectedStatus(null)}
+                    className="ml-4 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded text-gray-200"
+                  >
+                    Clear Status Filter
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
-        )}
+              <div className="grid grid-cols-1 gap-2">
+                {group.statuses.map((status) => {
+                  const Icon = getStatusIcon(status);
+                  const count = statusCounts[status] || 0;
+                  return (
+                    <motion.button
+                      key={status}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleStatusClick(status)}
+                      className={`flex items-center justify-between p-2 rounded-lg text-lg font-medium transition-all ${
+                        statusColors[status]
+                      } ${selectedStatus === status ? 'ring-2 ring-white' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Icon className="w-5 h-5" />
+                        <span>{status.replace(/_/g, ' ')}</span>
+                      </div>
+                      <span className="text-2xl font-extrabold">{count}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </motion.div>
 
-      {/* Action Bar */}
+      {/* Action Bar (remove Create New button) */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex justify-end gap-2 mb-6"
       >
-        <button
-          onClick={handleSelectionModeToggle}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            selectionMode 
-              ? 'bg-purple-600 text-white' 
-              : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-          }`}
-        >
-          Selection Mode
-        </button>
-        
-        {selectionMode && selectedItems.length > 0 && (
+        {selectedItems.length > 0 && (
           <>
             <button
               onClick={handleDeleteSelected}
@@ -634,7 +657,7 @@ export default function Page() {
                     {types && types.map((type) => (
                       <button
                         key={type}
-                        onClick={() => setSelectedType(selectedType === type ? null : type)}
+                        onClick={(e) => setSelectedType(selectedType === type ? null : type)}
                         className={`px-3 py-1 rounded-full text-sm transition-colors ${
                           selectedType === type
                             ? "bg-purple-600 text-white"
@@ -656,7 +679,7 @@ export default function Page() {
                     {topics && topics.map((topic) => (
                       <button
                         key={topic}
-                        onClick={() => setSelectedTopic(selectedTopic === topic ? null : topic)}
+                        onClick={(e) => setSelectedTopic(selectedTopic === topic ? null : topic)}
                         className={`px-3 py-1 rounded-full text-sm transition-colors ${
                           selectedTopic === topic
                             ? "bg-purple-600 text-white"
@@ -678,7 +701,7 @@ export default function Page() {
                     {channels && channels.map((channel) => (
                       <button
                         key={channel}
-                        onClick={() => setSelectedChannel(selectedChannel === channel ? null : channel)}
+                        onClick={(e) => setSelectedChannel(selectedChannel === channel ? null : channel)}
                         className={`px-3 py-1 rounded-full text-sm transition-colors ${
                           selectedChannel === channel
                             ? "bg-purple-600 text-white"
@@ -696,23 +719,23 @@ export default function Page() {
         </AnimatePresence>
       </motion.div>
 
+      {/* Main Content Area - No fixed height, scrolls with page */}
       {/* Render List */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+        layout
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
       >
         {items && items.map((item) => (
           <motion.div
             key={item.id}
+            layout
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            onClick={() => handleItemSelect(item.id)}
+            exit={{ opacity: 0, y: -20 }}
             className={`bg-gray-800 rounded-lg p-6 space-y-4 cursor-pointer transition-all ${
-              selectionMode && selectedItems.includes(item.id) 
-                ? 'ring-2 ring-purple-500' 
-                : ''
+              selectedItems.includes(item.id) ? 'ring-2 ring-blue-500' : ''
             }`}
+            onClick={(e) => handleItemSelect(item.id, e)}
           >
             {/* Row 1: Type, Channel, Created */}
             <div className="flex justify-between items-center">
@@ -782,7 +805,7 @@ export default function Page() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex justify-center gap-2 mt-6"
+        className="flex justify-center gap-2 mt-6 mb-6"
       >
         {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
           <motion.button
@@ -800,6 +823,55 @@ export default function Page() {
           </motion.button>
         ))}
       </motion.div>
+
+      {/* Selection Mode Toolbar - Fixed at bottom */}
+      {selectedItems.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-4 flex justify-between items-center z-50">
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-400">
+              {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} selected
+            </span>
+            <button
+              onClick={handleSelectAll}
+              className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              Select All
+            </button>
+            <button
+              onClick={handleDeselectAll}
+              className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              Deselect All
+            </button>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => handleActionClick('render')}
+              className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-500 rounded"
+            >
+              Render
+            </button>
+            <button
+              onClick={() => handleActionClick('metadata')}
+              className="px-3 py-1 text-sm bg-purple-600 hover:bg-purple-500 rounded"
+            >
+              Metadata
+            </button>
+            <button
+              onClick={() => handleActionClick('upload')}
+              className="px-3 py-1 text-sm bg-green-600 hover:bg-green-500 rounded"
+            >
+              Upload
+            </button>
+            <button
+              onClick={handleDeleteSelected}
+              className="px-3 py-1 text-sm bg-red-600 hover:bg-red-500 rounded"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Create Render Dialog */}
       <CreateRenderDialog
