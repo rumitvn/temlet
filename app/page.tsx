@@ -9,7 +9,17 @@ import {
   ChevronUpIcon,
   ChevronDownIcon
 } from "@heroicons/react/24/outline";
+import { 
+  ClockIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  DocumentTextIcon,
+  ArrowUpTrayIcon,
+  ShieldCheckIcon
+} from "@heroicons/react/24/solid";
 import CreateRenderDialog from './components/CreateRenderDialog';
+import { RenderStatus } from './types/render';
 
 // Custom debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -82,10 +92,49 @@ interface RenderItem {
 
 const statusColors = {
   new: "bg-blue-500/20 text-blue-400",
-  processing: "bg-yellow-500/20 text-yellow-400",
-  completed: "bg-green-500/20 text-green-400",
-  failed: "bg-red-500/20 text-red-400",
-  uploaded: "bg-purple-500/20 text-purple-400"
+  pending_render: "bg-orange-500/20 text-orange-400",
+  rendering: "bg-yellow-500/20 text-yellow-400",
+  rendered: "bg-green-500/20 text-green-400",
+  pending_metadata: "bg-purple-500/20 text-purple-400",
+  processing_metadata: "bg-indigo-500/20 text-indigo-400",
+  processed_metadata: "bg-violet-500/20 text-violet-400",
+  pending_upload: "bg-pink-500/20 text-pink-400",
+  processing_upload: "bg-rose-500/20 text-rose-400",
+  uploaded: "bg-emerald-500/20 text-emerald-400",
+  declined: "bg-red-500/20 text-red-400",
+  approved: "bg-teal-500/20 text-teal-400"
+};
+
+const statusGroups = {
+  render: {
+    title: "Render",
+    icon: DocumentTextIcon,
+    statuses: ['new', 'pending_render', 'rendering', 'rendered'] as RenderStatus[]
+  },
+  metadata: {
+    title: "Metadata",
+    icon: ArrowPathIcon,
+    statuses: ['pending_metadata', 'processing_metadata', 'processed_metadata'] as RenderStatus[]
+  },
+  upload: {
+    title: "Upload",
+    icon: ArrowUpTrayIcon,
+    statuses: ['pending_upload', 'processing_upload', 'uploaded'] as RenderStatus[]
+  },
+  owner: {
+    title: "Owner",
+    icon: ShieldCheckIcon,
+    statuses: ['declined', 'approved'] as RenderStatus[]
+  }
+};
+
+const getStatusIcon = (status: RenderStatus) => {
+  if (status.includes('pending')) return ClockIcon;
+  if (status.includes('ing')) return ArrowPathIcon;
+  if (status.includes('ed')) return CheckCircleIcon;
+  if (status === 'declined') return XCircleIcon;
+  if (status === 'approved') return CheckCircleIcon;
+  return ClockIcon;
 };
 
 export default function Page() {
@@ -104,6 +153,11 @@ export default function Page() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; path: string }[]>([]);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [statusCounts, setStatusCounts] = useState<Partial<Record<RenderStatus, number>>>({});
+  const [loadingCounts, setLoadingCounts] = useState(true);
 
   const getActiveFiltersCount = () => {
     let count = 0;
@@ -178,9 +232,26 @@ export default function Page() {
     }
   };
 
+  const fetchStatusCounts = async () => {
+    try {
+      setLoadingCounts(true);
+      const response = await fetch('/api/renders/status-counts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch status counts');
+      }
+      const data = await response.json();
+      setStatusCounts(data);
+    } catch (error) {
+      console.error('Error fetching status counts:', error);
+    } finally {
+      setLoadingCounts(false);
+    }
+  };
+
   useEffect(() => {
     fetchItems();
     fetchTemplates();
+    fetchStatusCounts();
   }, [currentPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, sortBy, sortOrder]);
 
   const clearFilters = () => {
@@ -230,6 +301,79 @@ export default function Page() {
         };
       }
       throw error; // Propagate the structured error
+    }
+  };
+
+  const handleStatusClick = (status: string) => {
+    setSelectedStatus(selectedStatus === status ? null : status);
+  };
+
+  const handleSelectionModeToggle = () => {
+    setSelectionMode(!selectionMode);
+    if (!selectionMode) {
+      setSelectedItems([]);
+    }
+  };
+
+  const handleItemSelect = (itemId: string) => {
+    if (selectionMode) {
+      setSelectedItems(prev => 
+        prev.includes(itemId) 
+          ? prev.filter(id => id !== itemId)
+          : [...prev, itemId]
+      );
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedItems.length === 0) return;
+    
+    try {
+      const response = await fetch('/api/renders/batch', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ids: selectedItems }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete items');
+      }
+
+      setSelectedItems([]);
+      setSelectionMode(false);
+      await Promise.all([fetchItems(), fetchStatusCounts()]);
+    } catch (error) {
+      console.error('Error deleting items:', error);
+    }
+  };
+
+  const handleActionClick = async (action: string) => {
+    if (selectedItems.length === 0) return;
+
+    try {
+      const response = await fetch('/api/renders/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          ids: selectedItems,
+          action 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to ${action} items`);
+      }
+
+      setSelectedItems([]);
+      setSelectionMode(false);
+      await Promise.all([fetchItems(), fetchStatusCounts()]);
+    } catch (error) {
+      console.error(`Error performing ${action}:`, error);
+      alert(`Action ${action} will be implemented later`);
     }
   };
 
@@ -284,6 +428,98 @@ export default function Page() {
           <PlusIcon className="w-5 h-5" />
           <span>New Render</span>
         </motion.button>
+      </motion.div>
+
+      {/* Status Counts Bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6"
+      >
+        {loadingCounts ? (
+          <div className="text-gray-400 text-center">Loading status counts...</div>
+        ) : (
+          <div className="flex flex-col lg:flex-row gap-4">
+            {Object.entries(statusGroups).map(([groupKey, group]) => (
+              <div key={groupKey} className="flex-1 bg-gray-800/50 rounded-xl p-3 mb-4 lg:mb-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <group.icon className="w-6 h-6 text-purple-400" />
+                  <h3 className="text-2xl font-bold text-gray-200">{group.title}</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {group.statuses.map((status) => {
+                    const Icon = getStatusIcon(status);
+                    const count = statusCounts[status] || 0;
+                    return (
+                      <motion.button
+                        key={status}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => handleStatusClick(status)}
+                        className={`flex items-center justify-between p-2 rounded-lg text-lg font-medium transition-all ${
+                          statusColors[status]
+                        } ${selectedStatus === status ? 'ring-2 ring-white' : ''}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Icon className="w-5 h-5" />
+                          <span>{status.replace(/_/g, ' ')}</span>
+                        </div>
+                        <span className="text-2xl font-extrabold">{count}</span>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Action Bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-end gap-2 mb-6"
+      >
+        <button
+          onClick={handleSelectionModeToggle}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            selectionMode 
+              ? 'bg-purple-600 text-white' 
+              : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+          }`}
+        >
+          Selection Mode
+        </button>
+        
+        {selectionMode && selectedItems.length > 0 && (
+          <>
+            <button
+              onClick={handleDeleteSelected}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+            >
+              Delete ({selectedItems.length})
+            </button>
+            <button
+              onClick={() => handleActionClick('render')}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            >
+              Render ({selectedItems.length})
+            </button>
+            <button
+              onClick={() => handleActionClick('metadata')}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+            >
+              Metadata ({selectedItems.length})
+            </button>
+            <button
+              onClick={() => handleActionClick('upload')}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
+            >
+              Upload ({selectedItems.length})
+            </button>
+          </>
+        )}
       </motion.div>
 
       {/* Search and Filter Bar */}
@@ -471,7 +707,12 @@ export default function Page() {
             key={item.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gray-800 rounded-lg p-6 space-y-4"
+            onClick={() => handleItemSelect(item.id)}
+            className={`bg-gray-800 rounded-lg p-6 space-y-4 cursor-pointer transition-all ${
+              selectionMode && selectedItems.includes(item.id) 
+                ? 'ring-2 ring-purple-500' 
+                : ''
+            }`}
           >
             {/* Row 1: Type, Channel, Created */}
             <div className="flex justify-between items-center">

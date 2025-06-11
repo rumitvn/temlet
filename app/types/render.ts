@@ -1,7 +1,12 @@
 export type RenderStatus = 
     | 'new'
+    | 'pending_render'
+    | 'rendering'
+    | 'rendered'
+    | 'pending_metadata'
     | 'processing_metadata'
     | 'processed_metadata'
+    | 'pending_upload'
     | 'processing_upload'
     | 'uploaded'
     | 'declined'
