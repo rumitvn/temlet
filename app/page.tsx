@@ -882,9 +882,18 @@ export default function Page() {
             </div>
 
             {/* Row 3: Render Zone */}
-            <div className="bg-gray-700/50 rounded-lg p-4">
+            <div className={`rounded-lg p-4 ${
+              ['rendered', 'pending_metadata', 'processing_metadata', 'processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) 
+                ? 'bg-green-900/30 border border-green-500/30' 
+                : 'bg-gray-700/50'
+            }`}>
               <div className="flex justify-between items-center mb-2">
-                <h4 className="text-sm font-medium text-gray-400">Render</h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-gray-400">Render</h4>
+                  {['rendered', 'pending_metadata', 'processing_metadata', 'processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) && (
+                    <CheckCircleIcon className="w-4 h-4 text-green-500" />
+                  )}
+                </div>
                 <button 
                   className="text-purple-400 hover:text-purple-300"
                   onClick={(e) => {
@@ -921,6 +930,20 @@ export default function Page() {
                   }}
                 >
                   Start Render
+                </button>
+              )}
+              {['rendered', 'pending_metadata', 'processing_metadata', 'processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) && (
+                <button
+                  className="mt-2 w-full px-3 py-1 text-sm bg-green-600 hover:bg-green-500 rounded flex items-center justify-center gap-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(`/api/renders/${item.id}/video`, '_blank');
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                  </svg>
+                  Open Video
                 </button>
               )}
             </div>

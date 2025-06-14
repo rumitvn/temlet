@@ -57,6 +57,7 @@ export interface RenderItem {
     templateAeComposition: string;
     templateAeRenderFormat: TemplateAeRenderFormat;
     templateAeAssets?: TemplateAeAsset[];
+    renderOutputFolder: string;
     autoRender: boolean;
     autoCreateMetadata: boolean;
     autoUpload: boolean;
