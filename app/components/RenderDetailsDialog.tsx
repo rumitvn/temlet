@@ -1,6 +1,5 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { Fragment, useEffect, useState } from "react";
-import { checkRenderStatus } from "../services/render";
 
 interface RenderDetailsDialogProps {
   isOpen: boolean;
@@ -13,35 +12,7 @@ export default function RenderDetailsDialog({
   onClose,
   renderItem,
 }: RenderDetailsDialogProps) {
-  const [jobStatus, setJobStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (isOpen && renderItem?.nexrenderUid) {
-      // Initial status check
-      const checkStatus = async () => {
-        try {
-          setLoading(true);
-          const status = await checkRenderStatus(renderItem.nexrenderUid);
-          console.log('Nexrender status:', status);
-          setJobStatus(status);
-        } catch (error) {
-          console.error("Error checking render status:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      checkStatus();
-
-      // Set up polling interval
-      const interval = setInterval(checkStatus, 2000); // Poll every 2 seconds
-
-      return () => {
-        clearInterval(interval);
-      };
-    }
-  }, [isOpen, renderItem?.nexrenderUid]);
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -103,44 +74,36 @@ export default function RenderDetailsDialog({
                   </div>
 
                   {/* Job Status */}
-                  <div className="mt-4">
+                  <div>
                     <h3 className="text-lg font-medium text-gray-200">Job Status</h3>
-                    {loading ? (
-                      <div className="flex items-center justify-center p-4">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">State:</span>
+                        <span className="text-gray-200">{renderItem.status}</span>
                       </div>
-                    ) : jobStatus ? (
-                      <div className="mt-2 space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-400">State:</span>
-                          <span className="text-gray-200">{jobStatus.state}</span>
+                      
+                      {/* Progress Bar */}
+                      {renderItem.renderProgress !== undefined && (
+                        <div className="mt-4">
+                          <div className="w-full bg-gray-700 rounded-full h-2.5">
+                            <div 
+                              className="bg-purple-600 h-2.5 rounded-full transition-all duration-500"
+                              style={{ width: `${renderItem.renderProgress}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-sm text-gray-400 mt-1 text-right">
+                            {renderItem.renderProgress}%
+                          </p>
                         </div>
-                        
-                        {/* Progress Bar */}
-                        {jobStatus.renderProgress !== undefined && (
-                          <div className="mt-4">
-                            <div className="w-full bg-gray-700 rounded-full h-2.5">
-                              <div 
-                                className="bg-purple-600 h-2.5 rounded-full transition-all duration-500"
-                                style={{ width: `${jobStatus.renderProgress}%` }}
-                              ></div>
-                            </div>
-                            <p className="text-sm text-gray-400 mt-1 text-right">
-                              {jobStatus.renderProgress}%
-                            </p>
-                          </div>
-                        )}
+                      )}
 
-                        {jobStatus.error && (
-                          <div className="mt-2 p-3 bg-red-500/20 rounded-lg">
-                            <span className="text-red-400 font-medium">Error:</span>
-                            <p className="text-red-300 mt-1 text-sm">{jobStatus.error}</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-gray-400 mt-2">No job status available</p>
-                    )}
+                      {renderItem.error && (
+                        <div className="mt-2 p-3 bg-red-500/20 rounded-lg">
+                          <span className="text-red-400 font-medium">Error:</span>
+                          <p className="text-red-300 mt-1 text-sm">{renderItem.error}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Assets */}

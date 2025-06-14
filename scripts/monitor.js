@@ -14,5 +14,5 @@ async function runMonitor() {
 // Run immediately
 runMonitor();
 
-// Then run every minute
-setInterval(runMonitor, 60000); 
+// Then run every 5 seconds
+setInterval(runMonitor, 5000); 

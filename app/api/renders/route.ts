@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '10');
         const skip = (page - 1) * limit;
+        const ids = searchParams.get('ids')?.split(',');
 
         // Build the where clause
         const whereClause: any = {};
@@ -26,20 +27,24 @@ export async function GET(req: NextRequest) {
         if (status) {
             whereClause.status = status;
         }
+        if (ids) {
+            whereClause.id = {
+                in: ids
+            };
+        }
 
-        const [items, total] = await Promise.all([
-            prisma.renderItem.findMany({
-                where: whereClause,
-                skip,
-                take: limit,
-                orderBy: {
-                    [sortBy]: sortOrder
-                }
-            }),
-            prisma.renderItem.count({
-                where: whereClause
-            })
-        ]);
+        const items = await prisma.renderItem.findMany({
+            where: whereClause,
+            skip: ids ? 0 : skip, // Don't skip if fetching by IDs
+            take: ids ? undefined : limit, // Don't limit if fetching by IDs
+            orderBy: {
+                [sortBy]: sortOrder
+            }
+        });
+
+        const total = ids ? items.length : await prisma.renderItem.count({
+            where: whereClause
+        });
 
         return NextResponse.json({
             items,

@@ -43,9 +43,7 @@ export async function POST(
     });
 
     // Generate assets
-    console.log('Generating assets...');
     const assets = generateAssets(renderItem);
-    console.log('Generated assets:', JSON.stringify(assets, null, 2));
 
     // Create job in Nexrender
     const requestBody = {

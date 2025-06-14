@@ -21,7 +21,6 @@ import {
 import CreateRenderDialog from './components/CreateRenderDialog';
 import { RenderStatus, RenderItem, TemplateAeRenderFormat } from './types/render';
 import RenderDetailsDialog from './components/RenderDetailsDialog';
-import { checkRenderStatus } from './services/render';
 
 // Custom debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -147,6 +146,9 @@ export default function Page() {
   const [loadingCounts, setLoadingCounts] = useState(true);
   const [selectedRenderItem, setSelectedRenderItem] = useState<RenderItem | null>(null);
   const [showRenderDetails, setShowRenderDetails] = useState(false);
+
+  // Track items that just changed status in the last poll
+  const [recentlyChangedIds, setRecentlyChangedIds] = useState<string[]>([]);
 
   const getActiveFiltersCount = () => {
     let count = 0;
@@ -290,74 +292,79 @@ export default function Page() {
     return date.toLocaleString();
   };
 
-  // Add SSE connection
+  // Add polling for render updates
   useEffect(() => {
-    console.log('Setting up SSE connection...');
-    const eventSource = new EventSource('/api/renders/updates');
-
-    eventSource.onmessage = (event) => {
-      console.log('Received SSE message:', event.data);
-      const data = JSON.parse(event.data) as { type: string; render: RenderItem };
-      
-      if (data.type === 'render_update') {
-        console.log('Processing render update:', data.render);
-        // Update specific item in the list
-        setItems(prevItems => {
-          const newItems = prevItems.map(item => 
-            item.id === data.render.id ? { ...item, ...data.render } : item
-          );
-          console.log('Updated items list:', newItems);
-          return newItems;
-        });
-
-        // If the updated item is currently selected in the details dialog, update it
-        if (selectedRenderItem?.id === data.render.id) {
-          console.log('Updating selected render item:', data.render);
-          setSelectedRenderItem(data.render);
-        }
-        // Always refresh status counts from backend
-        fetchStatusCounts();
-      }
-    };
-
-    eventSource.onerror = (error) => {
-      console.error('SSE Error:', error);
-      eventSource.close();
-    };
-
-    return () => {
-      console.log('Cleaning up SSE connection...');
-      eventSource.close();
-    };
-  }, []);
-
-  // Add polling for render progress
-  useEffect(() => {
-    const pollRenderProgress = async () => {
+    const pollRenderUpdates = async () => {
+      // Only check items that are actively being processed, or just changed status
       const itemsToCheck = items.filter(item => 
-        item.status === 'pending_render' || item.status === 'rendering'
+        [
+          'pending_render',
+          'rendering',
+          'pending_metadata',
+          'processing_metadata',
+          'pending_upload',
+          'processing_upload'
+        ].includes(item.status) ||
+        recentlyChangedIds.includes(item.id)
       );
 
-      for (const item of itemsToCheck) {
-        try {
-          const status = await checkRenderStatus(item.nexrenderUid);
-          // Update the item with new status and progress
-          setItems(prevItems => 
-            prevItems.map(prevItem => 
-              prevItem.id === item.id 
-                ? { ...prevItem, renderProgress: status.renderProgress }
-                : prevItem
-            )
-          );
-        } catch (error) {
-          console.error(`Error checking progress for ${item.id}:`, error);
+      if (itemsToCheck.length === 0) return;
+
+      try {
+        // Fetch updated items from the API
+        const response = await fetch(`/api/renders?ids=${itemsToCheck.map(item => item.id).join(',')}`);
+        if (!response.ok) throw new Error('Failed to fetch render updates');
+        
+        const data = await response.json();
+        
+        // Refactored: Detect status changes synchronously and update state
+        const updatedItems: RenderItem[] = [];
+        let statusChanged = false;
+        const statusChanges: Record<string, number> = {};
+        const changedIds: string[] = [];
+        for (const item of items) {
+          const updatedItem = data.items.find((i: RenderItem) => i.id === item.id);
+          if (updatedItem) {
+            if (updatedItem.status !== item.status) {
+              statusChanged = true;
+              changedIds.push(item.id);
+              statusChanges[item.status] = (statusChanges[item.status] || 0) - 1;
+              statusChanges[updatedItem.status] = (statusChanges[updatedItem.status] || 0) + 1;
+            }
+            updatedItems.push(updatedItem);
+          } else {
+            updatedItems.push(item);
+          }
         }
+        setItems(updatedItems);
+        if (selectedRenderItem) {
+          const updatedSelectedItem = data.items.find((i: RenderItem) => i.id === selectedRenderItem.id);
+          if (updatedSelectedItem) {
+            setSelectedRenderItem(updatedSelectedItem);
+          }
+        }
+        if (Object.keys(statusChanges).length > 0) {
+          setStatusCounts(prev => {
+            const newCounts = { ...prev };
+            Object.entries(statusChanges).forEach(([status, change]) => {
+              const currentCount = newCounts[status as RenderStatus] || 0;
+              newCounts[status as RenderStatus] = Math.max(0, currentCount + change);
+            });
+            return newCounts;
+          });
+        }
+        setRecentlyChangedIds(changedIds);
+        if (statusChanged) {
+          fetchStatusCounts();
+        }
+      } catch (error) {
+        console.error('Error polling render updates:', error);
       }
     };
 
-    const interval = setInterval(pollRenderProgress, 2000);
+    const interval = setInterval(pollRenderUpdates, 2000);
     return () => clearInterval(interval);
-  }, [items]);
+  }, [items, selectedRenderItem, recentlyChangedIds]);
 
   const handleCreateRender = async (data: any) => {
     try {
@@ -892,7 +899,7 @@ export default function Page() {
                 <span className="text-gray-300">{item.nexrenderUid}</span>
                 <span className="text-gray-500">{item.renderTime ? formatDate(item.renderTime) : '-'}</span>
               </div>
-              {(item.status === 'pending_render' || item.status === 'rendering') && item.renderProgress !== undefined && (
+              {(item.status === 'rendering') && item.renderProgress !== undefined && (
                 <div className="mt-2">
                   <div className="w-full bg-gray-700 rounded-full h-2">
                     <div 
