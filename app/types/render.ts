@@ -14,6 +14,20 @@ export type RenderStatus =
 
 export type RenderType = 'short' | 'long';
 
+export interface TemplateAeRenderFormat {
+    id: string;
+    name: string;
+    code: string;
+}
+
+export interface TemplateAeAsset {
+    type: 'data' | 'audio' | 'image' | 'video';
+    layerName: string;
+    property?: string;
+    value?: string | number;
+    src?: string;
+}
+
 export interface YouTubeMetadata {
     title: string;
     description: string;
@@ -41,6 +55,8 @@ export interface RenderItem {
     channelId: string;
     templateAeUrl: string;
     templateAeComposition: string;
+    templateAeRenderFormat: TemplateAeRenderFormat;
+    templateAeAssets: TemplateAeAsset[];
     autoRender: boolean;
     autoCreateMetadata: boolean;
     autoUpload: boolean;
@@ -69,6 +85,8 @@ export interface CreateRenderItemDto {
     channelId: string;
     templateAeUrl: string;
     templateAeComposition: string;
+    templateAeRenderFormat: TemplateAeRenderFormat;
+    templateAeAssets: TemplateAeAsset[];
     autoRender: boolean;
     autoCreateMetadata: boolean;
     autoUpload: boolean;
@@ -87,6 +105,8 @@ export interface UpdateRenderItemDto {
     channelId?: string;
     templateAeUrl?: string;
     templateAeComposition?: string;
+    templateAeRenderFormat?: TemplateAeRenderFormat;
+    templateAeAssets?: TemplateAeAsset[];
     autoRender?: boolean;
     autoCreateMetadata?: boolean;
     autoUpload?: boolean;

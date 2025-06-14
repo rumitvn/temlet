@@ -154,6 +154,7 @@ export default function Page() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; path: string }[]>([]);
   const [outputFolders, setOutputFolders] = useState<{ id: string; path: string }[]>([]);
+  const [renderFormats, setRenderFormats] = useState<{ id: string; name: string }[]>([]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [statusCounts, setStatusCounts] = useState<Partial<Record<RenderStatus, number>>>({});
@@ -214,6 +215,17 @@ export default function Page() {
     }
   }, []);
 
+  const fetchRenderFormats = useCallback(async () => {
+    try {
+      const response = await fetch('/api/render-formats');
+      if (!response.ok) throw new Error('Failed to fetch render formats');
+      const data = await response.json();
+      setRenderFormats(data);
+    } catch (error) {
+      console.error('Error fetching render formats:', error);
+    }
+  }, []);
+
   const fetchItems = useCallback(async () => {
     try {
       setLoading(true);
@@ -265,11 +277,12 @@ export default function Page() {
         fetchItems(),
         fetchStatusCounts(),
         fetchTemplates(),
-        fetchOutputFolders()
+        fetchOutputFolders(),
+        fetchRenderFormats()
       ]);
     };
     fetchInitialData();
-  }, [fetchItems, fetchStatusCounts, fetchTemplates, fetchOutputFolders]);
+  }, [fetchItems, fetchStatusCounts, fetchTemplates, fetchOutputFolders, fetchRenderFormats]);
 
   // Effect for refreshing data when filters change
   useEffect(() => {
@@ -904,9 +917,11 @@ export default function Page() {
         types={types}
         templates={templates}
         outputFolders={outputFolders}
+        renderFormats={renderFormats}
         onSave={handleCreateRender}
         onTemplatesChange={fetchTemplates}
         onOutputFoldersChange={fetchOutputFolders}
+        onRenderFormatsChange={fetchRenderFormats}
       />
     </div>
   );

@@ -8,6 +8,7 @@ import LoadingDialog from './LoadingDialog';
 import ErrorDialog from './ErrorDialog';
 import SuccessDialog from './SuccessDialog';
 import OutputFolderManagerDialog from './OutputFolderManagerDialog';
+import RenderFormatManagerDialog from './RenderFormatManagerDialog';
 
 interface CreateRenderDialogProps {
   isOpen: boolean;
@@ -17,9 +18,11 @@ interface CreateRenderDialogProps {
   types: string[];
   templates: { id: string; path: string }[];
   outputFolders: { id: string; path: string }[];
+  renderFormats: { id: string; name: string; code: string }[];
   onSave: (data: any) => void;
   onTemplatesChange: () => void;
   onOutputFoldersChange: () => void;
+  onRenderFormatsChange: () => void;
 }
 
 export default function CreateRenderDialog({
@@ -30,9 +33,11 @@ export default function CreateRenderDialog({
   types,
   templates,
   outputFolders,
+  renderFormats,
   onSave,
   onTemplatesChange,
   onOutputFoldersChange,
+  onRenderFormatsChange,
 }: CreateRenderDialogProps) {
   const [formData, setFormData] = useState({
     channelId: '',
@@ -41,6 +46,7 @@ export default function CreateRenderDialog({
     type: '',
     templateAeUrl: '',
     templateAeComposition: 'Final',
+    templateAeRenderFormat: { id: '', name: '' },
     outputFolderPath: '',
     autoRender: true,
     autoCreateMetadata: true,
@@ -59,6 +65,7 @@ export default function CreateRenderDialog({
   const [customTemplate, setCustomTemplate] = useState<File | null>(null);
   const [isTemplateManagerOpen, setIsTemplateManagerOpen] = useState(false);
   const [isOutputFolderManagerOpen, setIsOutputFolderManagerOpen] = useState(false);
+  const [isRenderFormatManagerOpen, setIsRenderFormatManagerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +81,7 @@ export default function CreateRenderDialog({
         type: '',
         templateAeUrl: '',
         templateAeComposition: 'Final',
+        templateAeRenderFormat: { id: '', name: '' },
         outputFolderPath: '',
         autoRender: true,
         autoCreateMetadata: true,
@@ -204,6 +212,19 @@ export default function CreateRenderDialog({
       } finally {
         setIsLoading(false);
       }
+    }
+  };
+
+  const handleRenderFormatChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedFormat = renderFormats.find(f => f.id === e.target.value);
+    if (selectedFormat) {
+      setFormData(prev => ({
+        ...prev,
+        templateAeRenderFormat: {
+          id: selectedFormat.id,
+          name: selectedFormat.name
+        }
+      }));
     }
   };
 
@@ -372,13 +393,44 @@ export default function CreateRenderDialog({
                   </select>
                 </div>
 
+                {/* Template After Effects Render Format */}
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-gray-400">
+                      Template After Effects Render Format
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsRenderFormatManagerOpen(true)}
+                      className="text-purple-400 hover:text-purple-300 text-sm"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                  <select
+                    name="templateAeRenderFormat"
+                    value={formData.templateAeRenderFormat.id}
+                    onChange={handleRenderFormatChange}
+                    className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
+                    required
+                  >
+                    <option value="">Select a render format</option>
+                    {renderFormats.map(format => (
+                      <option key={format.id} value={format.id}>
+                        {format.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Template After Effects */}
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="block text-sm font-medium text-gray-400">
-                      Template After Effects
+                      Template After Effects File
                     </label>
                     <button
+                      type="button"
                       onClick={() => setIsTemplateManagerOpen(true)}
                       className="text-purple-400 hover:text-purple-300 text-sm"
                     >
@@ -668,6 +720,12 @@ export default function CreateRenderDialog({
         onClose={() => setIsOutputFolderManagerOpen(false)}
         outputFolders={outputFolders}
         onOutputFoldersChange={onOutputFoldersChange}
+      />
+      <RenderFormatManagerDialog
+        isOpen={isRenderFormatManagerOpen}
+        onClose={() => setIsRenderFormatManagerOpen(false)}
+        formats={renderFormats}
+        onFormatsChange={onRenderFormatsChange}
       />
     </>
   );
