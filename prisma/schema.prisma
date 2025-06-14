@@ -48,6 +48,7 @@ model RenderItem {
   metadataTime          Int?
   uploadTime            Int?
   youtubeLink           String?
+  error                 String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

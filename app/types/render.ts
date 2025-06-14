@@ -74,6 +74,8 @@ export interface RenderItem {
     youtubeLink: string | null;
     createdAt: Date;
     updatedAt: Date;
+    error?: string;
+    renderProgress?: number;
 }
 
 export interface CreateRenderItemDto {
@@ -87,6 +89,7 @@ export interface CreateRenderItemDto {
     templateAeComposition: string;
     templateAeRenderFormat: TemplateAeRenderFormat;
     templateAeAssets?: TemplateAeAsset[];
+    renderOutputFolder: string;
     autoRender: boolean;
     autoCreateMetadata: boolean;
     autoUpload: boolean;

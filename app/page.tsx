@@ -19,7 +19,9 @@ import {
   ShieldCheckIcon
 } from "@heroicons/react/24/solid";
 import CreateRenderDialog from './components/CreateRenderDialog';
-import { RenderStatus } from './types/render';
+import { RenderStatus, RenderItem, TemplateAeRenderFormat } from './types/render';
+import RenderDetailsDialog from './components/RenderDetailsDialog';
+import { checkRenderStatus } from './services/render';
 
 // Custom debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -72,22 +74,6 @@ try {
   channels = filters.channels || defaultChannels;
 } catch (error) {
   console.warn("Failed to load filters from file, using defaults:", error);
-}
-
-interface RenderItem {
-  id: string;
-  fileName: string;
-  type: string;
-  topic: string;
-  status: string;
-  createdAt: string;
-  channelName: string;
-  nexrenderUid: string;
-  renderTime?: string;
-  metadataTime?: string;
-  uploadTime?: string;
-  youtubeMetadata?: any;
-  youtubeLink?: string;
 }
 
 const statusColors = {
@@ -154,11 +140,13 @@ export default function Page() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; path: string }[]>([]);
   const [outputFolders, setOutputFolders] = useState<{ id: string; path: string }[]>([]);
-  const [renderFormats, setRenderFormats] = useState<{ id: string; name: string }[]>([]);
+  const [renderFormats, setRenderFormats] = useState<TemplateAeRenderFormat[]>([]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [statusCounts, setStatusCounts] = useState<Partial<Record<RenderStatus, number>>>({});
   const [loadingCounts, setLoadingCounts] = useState(true);
+  const [selectedRenderItem, setSelectedRenderItem] = useState<RenderItem | null>(null);
+  const [showRenderDetails, setShowRenderDetails] = useState(false);
 
   const getActiveFiltersCount = () => {
     let count = 0;
@@ -296,9 +284,80 @@ export default function Page() {
     setSearchQuery("");
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+  const formatDate = (dateString: string | number | Date | null | undefined) => {
+    if (!dateString) return '-';
+    const date = typeof dateString === 'number' ? new Date(dateString * 1000) : new Date(dateString);
+    return date.toLocaleString();
   };
+
+  // Add SSE connection
+  useEffect(() => {
+    console.log('Setting up SSE connection...');
+    const eventSource = new EventSource('/api/renders/updates');
+
+    eventSource.onmessage = (event) => {
+      console.log('Received SSE message:', event.data);
+      const data = JSON.parse(event.data) as { type: string; render: RenderItem };
+      
+      if (data.type === 'render_update') {
+        console.log('Processing render update:', data.render);
+        // Update specific item in the list
+        setItems(prevItems => {
+          const newItems = prevItems.map(item => 
+            item.id === data.render.id ? { ...item, ...data.render } : item
+          );
+          console.log('Updated items list:', newItems);
+          return newItems;
+        });
+
+        // If the updated item is currently selected in the details dialog, update it
+        if (selectedRenderItem?.id === data.render.id) {
+          console.log('Updating selected render item:', data.render);
+          setSelectedRenderItem(data.render);
+        }
+        // Always refresh status counts from backend
+        fetchStatusCounts();
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('SSE Error:', error);
+      eventSource.close();
+    };
+
+    return () => {
+      console.log('Cleaning up SSE connection...');
+      eventSource.close();
+    };
+  }, []);
+
+  // Add polling for render progress
+  useEffect(() => {
+    const pollRenderProgress = async () => {
+      const itemsToCheck = items.filter(item => 
+        item.status === 'pending_render' || item.status === 'rendering'
+      );
+
+      for (const item of itemsToCheck) {
+        try {
+          const status = await checkRenderStatus(item.nexrenderUid);
+          // Update the item with new status and progress
+          setItems(prevItems => 
+            prevItems.map(prevItem => 
+              prevItem.id === item.id 
+                ? { ...prevItem, renderProgress: status.renderProgress }
+                : prevItem
+            )
+          );
+        } catch (error) {
+          console.error(`Error checking progress for ${item.id}:`, error);
+        }
+      }
+    };
+
+    const interval = setInterval(pollRenderProgress, 2000);
+    return () => clearInterval(interval);
+  }, [items]);
 
   const handleCreateRender = async (data: any) => {
     try {
@@ -313,7 +372,6 @@ export default function Page() {
       const responseData = await response.json();
 
       if (!response.ok) {
-        // Handle API errors (400, 500, etc.)
         throw {
           type: 'api',
           message: responseData.error || 'Failed to create render item',
@@ -322,12 +380,16 @@ export default function Page() {
         };
       }
 
+      // If autoRender is true, start the render immediately
+      if (data.autoRender) {
+        await handleRender(responseData);
+      }
+
       // Refresh the list
       fetchItems();
-      return true; // Indicate success
+      return true;
     } catch (error: any) {
       console.error('Error creating render item:', error);
-      // If it's not our structured error, wrap it
       if (!error?.type) {
         throw {
           type: 'network',
@@ -335,7 +397,7 @@ export default function Page() {
           originalError: error
         };
       }
-      throw error; // Propagate the structured error
+      throw error;
     }
   };
 
@@ -430,6 +492,31 @@ export default function Page() {
 
   const handleDeselectAll = () => {
     setSelectedItems([]);
+  };
+
+  const handleRenderDetailsClick = (item: RenderItem) => {
+    setSelectedRenderItem(item);
+    setShowRenderDetails(true);
+  };
+
+  const handleRender = async (item: RenderItem) => {
+    try {
+      const response = await fetch(`/api/renders/${item.id}/render`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start render');
+      }
+
+      // Refresh the list
+      fetchItems();
+      // Always refresh status counts from backend
+      await fetchStatusCounts();
+    } catch (error) {
+      console.error('Error starting render:', error);
+      alert('Failed to start render. Please try again.');
+    }
   };
 
   return (
@@ -791,7 +878,13 @@ export default function Page() {
             <div className="bg-gray-700/50 rounded-lg p-4">
               <div className="flex justify-between items-center mb-2">
                 <h4 className="text-sm font-medium text-gray-400">Render</h4>
-                <button className="text-purple-400 hover:text-purple-300">
+                <button 
+                  className="text-purple-400 hover:text-purple-300"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRenderDetailsClick(item);
+                  }}
+                >
                   View Details
                 </button>
               </div>
@@ -799,6 +892,30 @@ export default function Page() {
                 <span className="text-gray-300">{item.nexrenderUid}</span>
                 <span className="text-gray-500">{item.renderTime ? formatDate(item.renderTime) : '-'}</span>
               </div>
+              {(item.status === 'pending_render' || item.status === 'rendering') && item.renderProgress !== undefined && (
+                <div className="mt-2">
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div 
+                      className="bg-purple-600 h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${item.renderProgress}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-sm text-gray-400 mt-1 text-right">
+                    {item.renderProgress}%
+                  </p>
+                </div>
+              )}
+              {item.status === 'new' && (
+                <button
+                  className="mt-2 w-full px-3 py-1 text-sm bg-blue-600 hover:bg-blue-500 rounded"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRender(item);
+                  }}
+                >
+                  Start Render
+                </button>
+              )}
             </div>
 
             {/* Row 4: Metadata Zone */}
@@ -923,6 +1040,18 @@ export default function Page() {
         onOutputFoldersChange={fetchOutputFolders}
         onRenderFormatsChange={fetchRenderFormats}
       />
+
+      {/* Add RenderDetailsDialog */}
+      {selectedRenderItem && (
+        <RenderDetailsDialog
+          isOpen={showRenderDetails}
+          onClose={() => {
+            setShowRenderDetails(false);
+            setSelectedRenderItem(null);
+          }}
+          renderItem={selectedRenderItem}
+        />
+      )}
     </div>
   );
 }
