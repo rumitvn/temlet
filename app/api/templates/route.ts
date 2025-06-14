@@ -22,41 +22,70 @@ export async function GET() {
     }
 }
 
-// POST /api/templates - Save a new template
+// POST /api/templates - Create a new template (either upload file or save path)
 export async function POST(req: NextRequest) {
     try {
-        const formData = await req.formData();
-        const file = formData.get('file') as File;
-        
-        if (!file) {
+        const contentType = req.headers.get("content-type") || "";
+
+        // Handle file upload
+        if (contentType.includes("multipart/form-data")) {
+            const formData = await req.formData();
+            const file = formData.get('file') as File;
+
+            if (!file) {
+                return NextResponse.json(
+                    { error: 'No file provided' },
+                    { status: 400 }
+                );
+            }
+
+            const bytes = await file.arrayBuffer();
+            const buffer = Buffer.from(bytes);
+
+            // Save to templates directory
+            const path = join(process.cwd(), 'public', 'templates', file.name);
+            await writeFile(path, buffer);
+
+            // Save to database
+            const template = await prisma.template.create({
+                data: {
+                    name: file.name,
+                    path: `/templates/${file.name}`,
+                    type: 'custom'
+                }
+            });
+
+            return NextResponse.json(template);
+        }
+        // Handle path saving
+        else if (contentType.includes("application/json")) {
+            const body = await req.json();
+            const { path } = body;
+
+            if (!path) {
+                return NextResponse.json(
+                    { error: 'No path provided' },
+                    { status: 400 }
+                );
+            }
+
+            // Save to database
+            const template = await prisma.template.create({
+                data: {
+                    name: path.split('/').pop() || path.split('\\').pop() || 'template',
+                    path,
+                    type: 'custom'
+                }
+            });
+
+            return NextResponse.json(template);
+        }
+        else {
             return NextResponse.json(
-                { error: 'No file provided' },
+                { error: 'Invalid content type' },
                 { status: 400 }
             );
         }
-
-        // Save the file to the templates directory
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        
-        // Create a unique filename
-        const timestamp = Date.now();
-        const filename = `${timestamp}-${file.name}`;
-        const filepath = join(process.cwd(), 'public', 'templates', filename);
-        
-        // Ensure the templates directory exists
-        await writeFile(filepath, buffer);
-
-        // Save the template info to the database
-        const template = await prisma.template.create({
-            data: {
-                name: file.name,
-                path: `/templates/${filename}`,
-                type: 'custom'
-            }
-        });
-
-        return NextResponse.json(template);
     } catch (error) {
         console.error('Error saving template:', error);
         return NextResponse.json(

@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
             'fileName', 'type', 'topic', 
             'channelName', 'channelId', 'templateAeUrl', 
             'templateAeComposition', 'templateAeRenderFormat',
-            'templateAeAssets', 'renderOutputFolder', 'jsonContent'
+            'renderOutputFolder', 'jsonContent'
         ];
         
         const missingFields = requiredFields.filter(field => !body[field]);
@@ -113,6 +113,18 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // Fetch the render format details to include the code field
+        const renderFormat = await prisma.renderFormat.findUnique({
+            where: { id: templateAeRenderFormat.id }
+        });
+
+        if (!renderFormat) {
+            return NextResponse.json(
+                { error: 'Invalid render format ID' },
+                { status: 400 }
+            );
+        }
+
         const renderItem = await prisma.renderItem.create({
             data: {
                 fileName,
@@ -123,8 +135,12 @@ export async function POST(req: NextRequest) {
                 channelId,
                 templateAeUrl,
                 templateAeComposition,
-                templateAeRenderFormat,
-                templateAeAssets,
+                templateAeRenderFormat: {
+                    id: renderFormat.id,
+                    name: renderFormat.name,
+                    code: renderFormat.code
+                },
+                templateAeAssets: templateAeAssets || [], // Default to empty array if not provided
                 renderOutputFolder,
                 autoRender: autoRender || false,
                 autoCreateMetadata: autoCreateMetadata || false,

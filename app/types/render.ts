@@ -56,7 +56,7 @@ export interface RenderItem {
     templateAeUrl: string;
     templateAeComposition: string;
     templateAeRenderFormat: TemplateAeRenderFormat;
-    templateAeAssets: TemplateAeAsset[];
+    templateAeAssets?: TemplateAeAsset[];
     autoRender: boolean;
     autoCreateMetadata: boolean;
     autoUpload: boolean;
@@ -86,7 +86,7 @@ export interface CreateRenderItemDto {
     templateAeUrl: string;
     templateAeComposition: string;
     templateAeRenderFormat: TemplateAeRenderFormat;
-    templateAeAssets: TemplateAeAsset[];
+    templateAeAssets?: TemplateAeAsset[];
     autoRender: boolean;
     autoCreateMetadata: boolean;
     autoUpload: boolean;

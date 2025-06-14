@@ -45,6 +45,7 @@ export default function CreateRenderDialog({
     topic: '',
     type: '',
     templateAeUrl: '',
+    templateAeUrlValue: '',
     templateAeComposition: 'Final',
     templateAeRenderFormat: { id: '', name: '' },
     outputFolderPath: '',
@@ -80,6 +81,7 @@ export default function CreateRenderDialog({
         topic: '',
         type: '',
         templateAeUrl: '',
+        templateAeUrlValue: '',
         templateAeComposition: 'Final',
         templateAeRenderFormat: { id: '', name: '' },
         outputFolderPath: '',
@@ -417,7 +419,7 @@ export default function CreateRenderDialog({
                     <option value="">Select a render format</option>
                     {renderFormats.map(format => (
                       <option key={format.id} value={format.id}>
-                        {format.name}
+                        {format.code ? `${format.code}: ${format.name}` : format.name}
                       </option>
                     ))}
                   </select>
@@ -450,16 +452,45 @@ export default function CreateRenderDialog({
                         {template.path.split('/').pop()}
                       </option>
                     ))}
-                    <option value="custom">Select from file...</option>
+                    <option value="custom">Enter full template path...</option>
                   </select>
                   {formData.templateAeUrl === 'custom' && (
-                    <input
-                      type="file"
-                      accept=".aep"
-                      onChange={handleCustomTemplateChange}
-                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 mt-2"
-                      required
-                    />
+                    <div className="flex gap-2 mt-2">
+                      <input
+                        type="text"
+                        placeholder="Enter or paste full template path"
+                        value={formData.templateAeUrlValue || ''}
+                        onChange={e => setFormData(prev => ({ ...prev, templateAeUrlValue: e.target.value }))}
+                        className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"
+                        onClick={async () => {
+                          if (!formData.templateAeUrlValue) return;
+                          try {
+                            setIsLoading(true);
+                            setLoadingMessage('Saving template path...');
+                            const response = await fetch('/api/templates', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ path: formData.templateAeUrlValue })
+                            });
+                            if (!response.ok) throw new Error('Failed to save template path');
+                            setFormData(prev => ({ ...prev, templateAeUrl: formData.templateAeUrlValue, templateAeUrlValue: '' }));
+                            onTemplatesChange();
+                          } catch (error) {
+                            setError('Failed to save template path. Please try again.');
+                          } finally {
+                            setIsLoading(false);
+                            setLoadingMessage('');
+                          }
+                        }}
+                      >
+                        Save
+                      </button>
+                    </div>
                   )}
                 </div>
 

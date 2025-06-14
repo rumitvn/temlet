@@ -31,7 +31,7 @@ model RenderItem {
   templateAeUrl         String
   templateAeComposition String
   templateAeRenderFormat Json    // Format with id and name
-  templateAeAssets      Json     // Array of template assets
+  templateAeAssets      Json?    // Array of template assets
   renderOutputFolder    String?
   autoRender            Boolean  @default(false)
   autoCreateMetadata    Boolean  @default(false)
