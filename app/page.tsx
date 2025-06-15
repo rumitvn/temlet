@@ -21,6 +21,7 @@ import {
 import CreateRenderDialog from './components/CreateRenderDialog';
 import { RenderStatus, RenderItem, TemplateAeRenderFormat } from './types/render';
 import RenderDetailsDialog from './components/RenderDetailsDialog';
+import MetadataDetailsDialog from './components/MetadataDetailsDialog';
 
 // Custom debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -82,7 +83,7 @@ const statusColors = {
   rendered: "bg-green-500/20 text-green-400",
   pending_metadata: "bg-purple-500/20 text-purple-400",
   processing_metadata: "bg-indigo-500/20 text-indigo-400",
-  processed_metadata: "bg-violet-500/20 text-violet-400",
+  processed_metadata: "bg-teal-500/20 text-teal-400",
   pending_upload: "bg-pink-500/20 text-pink-400",
   processing_upload: "bg-rose-500/20 text-rose-400",
   uploaded: "bg-emerald-500/20 text-emerald-400",
@@ -122,6 +123,9 @@ const getStatusIcon = (status: RenderStatus) => {
   return ClockIcon;
 };
 
+// Add this at the top-level of the file, outside the Page component
+const renderStatusMap = new Map<string, RenderStatus>();
+
 export default function Page() {
   const [items, setItems] = useState<RenderItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -146,6 +150,7 @@ export default function Page() {
   const [loadingCounts, setLoadingCounts] = useState(true);
   const [selectedRenderItem, setSelectedRenderItem] = useState<RenderItem | null>(null);
   const [showRenderDetails, setShowRenderDetails] = useState(false);
+  const [showMetadataDetails, setShowMetadataDetails] = useState(false);
 
   // Track items that just changed status in the last poll
   const [recentlyChangedIds, setRecentlyChangedIds] = useState<string[]>([]);
@@ -469,6 +474,17 @@ export default function Page() {
     }
 
     try {
+      if (action === 'metadata') {
+        // For metadata, trigger handleMetadata for each selected item directly
+        const itemsToProcess = items.filter(i => selectedItems.includes(i.id));
+        for (const item of itemsToProcess) {
+          handleMetadata(item);
+        }
+        setSelectedItems([]);
+        return;
+      }
+
+      // For other actions, use the batch API
       const response = await fetch('/api/renders/batch', {
         method: 'POST',
         headers: {
@@ -506,6 +522,11 @@ export default function Page() {
     setShowRenderDetails(true);
   };
 
+  const handleMetadataDetailsClick = (item: RenderItem) => {
+    setSelectedRenderItem(item);
+    setShowMetadataDetails(true);
+  };
+
   const handleRender = async (item: RenderItem) => {
     try {
       const response = await fetch(`/api/renders/${item.id}/render`, {
@@ -516,13 +537,216 @@ export default function Page() {
         throw new Error('Failed to start render');
       }
 
-      // Refresh the list
-      fetchItems();
-      // Always refresh status counts from backend
-      await fetchStatusCounts();
+      // Update local state immediately
+      setItems(prev => prev.map(i => 
+        i.id === item.id ? { ...i, status: 'pending_render' } : i
+      ));
+      // Update status counts
+      setStatusCounts(prev => ({
+        ...prev,
+        new: (prev.new || 0) - 1,
+        pending_render: (prev.pending_render || 0) + 1
+      }));
+
+      // Track last known status for this item
+      renderStatusMap.set(item.id, 'pending_render');
+
+      // Start polling for render updates
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await fetch(`/api/renders/${item.id}`);
+          if (!statusResponse.ok) throw new Error('Failed to fetch render status');
+          
+          const updatedItem = await statusResponse.json();
+          const lastStatus = renderStatusMap.get(item.id);
+          
+          // Only update counts if status actually changed
+          if (updatedItem.status !== lastStatus) {
+            setStatusCounts(prevCounts => {
+              const newCounts = { ...prevCounts };
+              // Decrement previous status
+              if (lastStatus) {
+                newCounts[lastStatus] = Math.max(0, (newCounts[lastStatus] || 0) - 1);
+              }
+              // Increment new status
+              if (updatedItem.status) {
+                const newStatus = updatedItem.status as RenderStatus;
+                newCounts[newStatus] = (newCounts[newStatus] || 0) + 1;
+              }
+              return newCounts;
+            });
+            renderStatusMap.set(item.id, updatedItem.status);
+          }
+
+          // Update local state
+          setItems(prev => prev.map(i => i.id === item.id ? updatedItem : i));
+
+          // If render is complete and autoCreateMetadata is true, trigger metadata generation
+          if (updatedItem.status === 'rendered' && updatedItem.autoCreateMetadata) {
+            clearInterval(pollInterval);
+            renderStatusMap.delete(item.id);
+            await handleMetadata(updatedItem);
+          }
+          // If render failed or completed without auto metadata, stop polling
+          else if (['rendered', 'declined'].includes(updatedItem.status)) {
+            clearInterval(pollInterval);
+            renderStatusMap.delete(item.id);
+            // Ensure final status counts are correct
+            setStatusCounts(prevCounts => {
+              const newCounts = { ...prevCounts };
+              newCounts.rendering = 0;
+              return newCounts;
+            });
+          }
+        } catch (error) {
+          console.error('Error polling render status:', error);
+          clearInterval(pollInterval);
+          renderStatusMap.delete(item.id);
+        }
+      }, 2000); // Poll every 2 seconds
+
+      // Cleanup interval after 5 minutes (timeout)
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        renderStatusMap.delete(item.id);
+      }, 5 * 60 * 1000);
+
     } catch (error) {
       console.error('Error starting render:', error);
       alert('Failed to start render. Please try again.');
+    }
+  };
+
+  const handleMetadata = async (item: RenderItem) => {
+    try {
+      // Always set to pending_metadata if not already
+      let latestStatus: RenderStatus | undefined;
+      setItems(prev => {
+        const found = prev.find(i => i.id === item.id);
+        latestStatus = found?.status;
+        return prev;
+      });
+
+      if (latestStatus !== 'pending_metadata') {
+        setItems(prev => prev.map(i =>
+          i.id === item.id ? { ...i, status: 'pending_metadata' } : i
+        ));
+        setStatusCounts(prev => ({
+          ...prev,
+          rendered: Math.max(0, (prev.rendered || 0) - 1),
+          pending_metadata: (prev.pending_metadata || 0) + 1
+        }));
+        await fetch(`/api/renders/${item.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'pending_metadata' }),
+        });
+      }
+
+      // Immediately proceed to processing_metadata
+      setItems(prev => prev.map(i =>
+        i.id === item.id ? { ...i, status: 'processing_metadata' } : i
+      ));
+      setStatusCounts(prev => ({
+        ...prev,
+        pending_metadata: Math.max(0, (prev.pending_metadata || 0) - 1),
+        processing_metadata: (prev.processing_metadata || 0) + 1
+      }));
+      await fetch(`/api/renders/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'processing_metadata' }),
+      });
+
+      // Call metadata API
+      const metadataResponse = await fetch('/api/youtube-metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ json: item.jsonContent }),
+      });
+
+      if (!metadataResponse.ok) {
+        throw new Error('Failed to generate metadata');
+      }
+
+      const metadataResult = await metadataResponse.json();
+      
+      // Ensure we have title and description
+      if (!metadataResult.title || !metadataResult.description) {
+        throw new Error('Invalid metadata response: missing title or description');
+      }
+
+      // Preserve existing metadata fields and update with new ones
+      const updatedMetadata = {
+        ...item.youtubeMetadata, // Preserve existing metadata
+        title: metadataResult.title,
+        description: metadataResult.description,
+        tags: metadataResult.tags,
+        // Preserve other required fields if they exist
+        categoryId: item.youtubeMetadata?.categoryId || "27",
+        defaultLanguage: item.youtubeMetadata?.defaultLanguage || "vi",
+        defaultAudioLanguage: item.youtubeMetadata?.defaultAudioLanguage || "vi",
+        playlistId: item.youtubeMetadata?.playlistId || "",
+        scheduleDate: item.youtubeMetadata?.scheduleDate || "",
+      };
+
+      // Update local state immediately
+      setItems(prev => prev.map(i => 
+        i.id === item.id ? { 
+          ...i, 
+          status: 'processed_metadata',
+          youtubeMetadata: updatedMetadata,
+          metadataTime: Math.floor(Date.now() / 1000)
+        } : i
+      ));
+      // Update status counts
+      setStatusCounts(prev => ({
+        ...prev,
+        processing_metadata: (prev.processing_metadata || 0) - 1,
+        processed_metadata: (prev.processed_metadata || 0) + 1
+      }));
+
+      // Update item with metadata
+      const updateResponse = await fetch(`/api/renders/${item.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          youtubeMetadata: updatedMetadata,
+          status: 'processed_metadata',
+          metadataTime: Math.floor(Date.now() / 1000),
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update metadata');
+      }
+
+    } catch (error) {
+      console.error('Error generating metadata:', error);
+      // Update local state immediately
+      setItems(prev => prev.map(i => 
+        i.id === item.id ? { ...i, status: 'declined' } : i
+      ));
+      // Update status counts
+      setStatusCounts(prev => ({
+        ...prev,
+        processing_metadata: (prev.processing_metadata || 0) - 1,
+        declined: (prev.declined || 0) + 1
+      }));
+
+      // Update status to error
+      await fetch(`/api/renders/${item.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          status: 'declined',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }),
+      });
     }
   };
 
@@ -949,19 +1173,73 @@ export default function Page() {
             </div>
 
             {/* Row 4: Metadata Zone */}
-            <div className="bg-gray-700/50 rounded-lg p-4">
+            <div className={`rounded-lg p-4 ${
+              ['processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) 
+                ? item.status === 'processed_metadata'
+                  ? 'bg-teal-900/30 border border-teal-500/30'
+                  : 'bg-green-900/30 border border-green-500/30'
+                : 'bg-gray-700/50'
+            }`}>
               <div className="flex justify-between items-center mb-2">
-                <h4 className="text-sm font-medium text-gray-400">Metadata</h4>
-                <button className="text-purple-400 hover:text-purple-300">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-gray-400">Metadata</h4>
+                  {['processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) && (
+                    <CheckCircleIcon className="w-4 h-4 text-teal-500" />
+                  )}
+                </div>
+                <button 
+                  className="text-purple-400 hover:text-purple-300"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMetadataDetailsClick(item);
+                  }}
+                >
                   View Details
                 </button>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-300 truncate max-w-[70%]">
-                  {item.youtubeMetadata ? JSON.stringify(item.youtubeMetadata).slice(0, 50) + '...' : '-'}
-                </span>
+              <div className="flex flex-col gap-1 text-sm">
+                {item.youtubeMetadata ? (
+                  <>
+                    <span className="text-gray-300 truncate">
+                      {item.youtubeMetadata.title}
+                    </span>
+                    <span className="text-gray-400 truncate">
+                      {item.youtubeMetadata.description}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-gray-500">No metadata generated</span>
+                )}
                 <span className="text-gray-500">{item.metadataTime ? formatDate(item.metadataTime) : '-'}</span>
               </div>
+              {item.status === 'rendered' && (
+                <button
+                  className="mt-2 w-full px-3 py-1 text-sm bg-purple-600 hover:bg-purple-500 rounded"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMetadata(item);
+                  }}
+                >
+                  Generate Metadata
+                </button>
+              )}
+              {(item.status === 'pending_metadata' || item.status === 'processing_metadata') && (
+                <div className="mt-2">
+                  <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-purple-600 h-2 rounded-full transition-all duration-500 animate-[loading_2s_ease-in-out_infinite]"
+                      style={{ 
+                        width: '100%',
+                        transform: 'translateX(-100%)',
+                        background: 'linear-gradient(90deg, transparent, rgba(147, 51, 234, 0.8), transparent)',
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-sm text-gray-400 mt-1 text-right">
+                    {item.status === 'pending_metadata' ? 'Pending...' : 'Processing...'}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Row 5: Upload Zone */}
@@ -1073,14 +1351,24 @@ export default function Page() {
 
       {/* Add RenderDetailsDialog */}
       {selectedRenderItem && (
-        <RenderDetailsDialog
-          isOpen={showRenderDetails}
-          onClose={() => {
-            setShowRenderDetails(false);
-            setSelectedRenderItem(null);
-          }}
-          renderItem={selectedRenderItem}
-        />
+        <>
+          <RenderDetailsDialog
+            isOpen={showRenderDetails}
+            onClose={() => {
+              setShowRenderDetails(false);
+              setSelectedRenderItem(null);
+            }}
+            renderItem={selectedRenderItem}
+          />
+          <MetadataDetailsDialog
+            isOpen={showMetadataDetails}
+            onClose={() => {
+              setShowMetadataDetails(false);
+              setSelectedRenderItem(null);
+            }}
+            renderItem={selectedRenderItem}
+          />
+        </>
       )}
     </div>
   );

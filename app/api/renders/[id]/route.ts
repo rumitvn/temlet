@@ -3,12 +3,13 @@ import { prisma } from "@/app/lib/db";
 
 // GET /api/renders/[id] - Get a single render item
 export async function GET(
-    req: NextRequest,
+    request: Request,
     { params }: { params: { id: string } }
 ) {
     try {
+        const { id } = await params;
         const renderItem = await prisma.renderItem.findUnique({
-            where: { id: params.id }
+            where: { id }
         });
 
         if (!renderItem) {
@@ -30,68 +31,63 @@ export async function GET(
 
 // PATCH /api/renders/[id] - Update a render item
 export async function PATCH(
-    req: NextRequest,
+    request: Request,
     { params }: { params: { id: string } }
 ) {
     try {
-        const body = await req.json();
+        const { id } = await params;
+        const body = await request.json();
         const {
             fileName,
             type,
             topic,
+            channelName,
+            channelId,
+            templateAeUrl,
+            templateAeComposition,
+            templateAeRenderFormat,
+            templateAeAssets,
+            autoRender,
+            autoCreateMetadata,
+            autoUpload,
+            uploadScheduleStart,
+            uploadFromHour,
+            uploadToHour,
+            videosPerDay,
+            youtubeMetadata,
             status,
-            metadata,
-            outputPath,
-            youtubeUrl,
-            error,
-            processingTime,
-            fileSize,
-            resolution,
-            duration,
-            format,
-            codec,
-            bitrate,
-            fps,
-            audioCodec,
-            audioBitrate,
-            audioChannels,
-            audioSampleRate,
-            tags,
-            description,
-            title,
-            thumbnailUrl,
-            customFields
+            renderTime,
+            metadataTime,
+            uploadTime,
+            youtubeLink,
         } = body;
 
         const renderItem = await prisma.renderItem.update({
-            where: { id: params.id },
+            where: { id },
             data: {
                 ...(fileName && { fileName }),
                 ...(type && { type }),
                 ...(topic && { topic }),
+                ...(channelName && { channelName }),
+                ...(channelId && { channelId }),
+                ...(templateAeUrl && { templateAeUrl }),
+                ...(templateAeComposition && { templateAeComposition }),
+                ...(templateAeRenderFormat && { templateAeRenderFormat }),
+                ...(templateAeAssets && { templateAeAssets }),
+                ...(autoRender !== undefined && { autoRender }),
+                ...(autoCreateMetadata !== undefined && { autoCreateMetadata }),
+                ...(autoUpload !== undefined && { autoUpload }),
+                ...(uploadScheduleStart && { uploadScheduleStart }),
+                ...(uploadFromHour !== undefined && { uploadFromHour }),
+                ...(uploadToHour !== undefined && { uploadToHour }),
+                ...(videosPerDay !== undefined && { videosPerDay }),
+                ...(youtubeMetadata && { youtubeMetadata }),
                 ...(status && { status }),
-                ...(metadata && { metadata }),
-                ...(outputPath && { outputPath }),
-                ...(youtubeUrl && { youtubeUrl }),
-                ...(error && { error }),
-                ...(processingTime && { processingTime }),
-                ...(fileSize && { fileSize }),
-                ...(resolution && { resolution }),
-                ...(duration && { duration }),
-                ...(format && { format }),
-                ...(codec && { codec }),
-                ...(bitrate && { bitrate }),
-                ...(fps && { fps }),
-                ...(audioCodec && { audioCodec }),
-                ...(audioBitrate && { audioBitrate }),
-                ...(audioChannels && { audioChannels }),
-                ...(audioSampleRate && { audioSampleRate }),
-                ...(tags && { tags }),
-                ...(description && { description }),
-                ...(title && { title }),
-                ...(thumbnailUrl && { thumbnailUrl }),
-                ...(customFields && { customFields })
-            }
+                ...(renderTime !== undefined && { renderTime }),
+                ...(metadataTime !== undefined && { metadataTime }),
+                ...(uploadTime !== undefined && { uploadTime }),
+                ...(youtubeLink && { youtubeLink }),
+            },
         });
 
         return NextResponse.json(renderItem);
@@ -106,12 +102,13 @@ export async function PATCH(
 
 // DELETE /api/renders/[id] - Delete a render item
 export async function DELETE(
-    req: NextRequest,
+    request: Request,
     { params }: { params: { id: string } }
 ) {
     try {
+        const { id } = await params;
         await prisma.renderItem.delete({
-            where: { id: params.id }
+            where: { id },
         });
 
         return NextResponse.json({ success: true });

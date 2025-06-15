@@ -36,6 +36,7 @@ export interface YouTubeMetadata {
     defaultLanguage: string;
     defaultAudioLanguage: string;
     scheduleDate: string;
+    playlistId: string;
 }
 
 export interface UploadConfig {
