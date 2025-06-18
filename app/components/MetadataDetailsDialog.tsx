@@ -1,5 +1,5 @@
 import { Dialog, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { RenderItem } from '../types/render';
 import { XMarkIcon as XMarkIcon } from '@heroicons/react/24/solid';
 
@@ -7,9 +7,49 @@ interface MetadataDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   renderItem: RenderItem;
+  onMetadataUpdate?: (updated: RenderItem) => void;
 }
 
-export default function MetadataDetailsDialog({ isOpen, onClose, renderItem }: MetadataDetailsDialogProps) {
+export default function MetadataDetailsDialog({ isOpen, onClose, renderItem, onMetadataUpdate }: MetadataDetailsDialogProps) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(renderItem.youtubeMetadata?.title || '');
+  const [description, setDescription] = useState(renderItem.youtubeMetadata?.description || '');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const updatedMetadata = {
+        ...renderItem.youtubeMetadata,
+        title,
+        description,
+        tags: renderItem.youtubeMetadata?.tags ?? '',
+        categoryId: renderItem.youtubeMetadata?.categoryId ?? '',
+        defaultLanguage: renderItem.youtubeMetadata?.defaultLanguage ?? '',
+        defaultAudioLanguage: renderItem.youtubeMetadata?.defaultAudioLanguage ?? '',
+        scheduleDate: renderItem.youtubeMetadata?.scheduleDate ?? '',
+        playlistId: renderItem.youtubeMetadata?.playlistId ?? '',
+      };
+      const res = await fetch(`/api/renders/${renderItem.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ youtubeMetadata: updatedMetadata }),
+      });
+      console.log('PATCH response', res);
+      if (res.ok) {
+        const updated = await res.json();
+        setEditing(false);
+        if (onMetadataUpdate) {
+          onMetadataUpdate(updated);
+        }
+      } else {
+        alert('Failed to update metadata');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -58,11 +98,30 @@ export default function MetadataDetailsDialog({ isOpen, onClose, renderItem }: M
                     <>
                       <div>
                         <h4 className="text-sm font-medium text-gray-400 mb-1">Title</h4>
-                        <p className="text-white">{renderItem.youtubeMetadata.title}</p>
+                        {editing ? (
+                          <input
+                            className="w-full bg-gray-700 text-white rounded px-3 py-2 mb-1"
+                            value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            maxLength={120}
+                          />
+                        ) : (
+                          <p className="text-white">{renderItem.youtubeMetadata.title}</p>
+                        )}
+                        <div className="text-xs text-gray-400">{[...title].length} / 100</div>
                       </div>
                       <div>
                         <h4 className="text-sm font-medium text-gray-400 mb-1">Description</h4>
-                        <p className="text-white whitespace-pre-wrap">{renderItem.youtubeMetadata.description}</p>
+                        {editing ? (
+                          <textarea
+                            className="w-full bg-gray-700 text-white rounded px-3 py-2 mb-1"
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            rows={5}
+                          />
+                        ) : (
+                          <p className="text-white whitespace-pre-wrap">{renderItem.youtubeMetadata.description}</p>
+                        )}
                       </div>
                       <div>
                         <h4 className="text-sm font-medium text-gray-400 mb-1">Tags</h4>
@@ -94,6 +153,44 @@ export default function MetadataDetailsDialog({ isOpen, onClose, renderItem }: M
                   ) : (
                     <p className="text-gray-400">No metadata generated yet</p>
                   )}
+                </div>
+
+                <div className="mt-6 flex justify-end gap-2">
+                  {editing ? (
+                    <>
+                      <button
+                        type="button"
+                        className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded"
+                        onClick={() => setEditing(false)}
+                        disabled={saving}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded"
+                        onClick={handleSave}
+                        disabled={saving || !title.trim() || [...title].length > 100}
+                      >
+                        {saving ? 'Saving...' : 'Save'}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded"
+                      onClick={() => setEditing(true)}
+                    >
+                      Edit
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="inline-flex justify-center rounded-md border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+                    onClick={onClose}
+                  >
+                    Close
+                  </button>
                 </div>
               </Dialog.Panel>
             </Transition.Child>

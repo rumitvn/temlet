@@ -484,6 +484,16 @@ export default function Page() {
         return;
       }
 
+      if (action === 'upload') {
+        // For upload, trigger handleUpload for each selected item directly
+        const itemsToProcess = items.filter(i => selectedItems.includes(i.id) && i.status === 'processed_metadata');
+        for (const item of itemsToProcess) {
+          await handleUpload(item);
+        }
+        setSelectedItems([]);
+        return;
+      }
+
       // For other actions, use the batch API
       const response = await fetch('/api/renders/batch', {
         method: 'POST',
@@ -746,6 +756,94 @@ export default function Page() {
           status: 'declined',
           error: error instanceof Error ? error.message : 'Unknown error'
         }),
+      });
+    }
+  };
+
+  const handleUpload = async (item: RenderItem) => {
+    if (!item.youtubeMetadata) {
+      console.error('Missing YouTube metadata');
+      return;
+    }
+
+    try {
+      // Update status to pending_upload
+      await fetch(`/api/renders/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "pending_upload" }),
+      });
+
+      // Update status to processing_upload
+      await fetch(`/api/renders/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "processing_upload" }),
+      });
+
+      // Get the video file
+      const videoResponse = await fetch(`/api/renders/${item.id}/video`);
+      if (!videoResponse.ok) {
+        throw new Error('Failed to fetch video file');
+      }
+      const videoBlob = await videoResponse.blob();
+      const videoFile = new File([videoBlob], `${item.fileName}.mp4`, { type: 'video/mp4' });
+
+      // Prepare form data
+      const form = new FormData();
+      form.append("mp4", videoFile);
+      form.append("title", item.youtubeMetadata.title);
+      form.append("description", item.youtubeMetadata.description);
+      form.append("playlistId", "");
+      form.append("tags", item.youtubeMetadata.tags);
+      form.append("categoryId", "27");
+      form.append("defaultLanguage", "vi");
+      form.append("defaultAudioLanguage", "vi");
+      form.append("scheduleDate", "");
+
+      // Upload to YouTube
+      const res = await fetch("/api/youtube-upload", {
+        method: "POST",
+        body: form,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Upload failed');
+      }
+
+      // Update status to uploaded and store YouTube link and upload time
+      const uploadTime = Math.floor(Date.now() / 1000);
+      await fetch(`/api/renders/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "uploaded",
+          youtubeLink: `https://youtube.com/watch?v=${data.videoId}`,
+          uploadTime,
+        }),
+      });
+
+      // Update local state for this item and statusCounts
+      setItems(prev => prev.map(i =>
+        i.id === item.id
+          ? { ...i, status: 'uploaded', youtubeLink: `https://youtube.com/watch?v=${data.videoId}`, uploadTime }
+          : i
+      ));
+      setStatusCounts(prev => ({
+        ...prev,
+        processing_upload: Math.max(0, (prev.processing_upload || 0) - 1),
+        uploaded: (prev.uploaded || 0) + 1
+      }));
+
+    } catch (error) {
+      console.error('Upload failed:', error);
+      // Update status to declined on error
+      await fetch(`/api/renders/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "declined" }),
       });
     }
   };
@@ -1161,7 +1259,12 @@ export default function Page() {
                   className="mt-2 w-full px-3 py-1 text-sm bg-green-600 hover:bg-green-500 rounded flex items-center justify-center gap-2"
                   onClick={(e) => {
                     e.stopPropagation();
-                    window.open(`/api/renders/${item.id}/video`, '_blank');
+                    // Open the video file in a new tab (restore old behavior)
+                    if (item.mp4Link) {
+                      window.open(item.mp4Link, '_blank');
+                    } else {
+                      window.open(`/api/renders/${item.id}/video`, '_blank');
+                    }
                   }}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -1243,19 +1346,92 @@ export default function Page() {
             </div>
 
             {/* Row 5: Upload Zone */}
-            <div className="bg-gray-700/50 rounded-lg p-4">
+            <div className={`rounded-lg p-4 ${
+              ['uploaded', 'declined', 'approved'].includes(item.status) 
+                ? 'bg-green-900/30 border border-green-500/30'
+                : 'bg-gray-700/50'
+            }`}>
               <div className="flex justify-between items-center mb-2">
-                <h4 className="text-sm font-medium text-gray-400">Upload</h4>
-                <button className="text-purple-400 hover:text-purple-300">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-gray-400">Upload</h4>
+                  {['uploaded', 'declined', 'approved'].includes(item.status) && (
+                    <CheckCircleIcon className="w-4 h-4 text-green-500" />
+                  )}
+                </div>
+                <button 
+                  className="text-purple-400 hover:text-purple-300"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (item.youtubeLink) {
+                      window.open(item.youtubeLink, '_blank');
+                    }
+                  }}
+                >
                   View Details
                 </button>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-300 truncate max-w-[70%]">
-                  {item.youtubeLink || '-'}
-                </span>
+              <div className="flex flex-col gap-1 text-sm">
+                {item.youtubeLink ? (
+                  <a
+                    href={item.youtubeLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:underline break-all"
+                  >
+                    {item.youtubeLink}
+                  </a>
+                ) : (
+                  <span className="text-gray-300">-</span>
+                )}
                 <span className="text-gray-500">{item.uploadTime ? formatDate(item.uploadTime) : '-'}</span>
               </div>
+              {item.status === 'processed_metadata' && (
+                <button
+                  className="mt-2 w-full px-3 py-2 text-sm font-semibold rounded flex items-center justify-center gap-2 transition-colors"
+                  style={{ background: '#FF0000', color: '#fff' }}
+                  onMouseOver={e => e.currentTarget.style.background = '#ff4d4d'}
+                  onMouseOut={e => e.currentTarget.style.background = '#FF0000'}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (!item.youtubeMetadata || !item.youtubeMetadata.title || !item.youtubeMetadata.title.trim()) {
+                      alert('Cannot upload: Missing or empty YouTube title.');
+                      return;
+                    }
+                    if ([...item.youtubeMetadata.title].length > 100) {
+                      alert('Cannot upload: YouTube title must be 100 characters or fewer. Current count: ' + [...item.youtubeMetadata.title].length);
+                      return;
+                    }
+                    setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'pending_upload' } : i));
+                    setStatusCounts(prev => ({
+                      ...prev,
+                      processed_metadata: Math.max(0, (prev.processed_metadata || 0) - 1),
+                      pending_upload: (prev.pending_upload || 0) + 1,
+                    }));
+                  }}
+                >
+                  <svg height="20" viewBox="0 0 24 24" width="20" fill="#fff" style={{ marginRight: 6 }}>
+                    <path d="M23.498 6.186a2.994 2.994 0 0 0-2.112-2.12C19.228 3.5 12 3.5 12 3.5s-7.228 0-9.386.566A2.994 2.994 0 0 0 .502 6.186C0 8.344 0 12 0 12s0 3.656.502 5.814a2.994 2.994 0 0 0 2.112 2.12C4.772 20.5 12 20.5 12 20.5s7.228 0 9.386-.566a2.994 2.994 0 0 0 2.112-2.12C24 15.656 24 12 24 12s0-3.656-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                  </svg>
+                  Upload to YouTube
+                </button>
+              )}
+              {(item.status === 'pending_upload' || item.status === 'processing_upload') && (
+                <div className="mt-2">
+                  <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-green-600 h-2 rounded-full transition-all duration-500 animate-[loading_2s_ease-in-out_infinite]"
+                      style={{ 
+                        width: '100%',
+                        transform: 'translateX(-100%)',
+                        background: 'linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.8), transparent)',
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-sm text-gray-400 mt-1 text-right">
+                    {item.status === 'pending_upload' ? 'Pending...' : 'Uploading...'}
+                  </p>
+                </div>
+              )}
             </div>
           </motion.div>
         ))}
@@ -1367,6 +1543,10 @@ export default function Page() {
               setSelectedRenderItem(null);
             }}
             renderItem={selectedRenderItem}
+            onMetadataUpdate={(updated) => {
+              setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
+              setSelectedRenderItem(updated);
+            }}
           />
         </>
       )}
