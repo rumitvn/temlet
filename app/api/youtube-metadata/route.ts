@@ -16,8 +16,8 @@ export async function POST(req: NextRequest) {
 
     const userPrompt = `Hãy viết tiêu đề, mô tả và danh sách hashtag cho video giáo dục thiếu nhi dạng YouTube Shorts dựa theo JSON dữ liệu sau:\n\n${JSON.stringify(json, null, 2)}\n\nYêu cầu:\n- Tiêu đề theo mẫu: Đố Vui Động Vật: [câu hỏi chính] (Phần ${order}) | Pikoro 🦜 – MiniMate #shorts #minimate #pikoro\n- Mô tả hấp dẫn, mô tả nội dung 3 câu hỏi trong video\n- Hashtag liên quan tới giáo dục trẻ em, động vật, minimate, pikoro, #shorts\n- Trả đúng định dạng JSON như hướng dẫn
     Nội dung mẫu như sau:
-    1. Tiêu đề (title): Đố Vui Động Vật: Cá Sấu Sống Ở Đâu? (Phần 1) | Pikoro 🦜 - MiniMate #shorts #minimate #pikoro
-    2. Mô tả (description, phải ít hơn 100 ký tự):
+    1. Tiêu đề (title, phải ít hơn 100 ký tự): Cá Sấu Sống Ở Đâu? (Phần 1) | Pikoro 🦜 #shorts #minimate #pikoro
+    2. Mô tả (description):
 🎉 Bạn đã sẵn sàng khám phá thế giới động vật cùng Pikoro chưa? 🦜✨ Hôm nay, chúng ta sẽ tìm hiểu về CÁ SẤU – loài bò sát đáng sợ sống gần nước! 🐊
 
 🎯 Cùng thử thách trí nhớ và đoán xem:

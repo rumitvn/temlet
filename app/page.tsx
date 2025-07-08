@@ -361,6 +361,18 @@ export default function Page() {
         setRecentlyChangedIds(changedIds);
         if (statusChanged) {
           fetchStatusCounts();
+          
+          // Check for autoUpload after metadata processing
+          for (const updatedItem of data.items) {
+            if (updatedItem.status === 'processed_metadata' && updatedItem.autoUpload) {
+              // Find the original item to get the current state
+              const originalItem = items.find(i => i.id === updatedItem.id);
+              if (originalItem && originalItem.status !== 'processed_metadata') {
+                // This item just changed to processed_metadata, trigger autoUpload
+                handleUpload(updatedItem);
+              }
+            }
+          }
         }
       } catch (error) {
         console.error('Error polling render updates:', error);
@@ -486,7 +498,7 @@ export default function Page() {
 
       if (action === 'upload') {
         // For upload, trigger handleUpload for each selected item directly
-        const itemsToProcess = items.filter(i => selectedItems.includes(i.id) && i.status === 'processed_metadata');
+        const itemsToProcess = items.filter(i => selectedItems.includes(i.id) && i.youtubeMetadata != null);
         for (const item of itemsToProcess) {
           await handleUpload(item);
         }
@@ -733,6 +745,11 @@ export default function Page() {
         throw new Error('Failed to update metadata');
       }
 
+      // If autoUpload is true, trigger upload immediately
+      if (item.autoUpload) {
+        await handleUpload({ ...item, status: 'processed_metadata', youtubeMetadata: updatedMetadata });
+      }
+
     } catch (error) {
       console.error('Error generating metadata:', error);
       // Update local state immediately
@@ -767,19 +784,39 @@ export default function Page() {
     }
 
     try {
-      // Update status to pending_upload
+      // Update status to pending_upload and update local state immediately
       await fetch(`/api/renders/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "pending_upload" }),
       });
+      
+      // Update local state immediately
+      setItems(prev => prev.map(i =>
+        i.id === item.id ? { ...i, status: 'pending_upload' } : i
+      ));
+      setStatusCounts(prev => ({
+        ...prev,
+        processed_metadata: Math.max(0, (prev.processed_metadata || 0) - 1),
+        pending_upload: (prev.pending_upload || 0) + 1
+      }));
 
-      // Update status to processing_upload
+      // Update status to processing_upload and update local state immediately
       await fetch(`/api/renders/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "processing_upload" }),
       });
+      
+      // Update local state immediately
+      setItems(prev => prev.map(i =>
+        i.id === item.id ? { ...i, status: 'processing_upload' } : i
+      ));
+      setStatusCounts(prev => ({
+        ...prev,
+        pending_upload: Math.max(0, (prev.pending_upload || 0) - 1),
+        processing_upload: (prev.processing_upload || 0) + 1
+      }));
 
       // Get the video file
       const videoResponse = await fetch(`/api/renders/${item.id}/video`);
@@ -839,6 +876,17 @@ export default function Page() {
 
     } catch (error) {
       console.error('Upload failed:', error);
+      
+      // Update local state to declined immediately
+      setItems(prev => prev.map(i =>
+        i.id === item.id ? { ...i, status: 'declined' } : i
+      ));
+      setStatusCounts(prev => ({
+        ...prev,
+        processing_upload: Math.max(0, (prev.processing_upload || 0) - 1),
+        declined: (prev.declined || 0) + 1
+      }));
+      
       // Update status to declined on error
       await fetch(`/api/renders/${item.id}`, {
         method: "PATCH",
@@ -1401,12 +1449,8 @@ export default function Page() {
                       alert('Cannot upload: YouTube title must be 100 characters or fewer. Current count: ' + [...item.youtubeMetadata.title].length);
                       return;
                     }
-                    setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'pending_upload' } : i));
-                    setStatusCounts(prev => ({
-                      ...prev,
-                      processed_metadata: Math.max(0, (prev.processed_metadata || 0) - 1),
-                      pending_upload: (prev.pending_upload || 0) + 1,
-                    }));
+                    // Call the actual upload function
+                    await handleUpload(item);
                   }}
                 >
                   <svg height="20" viewBox="0 0 24 24" width="20" fill="#fff" style={{ marginRight: 6 }}>
