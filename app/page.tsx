@@ -22,6 +22,7 @@ import CreateRenderDialog from './components/CreateRenderDialog';
 import { RenderStatus, RenderItem, TemplateAeRenderFormat } from './types/render';
 import RenderDetailsDialog from './components/RenderDetailsDialog';
 import MetadataDetailsDialog from './components/MetadataDetailsDialog';
+import TikTokAuthDialog from './components/TikTokAuthDialog';
 
 // Custom debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -151,6 +152,8 @@ export default function Page() {
   const [selectedRenderItem, setSelectedRenderItem] = useState<RenderItem | null>(null);
   const [showRenderDetails, setShowRenderDetails] = useState(false);
   const [showMetadataDetails, setShowMetadataDetails] = useState(false);
+  const [showTikTokAuth, setShowTikTokAuth] = useState(false);
+  const [tiktokConnected, setTiktokConnected] = useState(false);
 
   // Track items that just changed status in the last poll
   const [recentlyChangedIds, setRecentlyChangedIds] = useState<string[]>([]);
@@ -264,6 +267,31 @@ export default function Page() {
       setLoading(false);
     }
   }, [currentPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, selectedStatus, sortBy, sortOrder]);
+
+  // Check TikTok connection status on mount
+  useEffect(() => {
+    const token = localStorage.getItem('tiktok_access_token');
+    const expiresAt = localStorage.getItem('tiktok_token_expires_at');
+    
+    if (token && expiresAt) {
+      const expiryTime = parseInt(expiresAt);
+      const now = Date.now();
+      
+      if (now < expiryTime) {
+        // Token is still valid
+        setTiktokConnected(true);
+        console.log('TikTok token is valid, connected');
+      } else {
+        // Token has expired, remove it
+        localStorage.removeItem('tiktok_access_token');
+        localStorage.removeItem('tiktok_token_expires_at');
+        setTiktokConnected(false);
+        console.log('TikTok token has expired, removed');
+      }
+    } else {
+      setTiktokConnected(false);
+    }
+  }, []);
 
   // Initial data fetch
   useEffect(() => {
@@ -478,7 +506,8 @@ export default function Page() {
     const actionMap = {
       render: 'render',
       metadata: 'create metadata for',
-      upload: 'upload'
+      upload: 'upload',
+      'tiktok-upload': 'upload to TikTok'
     };
     
     if (!confirm(`Are you sure you want to ${actionMap[action as keyof typeof actionMap]} ${selectedItems.length} item(s)?`)) {
@@ -501,6 +530,16 @@ export default function Page() {
         const itemsToProcess = items.filter(i => selectedItems.includes(i.id) && i.youtubeMetadata != null);
         for (const item of itemsToProcess) {
           await handleUpload(item);
+        }
+        setSelectedItems([]);
+        return;
+      }
+
+      if (action === 'tiktok-upload') {
+        // For TikTok upload, trigger handleTikTokUpload for each selected item directly
+        const itemsToProcess = items.filter(i => selectedItems.includes(i.id) && i.youtubeMetadata != null);
+        for (const item of itemsToProcess) {
+          await handleTikTokUpload(item);
         }
         setSelectedItems([]);
         return;
@@ -896,6 +935,133 @@ export default function Page() {
     }
   };
 
+  const handleTikTokUpload = async (item: RenderItem) => {
+    if (!item.youtubeMetadata) {
+      console.error('Missing YouTube metadata');
+      return;
+    }
+
+    // Check if TikTok is connected
+    if (!tiktokConnected) {
+      setShowTikTokAuth(true);
+      return;
+    }
+
+    try {
+      // Update status to pending_upload and update local state immediately
+      await fetch(`/api/renders/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "pending_upload" }),
+      });
+      
+      // Update local state immediately
+      setItems(prev => prev.map(i =>
+        i.id === item.id ? { ...i, status: 'pending_upload' } : i
+      ));
+      setStatusCounts(prev => ({
+        ...prev,
+        processed_metadata: Math.max(0, (prev.processed_metadata || 0) - 1),
+        pending_upload: (prev.pending_upload || 0) + 1
+      }));
+
+      // Update status to processing_upload and update local state immediately
+      await fetch(`/api/renders/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "processing_upload" }),
+      });
+      
+      // Update local state immediately
+      setItems(prev => prev.map(i =>
+        i.id === item.id ? { ...i, status: 'processing_upload' } : i
+      ));
+      setStatusCounts(prev => ({
+        ...prev,
+        pending_upload: Math.max(0, (prev.pending_upload || 0) - 1),
+        processing_upload: (prev.processing_upload || 0) + 1
+      }));
+
+      // Get the video file
+      const videoResponse = await fetch(`/api/renders/${item.id}/video`);
+      if (!videoResponse.ok) {
+        throw new Error('Failed to fetch video file');
+      }
+      const videoBlob = await videoResponse.blob();
+      const videoFile = new File([videoBlob], `${item.fileName}.mp4`, { type: 'video/mp4' });
+
+      // Prepare form data for TikTok
+      const form = new FormData();
+      form.append("mp4", videoFile);
+      form.append("title", item.youtubeMetadata.title);
+      form.append("description", item.youtubeMetadata.description);
+      form.append("tags", item.youtubeMetadata.tags);
+
+      // Upload to TikTok
+      const res = await fetch("/api/tiktok-upload", {
+        method: "POST",
+        body: form,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'TikTok upload failed');
+      }
+
+      // Update status to uploaded and store TikTok link and upload time
+      const uploadTime = Math.floor(Date.now() / 1000);
+      await fetch(`/api/renders/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "uploaded",
+          tiktokLink: `https://www.tiktok.com/inbox?publish_id=${data.publishId}`,
+          tiktokPublishId: data.publishId,
+          uploadTime,
+        }),
+      });
+
+      // Update local state for this item and statusCounts
+      setItems(prev => prev.map(i =>
+        i.id === item.id
+                      ? { 
+                ...i, 
+                status: 'uploaded', 
+                tiktokLink: `https://www.tiktok.com/inbox?publish_id=${data.publishId}`,
+                tiktokPublishId: data.publishId,
+                uploadTime 
+              }
+          : i
+      ));
+      setStatusCounts(prev => ({
+        ...prev,
+        processing_upload: Math.max(0, (prev.processing_upload || 0) - 1),
+        uploaded: (prev.uploaded || 0) + 1
+      }));
+
+    } catch (error) {
+      console.error('TikTok upload failed:', error);
+      
+      // Update local state to declined immediately
+      setItems(prev => prev.map(i =>
+        i.id === item.id ? { ...i, status: 'declined' } : i
+      ));
+      setStatusCounts(prev => ({
+        ...prev,
+        processing_upload: Math.max(0, (prev.processing_upload || 0) - 1),
+        declined: (prev.declined || 0) + 1
+      }));
+      
+      // Update status to declined on error
+      await fetch(`/api/renders/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "declined" }),
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
       {/* Header - Sticky */}
@@ -1039,6 +1205,12 @@ export default function Page() {
               className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
             >
               Upload ({selectedItems.length})
+            </button>
+            <button
+              onClick={() => handleActionClick('tiktok-upload')}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-black text-white hover:bg-gray-800 transition-colors"
+            >
+              TikTok ({selectedItems.length})
             </button>
           </>
         )}
@@ -1419,45 +1591,88 @@ export default function Page() {
                 </button>
               </div>
               <div className="flex flex-col gap-1 text-sm">
-                {item.youtubeLink ? (
-                  <a
-                    href={item.youtubeLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:underline break-all"
-                  >
-                    {item.youtubeLink}
-                  </a>
-                ) : (
+                {item.youtubeLink && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-400 text-xs">YouTube:</span>
+                    <a
+                      href={item.youtubeLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:underline break-all text-xs"
+                    >
+                      {item.youtubeLink}
+                    </a>
+                  </div>
+                )}
+                {item.tiktokLink && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-black bg-white px-1 rounded text-xs">TikTok:</span>
+                    <a
+                      href={item.tiktokLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:underline break-all text-xs"
+                    >
+                      {item.tiktokLink}
+                    </a>
+                  </div>
+                )}
+                {!item.youtubeLink && !item.tiktokLink && (
                   <span className="text-gray-300">-</span>
                 )}
                 <span className="text-gray-500">{item.uploadTime ? formatDate(item.uploadTime) : '-'}</span>
               </div>
               {item.status === 'processed_metadata' && (
-                <button
-                  className="mt-2 w-full px-3 py-2 text-sm font-semibold rounded flex items-center justify-center gap-2 transition-colors"
-                  style={{ background: '#FF0000', color: '#fff' }}
-                  onMouseOver={e => e.currentTarget.style.background = '#ff4d4d'}
-                  onMouseOut={e => e.currentTarget.style.background = '#FF0000'}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (!item.youtubeMetadata || !item.youtubeMetadata.title || !item.youtubeMetadata.title.trim()) {
-                      alert('Cannot upload: Missing or empty YouTube title.');
-                      return;
-                    }
-                    if ([...item.youtubeMetadata.title].length > 100) {
-                      alert('Cannot upload: YouTube title must be 100 characters or fewer. Current count: ' + [...item.youtubeMetadata.title].length);
-                      return;
-                    }
-                    // Call the actual upload function
-                    await handleUpload(item);
-                  }}
-                >
-                  <svg height="20" viewBox="0 0 24 24" width="20" fill="#fff" style={{ marginRight: 6 }}>
-                    <path d="M23.498 6.186a2.994 2.994 0 0 0-2.112-2.12C19.228 3.5 12 3.5 12 3.5s-7.228 0-9.386.566A2.994 2.994 0 0 0 .502 6.186C0 8.344 0 12 0 12s0 3.656.502 5.814a2.994 2.994 0 0 0 2.112 2.12C4.772 20.5 12 20.5 12 20.5s7.228 0 9.386-.566a2.994 2.994 0 0 0 2.112-2.12C24 15.656 24 12 24 12s0-3.656-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                  </svg>
-                  Upload to YouTube
-                </button>
+                <div className="mt-2 space-y-2">
+                  <button
+                    className="w-full px-3 py-2 text-sm font-semibold rounded flex items-center justify-center gap-2 transition-colors"
+                    style={{ background: '#FF0000', color: '#fff' }}
+                    onMouseOver={e => e.currentTarget.style.background = '#ff4d4d'}
+                    onMouseOut={e => e.currentTarget.style.background = '#FF0000'}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!item.youtubeMetadata || !item.youtubeMetadata.title || !item.youtubeMetadata.title.trim()) {
+                        alert('Cannot upload: Missing or empty YouTube title.');
+                        return;
+                      }
+                      if ([...item.youtubeMetadata.title].length > 100) {
+                        alert('Cannot upload: YouTube title must be 100 characters or fewer. Current count: ' + [...item.youtubeMetadata.title].length);
+                        return;
+                      }
+                      // Call the actual upload function
+                      await handleUpload(item);
+                    }}
+                  >
+                    <svg height="20" viewBox="0 0 24 24" width="20" fill="#fff" style={{ marginRight: 6 }}>
+                      <path d="M23.498 6.186a2.994 2.994 0 0 0-2.112-2.12C19.228 3.5 12 3.5 12 3.5s-7.228 0-9.386.566A2.994 2.994 0 0 0 .502 6.186C0 8.344 0 12 0 12s0 3.656.502 5.814a2.994 2.994 0 0 0 2.112 2.12C4.772 20.5 12 20.5 12 20.5s7.228 0 9.386-.566a2.994 2.994 0 0 0 2.112-2.12C24 15.656 24 12 24 12s0-3.656-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    Upload to YouTube
+                  </button>
+                  <button
+                    className="w-full px-3 py-2 text-sm font-semibold rounded flex items-center justify-center gap-2 transition-colors"
+                    style={{ background: '#000000', color: '#fff' }}
+                    onMouseOver={e => e.currentTarget.style.background = '#333333'}
+                    onMouseOut={e => e.currentTarget.style.background = '#000000'}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!item.youtubeMetadata || !item.youtubeMetadata.title || !item.youtubeMetadata.title.trim()) {
+                        alert('Cannot upload: Missing or empty TikTok title.');
+                        return;
+                      }
+                      if ([...item.youtubeMetadata.title].length > 150) {
+                        alert('Cannot upload: TikTok title must be 150 characters or fewer. Current count: ' + [...item.youtubeMetadata.title].length);
+                        return;
+                      }
+                      // Call the TikTok upload function
+                      await handleTikTokUpload(item);
+                    }}
+                  >
+                    <svg height="20" viewBox="0 0 24 24" width="20" fill="#fff" style={{ marginRight: 6 }}>
+                      <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+                    </svg>
+                    Upload to TikTok
+                  </button>
+                </div>
               )}
               {(item.status === 'pending_upload' || item.status === 'processing_upload') && (
                 <div className="mt-2">
@@ -1544,6 +1759,12 @@ export default function Page() {
               Upload
             </button>
             <button
+              onClick={() => handleActionClick('tiktok-upload')}
+              className="px-3 py-1 text-sm bg-black hover:bg-gray-700 rounded"
+            >
+              TikTok
+            </button>
+            <button
               onClick={handleDeleteSelected}
               className="px-3 py-1 text-sm bg-red-600 hover:bg-red-500 rounded"
             >
@@ -1567,6 +1788,16 @@ export default function Page() {
         onTemplatesChange={fetchTemplates}
         onOutputFoldersChange={fetchOutputFolders}
         onRenderFormatsChange={fetchRenderFormats}
+      />
+
+      {/* TikTok Auth Dialog */}
+      <TikTokAuthDialog
+        isOpen={showTikTokAuth}
+        onClose={() => setShowTikTokAuth(false)}
+        onSuccess={() => {
+          setTiktokConnected(true);
+          setShowTikTokAuth(false);
+        }}
       />
 
       {/* Add RenderDetailsDialog */}

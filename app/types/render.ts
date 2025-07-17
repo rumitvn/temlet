@@ -74,6 +74,8 @@ export interface RenderItem {
     metadataTime: number | null; // in seconds
     uploadTime: number | null; // in seconds
     youtubeLink: string | null;
+    tiktokLink: string | null;
+    tiktokPublishId: string | null;
     createdAt: Date;
     updatedAt: Date;
     error?: string;
@@ -125,4 +127,6 @@ export interface UpdateRenderItemDto {
     metadataTime?: number;
     uploadTime?: number;
     youtubeLink?: string;
+    tiktokLink?: string;
+    tiktokPublishId?: string;
 } 

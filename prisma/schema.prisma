@@ -48,6 +48,8 @@ model RenderItem {
   metadataTime          Int?
   uploadTime            Int?
   youtubeLink           String?
+  tiktokLink            String?
+  tiktokPublishId       String?
   error                 String?
   renderProgress        Float?   @default(0)
   createdAt             DateTime @default(now())
