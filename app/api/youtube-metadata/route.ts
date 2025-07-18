@@ -5,9 +5,13 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Grok API configuration
+const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
+const GROK_API_KEY = process.env.GROK_API_KEY;
+
 export async function POST(req: NextRequest) {
   try {
-    const { json } = await req.json();
+    const { json, provider = "grok" } = await req.json();
 
     const order = json?.order || 1;
 
@@ -34,15 +38,51 @@ export async function POST(req: NextRequest) {
 
     `;
 
-    const chat = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ]
-    });
+    let content = "";
 
-    const content = chat.choices[0].message.content || "";
+    if (provider === "grok") {
+      // Use Grok API
+      if (!GROK_API_KEY) {
+        throw new Error("GROK_API_KEY is not configured");
+      }
+
+      const grokResponse = await fetch(GROK_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${GROK_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "grok-3-latest",
+          stream: false,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 1000,
+        }),
+      });
+
+      if (!grokResponse.ok) {
+        throw new Error(`Grok API error: ${grokResponse.status}`);
+      }
+
+      const grokData = await grokResponse.json();
+      content = grokData.choices[0].message.content || "";
+    } else {
+      // Use OpenAI (default)
+      const chat = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ]
+      });
+
+      content = chat.choices[0].message.content || "";
+    }
+
     console.log('Output Content: ', content);
     const parsed = JSON.parse(content);
 
