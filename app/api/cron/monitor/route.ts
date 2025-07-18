@@ -4,16 +4,11 @@ import { NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export async function GET(req: Request) {
-  console.log('Cron job triggered');
-  
+export async function GET(req: Request) {  
   // Skip auth check in development
   if (process.env.NODE_ENV === 'development') {
-    console.log('Development mode: skipping auth check');
     try {
-      console.log('Starting monitoring from cron job');
       await startMonitoring();
-      console.log('Monitoring completed successfully');
       return new NextResponse('Monitoring completed', { status: 200 });
     } catch (error) {
       console.error('Error in cron job:', error);

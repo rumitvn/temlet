@@ -29,7 +29,6 @@ function mapNexrenderStatus(nexrenderState: string): string {
 
 // Background monitoring function
 export async function startMonitoring() {
-  console.log('Starting monitoring...');
   try {
     // Get all renders that need monitoring
     const renders = await prisma.renderItem.findMany({
@@ -59,8 +58,6 @@ export async function startMonitoring() {
         ]
       }
     });
-
-    console.log(`Found ${renders.length} items to monitor:`, renders);
 
     // Check status for each render
     for (const render of renders) {
@@ -147,5 +144,4 @@ export async function startMonitoring() {
   } catch (error) {
     console.error('Error in monitoring:', error);
   }
-  console.log('Monitoring cycle completed');
 }
