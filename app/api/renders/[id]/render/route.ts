@@ -15,10 +15,10 @@ const normalizePath = (path: string, isOutputPath: boolean = false): string => {
 
 export async function POST(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = context.params;
+    const { id } = await context.params;
     console.log('Starting render for item:', id);
 
     // Get the render item
@@ -66,7 +66,27 @@ export async function POST(
       },
     };
 
-    // console.log('Sending request to Nexrender:', JSON.stringify(requestBody, null, 2));
+    console.log('Sending request to Nexrender:', JSON.stringify(requestBody, null, 2));
+
+    // Check if Nexrender server is accessible first
+    try {
+      const healthCheck = await fetch("http://localhost:3000/api/v1/jobs", {
+        method: "GET",
+        headers: {
+          "nexrender-secret": "myapisecret",
+        },
+      });
+      
+      if (!healthCheck.ok) {
+        throw new Error(`Nexrender server health check failed: ${healthCheck.status} ${healthCheck.statusText}`);
+      }
+    } catch (healthError) {
+      console.error('Nexrender server not accessible:', healthError);
+      return NextResponse.json(
+        { error: "Nexrender server is not accessible. Please ensure it's running on localhost:3000" },
+        { status: 503 }
+      );
+    }
 
     const response = await fetch("http://localhost:3000/api/v1/jobs", {
       method: "POST",
@@ -88,7 +108,7 @@ export async function POST(
     }
 
     const jobData = await response.json();
-    // console.log('Nexrender job created:', jobData);
+    console.log('Nexrender job created:', jobData);
 
     // Update render item with job UID and status
     console.log('Updating render item with job UID:', jobData.uid);
