@@ -271,7 +271,12 @@ export default function CreateRenderDialog({
           const templateAeAssets = generateAssets(renderData as any); // Type assertion needed due to Prisma vs DTO type mismatch
           renderData.templateAeAssets = templateAeAssets as TemplateAeAsset[];
 
-          await onSave(renderData);
+          await onSave({
+            ...renderData,
+            _fileCount: jsonFiles.length,
+            _autoUpload: formData.autoUpload,
+            _fileIndex: jsonFiles.indexOf(jsonFile)
+          });
         } catch (fileError: any) {
           console.error('Error processing file:', jsonFile.name, fileError);
           

@@ -23,6 +23,7 @@ import { RenderStatus, RenderItem, TemplateAeRenderFormat } from './types/render
 import RenderDetailsDialog from './components/RenderDetailsDialog';
 import MetadataDetailsDialog from './components/MetadataDetailsDialog';
 import TikTokAuthDialog from './components/TikTokAuthDialog';
+import ScheduleUploadDialog, { ScheduleConfig } from './components/ScheduleUploadDialog';
 
 // Custom debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -133,6 +134,7 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 200); // 200ms delay
   const [showFilters, setShowFilters] = useState(false);
@@ -154,6 +156,11 @@ export default function Page() {
   const [showMetadataDetails, setShowMetadataDetails] = useState(false);
   const [showTikTokAuth, setShowTikTokAuth] = useState(false);
   const [tiktokConnected, setTiktokConnected] = useState(false);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [pendingUploadItems, setPendingUploadItems] = useState<RenderItem[]>([]);
+  const [pendingUploadType, setPendingUploadType] = useState<'youtube' | 'tiktok'>('youtube');
+  const [createdItemsForScheduling, setCreatedItemsForScheduling] = useState<RenderItem[]>([]);
+  const [isCreatingMultipleItems, setIsCreatingMultipleItems] = useState(false);
 
   // Track items that just changed status in the last poll
   const [recentlyChangedIds, setRecentlyChangedIds] = useState<string[]>([]);
@@ -231,7 +238,7 @@ export default function Page() {
         page: currentPage.toString(),
         sortBy,
         sortOrder,
-        limit: "20"
+        limit: itemsPerPage.toString()
       });
 
       // If we have a search query, use the search endpoint
@@ -266,7 +273,7 @@ export default function Page() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, selectedStatus, sortBy, sortOrder]);
+  }, [currentPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, selectedStatus, sortBy, sortOrder, itemsPerPage]);
 
   // Check TikTok connection status on mount
   useEffect(() => {
@@ -312,6 +319,26 @@ export default function Page() {
     fetchItems();
   }, [fetchItems]);
 
+  // Reset to first page when items per page changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
+
+  // Effect to handle scheduling dialog after multiple items are created
+  useEffect(() => {
+    if (isCreatingMultipleItems && createdItemsForScheduling.length > 0) {
+      // Check if we have all the items we expect
+      const expectedCount = (createdItemsForScheduling[0] as any)?._fileCount || 0;
+      if (createdItemsForScheduling.length >= expectedCount) {
+        setPendingUploadItems(createdItemsForScheduling);
+        setPendingUploadType('youtube');
+        setShowScheduleDialog(true);
+        setCreatedItemsForScheduling([]);
+        setIsCreatingMultipleItems(false);
+      }
+    }
+  }, [createdItemsForScheduling, isCreatingMultipleItems]);
+
   const clearFilters = () => {
     setSelectedType(null);
     setSelectedTopic(null);
@@ -323,6 +350,26 @@ export default function Page() {
     if (!dateString) return '-';
     const date = typeof dateString === 'number' ? new Date(dateString * 1000) : new Date(dateString);
     return date.toLocaleString();
+  };
+
+  // Helper function to calculate scheduled date for an item
+  const calculateScheduledDate = (scheduleConfig: ScheduleConfig, itemIndex: number): string => {
+    const { startDate, timeSlots, videosPerDay } = scheduleConfig;
+    const start = new Date(startDate);
+    
+    // Calculate which day this item should be scheduled for
+    const dayOffset = Math.floor(itemIndex / videosPerDay);
+    const timeSlotIndex = itemIndex % videosPerDay;
+    
+    const scheduledDate = new Date(start);
+    scheduledDate.setDate(start.getDate() + dayOffset);
+    
+    // Get the time slot
+    const timeSlot = timeSlots[timeSlotIndex % timeSlots.length];
+    const [hours, minutes] = timeSlot.split(':').map(Number);
+    scheduledDate.setHours(hours, minutes, 0, 0);
+    
+    return scheduledDate.toISOString();
   };
 
   // Add polling for render updates
@@ -437,6 +484,12 @@ export default function Page() {
         await handleRender(responseData);
       }
 
+      // If we're creating multiple items with autoUpload, collect them
+      if (data._autoUpload && data._fileCount > 1) {
+        setCreatedItemsForScheduling(prev => [...prev, responseData]);
+        setIsCreatingMultipleItems(true);
+      }
+
       // Refresh the list
       fetchItems();
       return true;
@@ -526,20 +579,40 @@ export default function Page() {
       }
 
       if (action === 'upload') {
-        // For upload, trigger handleUpload for each selected item directly
-        const itemsToProcess = items.filter(i => selectedItems.includes(i.id) && i.youtubeMetadata != null);
-        for (const item of itemsToProcess) {
-          await handleUpload(item);
+        // For upload, show scheduling dialog if multiple items selected
+        // Maintain selection order by using selectedItems array order
+        const itemsToProcess = selectedItems
+          .map(id => items.find(i => i.id === id))
+          .filter((item): item is RenderItem => item !== undefined && item.youtubeMetadata != null);
+        
+        if (itemsToProcess.length > 1) {
+          setPendingUploadItems(itemsToProcess);
+          setPendingUploadType('youtube');
+          setShowScheduleDialog(true);
+          return;
+        } else if (itemsToProcess.length === 1) {
+          // Single item upload without scheduling
+          await handleUpload(itemsToProcess[0]);
         }
         setSelectedItems([]);
         return;
       }
 
       if (action === 'tiktok-upload') {
-        // For TikTok upload, trigger handleTikTokUpload for each selected item directly
-        const itemsToProcess = items.filter(i => selectedItems.includes(i.id) && i.youtubeMetadata != null);
-        for (const item of itemsToProcess) {
-          await handleTikTokUpload(item);
+        // For TikTok upload, show scheduling dialog if multiple items selected
+        // Maintain selection order by using selectedItems array order
+        const itemsToProcess = selectedItems
+          .map(id => items.find(i => i.id === id))
+          .filter((item): item is RenderItem => item !== undefined && item.youtubeMetadata != null);
+        
+        if (itemsToProcess.length > 1) {
+          setPendingUploadItems(itemsToProcess);
+          setPendingUploadType('tiktok');
+          setShowScheduleDialog(true);
+          return;
+        } else if (itemsToProcess.length === 1) {
+          // Single item upload without scheduling
+          await handleTikTokUpload(itemsToProcess[0]);
         }
         setSelectedItems([]);
         return;
@@ -571,7 +644,13 @@ export default function Page() {
 
   const handleSelectAll = () => {
     if (!items) return;
-    setSelectedItems(items.map(item => item.id));
+    // Sort items by creation date (oldest first) when using Select All
+    const sortedItems = [...items].sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateA - dateB;
+    });
+    setSelectedItems(sortedItems.map(item => item.id));
   };
 
   const handleDeselectAll = () => {
@@ -816,7 +895,7 @@ export default function Page() {
     }
   };
 
-  const handleUpload = async (item: RenderItem) => {
+  const handleUpload = async (item: RenderItem, scheduleConfig?: ScheduleConfig, itemIndex?: number) => {
     if (!item.youtubeMetadata) {
       console.error('Missing YouTube metadata');
       return;
@@ -865,6 +944,12 @@ export default function Page() {
       const videoBlob = await videoResponse.blob();
       const videoFile = new File([videoBlob], `${item.fileName}.mp4`, { type: 'video/mp4' });
 
+      // Calculate scheduled date if provided
+      let scheduleDate = "";
+      if (scheduleConfig && itemIndex !== undefined) {
+        scheduleDate = calculateScheduledDate(scheduleConfig, itemIndex);
+      }
+
       // Prepare form data
       const form = new FormData();
       form.append("mp4", videoFile);
@@ -875,7 +960,7 @@ export default function Page() {
       form.append("categoryId", "27");
       form.append("defaultLanguage", "vi");
       form.append("defaultAudioLanguage", "vi");
-      form.append("scheduleDate", "");
+      form.append("scheduleDate", scheduleDate);
 
       // Upload to YouTube
       const res = await fetch("/api/youtube-upload", {
@@ -935,7 +1020,23 @@ export default function Page() {
     }
   };
 
-  const handleTikTokUpload = async (item: RenderItem) => {
+  const handleScheduledUpload = async (items: RenderItem[], scheduleConfig: ScheduleConfig, uploadType: 'youtube' | 'tiktok') => {
+    try {
+      // Process items in the order they were passed (maintaining selection order)
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (uploadType === 'youtube') {
+          await handleUpload(item, scheduleConfig, i);
+        } else {
+          await handleTikTokUpload(item, scheduleConfig, i);
+        }
+      }
+    } catch (error) {
+      console.error('Scheduled upload failed:', error);
+    }
+  };
+
+  const handleTikTokUpload = async (item: RenderItem, scheduleConfig?: ScheduleConfig, itemIndex?: number) => {
     if (!item.youtubeMetadata) {
       console.error('Missing YouTube metadata');
       return;
@@ -1639,8 +1740,10 @@ export default function Page() {
                         alert('Cannot upload: YouTube title must be 100 characters or fewer. Current count: ' + [...item.youtubeMetadata.title].length);
                         return;
                       }
-                      // Call the actual upload function
-                      await handleUpload(item);
+                      // Show scheduling dialog for single item
+                      setPendingUploadItems([item]);
+                      setPendingUploadType('youtube');
+                      setShowScheduleDialog(true);
                     }}
                   >
                     <svg height="20" viewBox="0 0 24 24" width="20" fill="#fff" style={{ marginRight: 6 }}>
@@ -1663,8 +1766,10 @@ export default function Page() {
                         alert('Cannot upload: TikTok title must be 150 characters or fewer. Current count: ' + [...item.youtubeMetadata.title].length);
                         return;
                       }
-                      // Call the TikTok upload function
-                      await handleTikTokUpload(item);
+                      // Show scheduling dialog for single item
+                      setPendingUploadItems([item]);
+                      setPendingUploadType('tiktok');
+                      setShowScheduleDialog(true);
                     }}
                   >
                     <svg height="20" viewBox="0 0 24 24" width="20" fill="#fff" style={{ marginRight: 6 }}>
@@ -1700,23 +1805,41 @@ export default function Page() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex justify-center gap-2 mt-6 mb-6"
+        className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-6 mb-6"
       >
-        {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-          <motion.button
-            key={pageNum}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setCurrentPage(pageNum)}
-            className={`w-10 h-10 rounded-lg ${
-              currentPage === pageNum
-                ? "bg-purple-600"
-                : "bg-gray-800 hover:bg-gray-700"
-            }`}
+        {/* Items per page selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-gray-400 text-sm">Show:</span>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => setItemsPerPage(Number(e.target.value))}
+            className="bg-gray-700 text-white rounded-lg px-3 py-1 text-sm border border-gray-600 focus:border-purple-500 focus:outline-none"
           >
-            {pageNum}
-          </motion.button>
-        ))}
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
+          <span className="text-gray-400 text-sm">per page</span>
+        </div>
+
+        {/* Page numbers */}
+        <div className="flex gap-2">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+            <motion.button
+              key={pageNum}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setCurrentPage(pageNum)}
+              className={`w-10 h-10 rounded-lg ${
+                currentPage === pageNum
+                  ? "bg-purple-600"
+                  : "bg-gray-800 hover:bg-gray-700"
+              }`}
+            >
+              {pageNum}
+            </motion.button>
+          ))}
+        </div>
       </motion.div>
 
       {/* Selection Mode Toolbar - Fixed at bottom */}
@@ -1798,6 +1921,23 @@ export default function Page() {
           setTiktokConnected(true);
           setShowTikTokAuth(false);
         }}
+      />
+
+      {/* Schedule Upload Dialog */}
+      <ScheduleUploadDialog
+        isOpen={showScheduleDialog}
+        onClose={() => {
+          setShowScheduleDialog(false);
+          setPendingUploadItems([]);
+        }}
+        onConfirm={(scheduleConfig) => {
+          handleScheduledUpload(pendingUploadItems, scheduleConfig, pendingUploadType);
+          setShowScheduleDialog(false);
+          setPendingUploadItems([]);
+          setSelectedItems([]);
+        }}
+        itemCount={pendingUploadItems.length}
+        items={pendingUploadItems}
       />
 
       {/* Add RenderDetailsDialog */}

@@ -1,74 +1,67 @@
-# RumitX Studio: AI-Powered Video Automation Suite
+# NexRender Manager
 
-**Created by [rumitx](https://github.com/rumitvn)**
+A comprehensive video rendering and upload management system for After Effects projects.
 
----
+## Features
 
-## 🚀 Project Overview
+### Render Management
+- Create render items from JSON files
+- Automatic rendering with nexrender
+- Real-time render progress tracking
+- Support for multiple templates and output formats
 
-**RumitX Studio** is an all-in-one automation platform for creators and marketers. Effortlessly generate, brand, and publish videos at scale using After Effects templates, AI-driven metadata, and seamless uploads to platforms like YouTube, TikTok, and Facebook.
+### Metadata Generation
+- Automatic YouTube metadata generation
+- Customizable titles, descriptions, and tags
+- Support for playlists and categories
 
----
+### Upload Management
+- **NEW: Scheduled Uploads** - Schedule multiple videos for automatic upload
+- YouTube upload integration
+- TikTok upload integration
+- Batch upload operations
 
-## ✨ Key Features
+## Scheduling Feature
 
-- **Automated Video Generation**
-  - Use After Effects (AE) templates with [nexrender](https://nexrender.com/) to render videos programmatically.
-  - Batch process multiple projects with custom JSON data and MP4 outputs.
+The new scheduling feature allows you to automatically schedule multiple videos for upload with specific timing rules:
 
-- **AI-Powered Metadata Creation**
-  - Instantly generate engaging titles, descriptions, and tags using advanced LLMs (Large Language Models).
-  - Optimize your content for discoverability and audience engagement.
+### How it works:
+1. **Start Date**: Choose when to start uploading videos
+2. **Time Slots**: Define specific times of day for uploads (e.g., 06:00, 11:00, 16:00)
+3. **Videos Per Day**: Set how many videos to upload per day
+4. **Automatic Distribution**: The system automatically distributes videos across days and time slots
 
-- **One-Click Uploads**
-  - Automatically upload finished videos and metadata to YouTube (with TikTok/Facebook support coming soon).
-  - Save time and eliminate repetitive manual steps.
+### Example:
+- Start Date: 20/07/2025
+- Time Slots: 06:00, 11:00, 16:00
+- Videos Per Day: 3
+- 7 videos selected
 
-- **Full CRUD API**
-  - Manage render jobs, track statuses, and retrieve results via a robust REST API.
+**Result:**
+- Day 1 (20/07/2025): Videos 1, 2, 3 at 06:00, 11:00, 16:00
+- Day 2 (21/07/2025): Videos 4, 5, 6 at 06:00, 11:00, 16:00  
+- Day 3 (22/07/2025): Video 7 at 06:00
 
----
+### When the scheduling dialog appears:
+- When selecting multiple items and clicking "Upload" or "TikTok"
+- When creating multiple render items with "Auto Upload" enabled
+- When clicking individual upload buttons (for consistency)
 
-## 🛠️ Getting Started
+## Installation
 
-1. **Install dependencies:**
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
+```bash
+npm install
+npm run dev
+```
 
-2. **Run the development server:**
-   ```bash
-   npm run dev
-   ```
+## API Endpoints
 
-3. **Open your browser:**
-   Visit [http://localhost:3000](http://localhost:3000) to access the dashboard and API.
+- `POST /api/renders` - Create render items
+- `POST /api/renders/:id/render` - Start rendering
+- `POST /api/youtube-metadata` - Generate YouTube metadata
+- `POST /api/youtube-upload` - Upload to YouTube
+- `POST /api/tiktok-upload` - Upload to TikTok
 
----
+## Configuration
 
-## 📦 Tech Stack
-- Next.js (App Router)
-- Prisma ORM & SQLite/Postgres
-- nexrender (After Effects automation)
-- OpenAI/LLM integration
-- RESTful API
-
----
-
-## 🤖 Example Workflow
-1. Upload your AE template and data (JSON/MP4).
-2. Let the system render videos and generate metadata.
-3. Review, edit, and approve content in the dashboard.
-4. Publish directly to YouTube with a single click.
-
----
-
-## 🌟 About the Author
-**rumitx** (Rum) is passionate about creative automation, AI, and empowering digital creators. For feedback, issues, or contributions, please open an issue or PR on GitHub.
-
----
-
-## 📄 License
-MIT
+The system supports various configuration options for templates, output folders, and render formats. These can be managed through the web interface.
