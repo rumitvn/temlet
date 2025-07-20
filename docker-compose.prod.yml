@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+  # Production Database
+  database:
+    image: postgres:15-alpine
+    container_name: nexrender-db-prod
+    environment:
+      POSTGRES_DB: nexrender_prod
+      POSTGRES_USER: nexrender
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-nexrender_password}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexrender"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Production Redis
+  redis:
+    image: redis:7-alpine
+    container_name: nexrender-redis-prod
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Production Nexrender Server
+  nexrender-server:
+    image: inlife/nexrender-server:latest
+    container_name: nexrender-server-prod
+    environment:
+      NEXRENDER_SERVER_PORT: 3000
+      NEXRENDER_SERVER_SECRET: ${NEXRENDER_SECRET:-your-secret-key-here}
+      NEXRENDER_DATABASE_URL: postgresql://nexrender:${DB_PASSWORD:-nexrender_password}@database:5432/nexrender_prod
+      NEXRENDER_REDIS_URL: redis://redis:6379
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./nexrender-data:/opt/nexrender/data
+      - ./nexrender-assets:/opt/nexrender/assets
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Production Nexrender Workers (scalable)
+  nexrender-worker:
+    image: inlife/nexrender-worker:latest
+    container_name: nexrender-worker-prod
+    environment:
+      NEXRENDER_WORKER_SERVER: http://nexrender-server:3000
+      NEXRENDER_WORKER_SECRET: ${NEXRENDER_SECRET:-your-secret-key-here}
+      NEXRENDER_WORKER_CONCURRENT: 2
+      NEXRENDER_WORKER_LOGS: /opt/nexrender/logs
+    volumes:
+      - ./nexrender-data:/opt/nexrender/data
+      - ./nexrender-assets:/opt/nexrender/assets
+      - ./nexrender-logs:/opt/nexrender/logs
+    depends_on:
+      - nexrender-server
+    restart: unless-stopped
+    deploy:
+      replicas: 2  # Run 2 worker instances
+
+  # Production Next.js Application
+  app:
+    build: .
+    container_name: nexrender-manager-app-prod
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://nexrender:${DB_PASSWORD:-nexrender_password}@database:5432/nexrender_prod
+      REDIS_URL: redis://redis:6379
+      NEXRENDER_SERVER_URL: http://nexrender-server:3000
+      NEXRENDER_SERVER_SECRET: ${NEXRENDER_SECRET:-your-secret-key-here}
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./nexrender-data:/app/nexrender-data
+      - ./nexrender-assets:/app/nexrender-assets
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nexrender-server:
+        condition: service_started
+    restart: unless-stopped
+
+  # Production Monitoring service
+  monitor:
+    build: .
+    container_name: nexrender-monitor-prod
+    command: ["node", "scripts/monitor.js"]
+    environment:
+      NODE_ENV: production
+      APP_URL: http://app:3001
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  # Nginx reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    container_name: nexrender-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  postgres_data_prod:
+  redis_data_prod:
+
+networks:
+  default:
+    name: nexrender-network-prod 
