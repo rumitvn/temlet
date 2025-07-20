@@ -1205,16 +1205,28 @@ export default function Page() {
           </motion.div>
         </div>
 
-        {/* New Render Button */}
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
-          onClick={() => setIsCreateDialogOpen(true)}
-        >
-          <PlusIcon className="w-5 h-5" />
-          <span>New Render</span>
-        </motion.button>
+        {/* Navigation Buttons */}
+        <div className="flex gap-4">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+            onClick={() => window.location.href = '/assets'}
+          >
+            <DocumentTextIcon className="w-5 h-5" />
+            <span>Assets</span>
+          </motion.button>
+          
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
+            <PlusIcon className="w-5 h-5" />
+            <span>New Render</span>
+          </motion.button>
+        </div>
       </motion.div>
 
       {/* Status Counts Bar (not sticky) */}

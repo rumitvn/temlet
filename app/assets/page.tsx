@@ -1,0 +1,1451 @@
+"use client";
+
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  PlusIcon, 
+  MagnifyingGlassIcon, 
+  FunnelIcon
+} from "@heroicons/react/24/outline";
+import { 
+  CheckCircleIcon,
+  XCircleIcon,
+  ExclamationTriangleIcon
+} from "@heroicons/react/24/solid";
+
+interface Asset {
+  id: string;
+  name: string;
+  type: 'voice' | 'image' | 'video' | 'json';
+  category: string;
+  path: string;
+  size?: number;
+  lastModified?: Date;
+  status: 'available' | 'missing' | 'processing';
+  key?: string; // Animal key like 'bear', 'cat', etc.
+  order?: number; // Order number for JSON files
+  rendered?: boolean; // Whether this asset has been rendered
+  renderJson?: string; // JSON file used for rendering
+}
+
+interface AssetCategory {
+  id: string;
+  name: string;
+  type: 'voice' | 'image' | 'video' | 'json';
+  count: number;
+  path: string;
+}
+
+interface AssetGroup {
+  key: string;
+  name: string;
+  assets: {
+    image?: Asset;
+    videos: Asset[];
+    voices: Asset[];
+    jsons: Asset[];
+    rewards: Asset[];
+  };
+  renderStatus: {
+    hasJson: boolean;
+    hasImage: boolean;
+    hasVideos: boolean;
+    hasVoices: boolean;
+    isComplete: boolean;
+    requiredVoices: number; // 9 voices per JSON
+    availableVoices: number;
+    requiredRewards: number; // 1 reward per JSON
+    availableRewards: number;
+    jsonOrders: number[]; // Which JSON orders exist (1, 2, 3, etc.)
+  };
+}
+
+interface SK3QLRContent {
+  key: string;
+  order: number;
+  intro: {
+    text: string;
+    voice: string;
+  };
+  quiz_1: {
+    question: {
+      text: string;
+      voice: string;
+    };
+    options: string[];
+    answer: {
+      position: number;
+      voice: string;
+    };
+  };
+  quiz_2: {
+    question: {
+      text: string;
+      voice: string;
+    };
+    options: string[];
+    answer: {
+      position: number;
+      voice: string;
+    };
+  };
+  quiz_3: {
+    question: {
+      text: string;
+      voice: string;
+    };
+    options: string[];
+    answer: {
+      position: number;
+      voice: string;
+    };
+  };
+  lesson: {
+    voice: string;
+  };
+  reward: {
+    voice: string;
+  };
+}
+
+export default function AssetsPage() {
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [assetGroups, setAssetGroups] = useState<AssetGroup[]>([]);
+  const [categories, setCategories] = useState<AssetCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+
+  const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(12);
+
+  // AI Generator state
+  const [aiContent, setAiContent] = useState<SK3QLRContent>({
+    key: "",
+    order: 1,
+    intro: { text: "", voice: "" },
+    quiz_1: {
+      question: { text: "", voice: "" },
+      options: ["", "", "", ""],
+      answer: { position: 1, voice: "" }
+    },
+    quiz_2: {
+      question: { text: "", voice: "" },
+      options: ["", ""],
+      answer: { position: 1, voice: "" }
+    },
+    quiz_3: {
+      question: { text: "", voice: "" },
+      options: ["", "", "", ""],
+      answer: { position: 1, voice: "" }
+    },
+    lesson: { voice: "" },
+    reward: { voice: "" }
+  });
+
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLanguage, setAiLanguage] = useState("vietnamese");
+  const [aiTopic, setAiTopic] = useState("animals");
+  const [aiProvider, setAiProvider] = useState("grok");
+
+  // Mock data for demonstration - in real app, this would come from API
+  const mockCategories: AssetCategory[] = [
+    { id: 'voice', name: 'Voice Assets', type: 'voice', count: 45, path: 'C:/Users/youruser/Documents/minimate/animals/voice' },
+    { id: 'image', name: 'Image Assets', type: 'image', count: 32, path: 'C:/Users/youruser/Documents/minimate/animals/image' },
+    { id: 'video', name: 'Video Assets', type: 'video', count: 28, path: 'C:/Users/youruser/Documents/minimate/animals/video' },
+    { id: 'json', name: 'Content JSONs', type: 'json', count: 15, path: 'C:/Users/youruser/Documents/minimate/animals/render' },
+    { id: 'reward', name: 'Reward Videos', type: 'video', count: 12, path: 'C:/Users/youruser/Documents/minimate/animals/reward' }
+  ];
+
+  const mockAssets: Asset[] = [
+    // Voice assets
+    { id: '1', name: 'alligator_1_voice_title.mp3', type: 'voice', category: 'voice', path: 'C:/Users/youruser/Documents/minimate/animals/voice/alligator_1/voice_title.mp3', size: 245760, lastModified: new Date('2024-01-15'), status: 'available' },
+    { id: '2', name: 'alligator_1_voice_q1_title.mp3', type: 'voice', category: 'voice', path: 'C:/Users/youruser/Documents/minimate/animals/voice/alligator_1/voice_q1_title.mp3', size: 512000, lastModified: new Date('2024-01-15'), status: 'available' },
+    { id: '3', name: 'alligator_1_voice_q1_ans.mp3', type: 'voice', category: 'voice', path: 'C:/Users/youruser/Documents/minimate/animals/voice/alligator_1/voice_q1_ans.mp3', size: 384000, lastModified: new Date('2024-01-15'), status: 'available' },
+    
+    // Image assets
+    { id: '4', name: 'alligator.jpg', type: 'image', category: 'image', path: 'C:/Users/youruser/Documents/minimate/animals/image/alligator.jpg', size: 2048576, lastModified: new Date('2024-01-10'), status: 'available' },
+    { id: '5', name: 'hippo.jpg', type: 'image', category: 'image', path: 'C:/Users/youruser/Documents/minimate/animals/image/hippo.jpg', size: 1876544, lastModified: new Date('2024-01-10'), status: 'available' },
+    { id: '6', name: 'camel.jpg', type: 'image', category: 'image', path: 'C:/Users/youruser/Documents/minimate/animals/image/camel.jpg', size: 2153472, lastModified: new Date('2024-01-10'), status: 'available' },
+    
+    // Video assets
+    { id: '7', name: 'alligator.mp4', type: 'video', category: 'video', path: 'C:/Users/youruser/Documents/minimate/animals/video/alligator.mp4', size: 52428800, lastModified: new Date('2024-01-12'), status: 'available' },
+    { id: '8', name: 'hippo.mp4', type: 'video', category: 'video', path: 'C:/Users/youruser/Documents/minimate/animals/video/hippo.mp4', size: 47185920, lastModified: new Date('2024-01-12'), status: 'available' },
+    
+    // JSON assets
+    { id: '9', name: 'alligator_1.json', type: 'json', category: 'json', path: 'C:/Users/youruser/Documents/minimate/animals/render/alligator_1.json', size: 2048, lastModified: new Date('2024-01-15'), status: 'available' },
+    { id: '10', name: 'hippo_1.json', type: 'json', category: 'json', path: 'C:/Users/youruser/Documents/minimate/animals/render/hippo_1.json', size: 1536, lastModified: new Date('2024-01-15'), status: 'available' },
+    
+    // Reward assets
+    { id: '11', name: 'alligator_reward.mp4', type: 'video', category: 'reward', path: 'C:/Users/youruser/Documents/minimate/animals/reward/output/reward_1/alligator.mp4', size: 10485760, lastModified: new Date('2024-01-14'), status: 'available' },
+  ];
+
+  // Helper function to extract key and order from filename
+  const extractKeyAndOrder = (filename: string, type: string): { key: string; order?: number } => {
+    if (type === 'json') {
+      // Extract from format like "bear_1.json"
+      const match = filename.match(/^(.+?)_(\d+)\.json$/);
+      if (match) {
+        return { key: match[1], order: parseInt(match[2]) };
+      }
+    } else if (type === 'voice') {
+      // Extract from format like "bear_1_voice_title.mp3" or "voice_lesson.mp3"
+      const match = filename.match(/^(.+?)_(\d+)_voice_/);
+      if (match) {
+        return { key: match[1], order: parseInt(match[2]) };
+      }
+      // For voice files without animal prefix, try to extract from path or use a generic key
+      const pathMatch = filename.match(/voice_(.+?)\.mp3/);
+      if (pathMatch) {
+        return { key: 'voice_' + pathMatch[1] };
+      }
+    } else {
+      // Extract from format like "bear.jpg", "bear.mp4"
+      const match = filename.match(/^(.+?)\.(jpg|mp4|png|gif)$/);
+      if (match) {
+        return { key: match[1] };
+      }
+    }
+    return { key: filename.split('.')[0] };
+  };
+
+  const fetchAssets = useCallback(async (searchTerm?: string, isSearch = false) => {
+    try {
+      if (isSearch) {
+        setSearching(true);
+      } else {
+        setLoading(true);
+      }
+      
+      const params = new URLSearchParams();
+      if (selectedCategory) params.append('category', selectedCategory);
+      if (searchTerm) params.append('search', searchTerm);
+      
+      const response = await fetch(`/api/assets?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch assets');
+      
+      const data = await response.json();
+      
+      // Process assets to add key and order information
+      const processedAssets = data.assets.map((asset: Asset) => {
+        const { key, order } = extractKeyAndOrder(asset.name, asset.type);
+        return { ...asset, key, order };
+      });
+      
+      setAssets(processedAssets);
+      
+      // Group assets by key - prioritize animal keys over voice type keys
+      const groupedAssets = processedAssets.reduce((groups: { [key: string]: AssetGroup }, asset: Asset) => {
+        let key = asset.key || 'unknown';
+        
+        // For voice files, try to extract the actual animal key from the path
+        if (asset.type === 'voice' && asset.path) {
+          // Extract animal key from path like "C:/.../animals/voice/bear_1/voice_title.mp3"
+          const pathMatch = asset.path.match(/animals[\/\\]voice[\/\\]([^\/\\]+)[\/\\]/);
+          if (pathMatch) {
+            const animalKey = pathMatch[1].split('_')[0]; // Extract "bear" from "bear_1"
+            if (animalKey && animalKey !== 'voice') {
+              key = animalKey;
+            }
+          }
+        }
+        
+        if (!groups[key]) {
+          groups[key] = {
+            key: key,
+            name: key.charAt(0).toUpperCase() + key.slice(1),
+            assets: {
+              videos: [],
+              voices: [],
+              jsons: [],
+              rewards: []
+            },
+            renderStatus: {
+              hasJson: false,
+              hasImage: false,
+              hasVideos: false,
+              hasVoices: false,
+              isComplete: false,
+              requiredVoices: 0,
+              availableVoices: 0,
+              requiredRewards: 0,
+              availableRewards: 0,
+              jsonOrders: []
+            }
+          };
+        }
+        
+        // Categorize assets
+        if (asset.type === 'image') {
+          // Only use images from the image directory, ignore images from reward directories
+          if (asset.category === 'image') {
+            groups[key].assets.image = asset;
+          }
+        } else if (asset.type === 'video') {
+          if (asset.category === 'reward') {
+            groups[key].assets.rewards.push(asset);
+          } else {
+            groups[key].assets.videos.push(asset);
+          }
+        } else if (asset.type === 'voice') {
+          groups[key].assets.voices.push(asset);
+        } else if (asset.type === 'json') {
+          groups[key].assets.jsons.push(asset);
+        }
+        
+        // Update render status
+        if (asset.type === 'image' && asset.category === 'image') {
+          groups[key].renderStatus.hasImage = true;
+        } else if (asset.type === 'video' && asset.category === 'video') {
+          groups[key].renderStatus.hasVideos = true;
+        } else if (asset.type === 'voice') {
+          groups[key].renderStatus.hasVoices = true;
+          groups[key].renderStatus.availableVoices++;
+        } else if (asset.type === 'json') {
+          groups[key].renderStatus.hasJson = true;
+          // Extract order from JSON filename (e.g., "alligator_1.json" -> 1)
+          const orderMatch = asset.name.match(/_(\d+)\.json$/);
+          if (orderMatch) {
+            const order = parseInt(orderMatch[1]);
+            if (!groups[key].renderStatus.jsonOrders.includes(order)) {
+              groups[key].renderStatus.jsonOrders.push(order);
+            }
+          }
+        } else if (asset.type === 'video' && asset.category === 'reward') {
+          groups[key].renderStatus.availableRewards++;
+        }
+        
+        // Calculate requirements based on JSON files
+        const jsonCount = groups[key].renderStatus.jsonOrders.length;
+        groups[key].renderStatus.requiredVoices = jsonCount * 9; // 9 voices per JSON
+        groups[key].renderStatus.requiredRewards = jsonCount; // 1 reward per JSON
+        
+        // Check if complete (has all required assets)
+        const hasRequiredAssets = groups[key].renderStatus.hasJson && 
+                                 groups[key].renderStatus.hasImage && 
+                                 groups[key].renderStatus.hasVideos && 
+                                 groups[key].renderStatus.availableVoices >= groups[key].renderStatus.requiredVoices &&
+                                 groups[key].renderStatus.availableRewards >= groups[key].renderStatus.requiredRewards;
+        groups[key].renderStatus.isComplete = hasRequiredAssets;
+        
+        return groups;
+      }, {});
+      
+      setAssetGroups(Object.values(groupedAssets));
+      
+      // Update categories with real counts
+      const categoryCounts = processedAssets.reduce((acc: any, asset: Asset) => {
+        acc[asset.category] = (acc[asset.category] || 0) + 1;
+        return acc;
+      }, {});
+      
+      setCategories(prev => prev.map(cat => ({
+        ...cat,
+        count: categoryCounts[cat.id] || 0
+      })));
+    } catch (error) {
+      console.error('Error fetching assets:', error);
+    } finally {
+      if (isSearch) {
+        setSearching(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [selectedCategory]);
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery.trim()) {
+        fetchAssets(searchQuery, true); // isSearch = true
+      } else {
+        fetchAssets('', true); // Reset to all assets, but still use search state
+      }
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, fetchAssets]);
+
+  // Initial load effect
+  useEffect(() => {
+    fetchAssets();
+  }, [fetchAssets]);
+
+  // Client-side filtered assets for immediate search feedback
+  const filteredAssets = useMemo(() => {
+    return assets.filter(asset => {
+      const matchesSearch = asset.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = !selectedCategory || asset.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [assets, searchQuery, selectedCategory]);
+
+  // Client-side filtered asset groups for immediate search feedback
+  const filteredAssetGroups = useMemo(() => {
+    return assetGroups.filter(group => 
+      searchQuery === '' || 
+      group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      group.assets.jsons.some(json => json.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      group.assets.videos.some(video => video.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      group.assets.voices.some(voice => voice.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [assetGroups, searchQuery]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredAssetGroups.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedAssetGroups = filteredAssetGroups.slice(startIndex, endIndex);
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory]);
+
+  const getAssetIcon = (type: string) => {
+    // Return a simple text representation for now
+    return () => <span className="text-2xl">{type === 'voice' ? '🎵' : type === 'image' ? '🖼️' : type === 'video' ? '🎥' : '📄'}</span>;
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'available': return CheckCircleIcon;
+      case 'missing': return XCircleIcon;
+      case 'processing': return ExclamationTriangleIcon;
+      default: return ExclamationTriangleIcon;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'available': return 'text-green-500';
+      case 'missing': return 'text-red-500';
+      case 'processing': return 'text-yellow-500';
+      default: return 'text-gray-500';
+    }
+  };
+
+  const getRenderStatusDisplay = (renderStatus: AssetGroup['renderStatus']) => {
+    const statuses = [];
+    if (renderStatus.hasJson) statuses.push(`📄 JSON (${renderStatus.jsonOrders.length})`);
+    if (renderStatus.hasImage) statuses.push('🖼️ Image');
+    if (renderStatus.hasVideos) statuses.push('🎥 Videos');
+    if (renderStatus.hasVoices) statuses.push(`🎵 Voices (${renderStatus.availableVoices}/${renderStatus.requiredVoices})`);
+    if (renderStatus.availableRewards > 0) statuses.push(`🏆 Rewards (${renderStatus.availableRewards}/${renderStatus.requiredRewards})`);
+    
+    // Calculate completion rate based on all requirements
+    const totalRequirements = 4; // JSON, Image, Videos, Voices
+    const metRequirements = [
+      renderStatus.hasJson,
+      renderStatus.hasImage,
+      renderStatus.hasVideos,
+      renderStatus.availableVoices >= renderStatus.requiredVoices && renderStatus.availableRewards >= renderStatus.requiredRewards
+    ].filter(Boolean).length;
+    
+    const completionRate = Math.round((metRequirements / totalRequirements) * 100);
+    let statusColor = 'text-red-400';
+    if (completionRate >= 75) statusColor = 'text-green-400';
+    else if (completionRate >= 50) statusColor = 'text-yellow-400';
+    
+    return {
+      statuses,
+      completionRate,
+      statusColor,
+      isComplete: renderStatus.isComplete,
+      jsonCount: renderStatus.jsonOrders.length,
+      voiceProgress: `${renderStatus.availableVoices}/${renderStatus.requiredVoices}`,
+      rewardProgress: `${renderStatus.availableRewards}/${renderStatus.requiredRewards}`,
+      missingVoices: Math.max(0, renderStatus.requiredVoices - renderStatus.availableVoices),
+      missingRewards: Math.max(0, renderStatus.requiredRewards - renderStatus.availableRewards)
+    };
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleAssetSelect = (assetId: string) => {
+    setSelectedAssets(prev => 
+      prev.includes(assetId) 
+        ? prev.filter(id => id !== assetId)
+        : [...prev, assetId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    setSelectedAssets(filteredAssets.map(asset => asset.id));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedAssets([]);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedAssets.length === 0) return;
+    
+    if (!confirm(`Are you sure you want to delete ${selectedAssets.length} asset(s)?`)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/assets', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ assetIds: selectedAssets }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete assets');
+      }
+
+      const data = await response.json();
+      
+      // Refresh assets list
+      fetchAssets();
+      
+      setSelectedAssets([]);
+      alert(`Successfully deleted ${data.deleted.length} asset(s)`);
+    } catch (error) {
+      console.error('Error deleting assets:', error);
+      alert('Failed to delete assets. Please try again.');
+    }
+  };
+
+  const handleUploadAssets = async (files: FileList) => {
+    if (!selectedCategory) {
+      alert('Please select a category first');
+      return;
+    }
+
+    setUploading(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('category', selectedCategory);
+      
+      Array.from(files).forEach(file => {
+        formData.append('files', file);
+      });
+
+      const response = await fetch('/api/assets', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload assets');
+      }
+
+      const data = await response.json();
+      
+      // Refresh assets list
+      fetchAssets();
+      
+      alert(`Successfully uploaded ${data.count} asset(s)`);
+    } catch (error) {
+      console.error('Error uploading assets:', error);
+      alert('Failed to upload assets. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const generateAIContent = async () => {
+    if (!aiPrompt.trim()) {
+      alert('Please enter a prompt for AI generation');
+      return;
+    }
+
+    setAiGenerating(true);
+    
+    try {
+      const response = await fetch('/api/assets/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: aiPrompt,
+          language: aiLanguage,
+          topic: aiTopic,
+          provider: aiProvider
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate content');
+      }
+
+      const data = await response.json();
+      setAiContent(data.content);
+    } catch (error) {
+      console.error('Error generating AI content:', error);
+      alert('Failed to generate content. Please try again.');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const saveGeneratedContent = () => {
+    const fileName = `${aiContent.key}_${aiContent.order}.json`;
+    const jsonContent = JSON.stringify(aiContent, null, 2);
+    
+    // Create a blob and download
+    const blob = new Blob([jsonContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    // Add to assets list
+    const newAsset: Asset = {
+      id: `json_${Date.now()}`,
+      name: fileName,
+      type: 'json',
+      category: 'json',
+      path: `C:/Users/youruser/Documents/minimate/animals/render/${fileName}`,
+      size: jsonContent.length,
+      lastModified: new Date(),
+      status: 'available'
+    };
+    
+    setAssets(prev => [...prev, newAsset]);
+    setShowAIGenerator(false);
+  };
+
+  const handlePreviewAsset = (asset: Asset) => {
+    setPreviewAsset(asset);
+    setShowPreview(true);
+  };
+
+  const handleClosePreview = () => {
+    // Stop any playing media when closing
+    const videos = document.querySelectorAll('video');
+    const audios = document.querySelectorAll('audio');
+    
+    videos.forEach(video => {
+      video.pause();
+      video.currentTime = 0;
+    });
+    
+    audios.forEach(audio => {
+      audio.pause();
+      audio.currentTime = 0;
+    });
+    
+    setShowPreview(false);
+  };
+
+  const getAssetPreviewContent = (asset: Asset) => {
+    const previewUrl = `/api/assets/preview?path=${encodeURIComponent(asset.path)}`;
+    
+    switch (asset.type) {
+      case 'image':
+        return (
+          <div className="text-center">
+            <img 
+              src={previewUrl}
+              alt={asset.name}
+              className="max-w-full max-h-96 object-contain rounded-lg"
+              onError={(e) => {
+                e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjMzc0MTUxIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE2Ij5JbWFnZSBQcmV2aWV3PC90ZXh0Pgo8L3N2Zz4K';
+              }}
+            />
+          </div>
+        );
+      case 'video':
+        return (
+          <video 
+            controls 
+            autoPlay
+            className="max-w-full max-h-96 rounded-lg"
+            src={previewUrl}
+          >
+            Your browser does not support the video tag.
+          </video>
+        );
+      case 'voice':
+        return (
+          <div className="text-center space-y-4">
+            <div className="text-6xl">🎵</div>
+            <audio controls autoPlay className="w-full">
+              <source src={previewUrl} type="audio/mpeg" />
+              Your browser does not support the audio element.
+            </audio>
+            <p className="text-gray-300">{asset.name}</p>
+          </div>
+        );
+      case 'json':
+        return (
+          <JSONPreview asset={asset} />
+        );
+      default:
+        return <div className="text-center text-gray-400">Preview not available</div>;
+    }
+  };
+
+  // JSON Preview Component
+  const JSONPreview = ({ asset }: { asset: Asset }) => {
+    const [jsonContent, setJsonContent] = useState<string>('Loading...');
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+      const loadJSON = async () => {
+        try {
+          const response = await fetch(`/api/assets/preview?path=${encodeURIComponent(asset.path)}`);
+          if (response.ok) {
+            const content = await response.text();
+            setJsonContent(JSON.stringify(JSON.parse(content), null, 2));
+          } else {
+            setJsonContent('Failed to load JSON content');
+          }
+        } catch (error) {
+          setJsonContent('Error loading JSON content');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadJSON();
+    }, [asset.path]);
+
+    return (
+      <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-auto">
+        {loading ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+          </div>
+        ) : (
+          <pre className="text-sm text-gray-300 whitespace-pre-wrap">
+            {jsonContent}
+          </pre>
+        )}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-500"></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-between items-center mb-8"
+      >
+        <div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 bg-clip-text text-transparent">
+            Assets Management
+          </h1>
+          <p className="text-gray-400 mt-2">Manage your SK3QLR video assets and generate content</p>
+        </div>
+        
+        <div className="flex gap-4">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
+            onClick={() => setShowAIGenerator(true)}
+          >
+            <span className="text-xl">✨</span>
+            <span>AI Generator</span>
+          </motion.button>
+          
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+            onClick={() => setShowCreateDialog(true)}
+          >
+            <PlusIcon className="w-5 h-5" />
+            <span>Upload Assets</span>
+          </motion.button>
+        </div>
+      </motion.div>
+
+      {/* Categories Overview */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8"
+      >
+        {categories.map((category) => {
+          const Icon = getAssetIcon(category.type);
+          return (
+            <motion.div
+              key={category.id}
+              whileHover={{ scale: 1.02 }}
+              className={`bg-gray-800 rounded-lg p-4 cursor-pointer transition-all ${
+                selectedCategory === category.id ? 'ring-2 ring-purple-500' : ''
+              }`}
+              onClick={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{category.type === 'voice' ? '🎵' : category.type === 'image' ? '🖼️' : category.type === 'video' ? '🎥' : '📄'}</span>
+                <div>
+                  <h3 className="font-semibold text-gray-200">{category.name}</h3>
+                  <p className="text-2xl font-bold text-purple-400">{category.count}</p>
+                  <p className="text-sm text-gray-500">{category.type}</p>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </motion.div>
+
+      {/* Search and Filters */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex gap-4 mb-6"
+      >
+        <div className="flex-1 relative">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <input
+            type="text"
+            placeholder="Search assets..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
+          />
+        </div>
+        
+        <div className="flex gap-2">
+          {selectedAssets.length > 0 && (
+            <>
+              <button
+                onClick={handleDeleteSelected}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Delete ({selectedAssets.length})
+              </button>
+              <button
+                onClick={handleDeselectAll}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+              >
+                Deselect All
+              </button>
+            </>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Assets Display */}
+      <motion.div layout className="space-y-6">
+          {searching && (
+            <div className="text-center py-4">
+              <div className="inline-flex items-center gap-2 text-gray-400">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
+                <span>Searching...</span>
+              </div>
+            </div>
+          )}
+          {paginatedAssetGroups.map((group) => {
+            const renderStatus = getRenderStatusDisplay(group.renderStatus);
+            const originalRenderStatus = group.renderStatus;
+            return (
+              <motion.div
+                key={group.key}
+                layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gray-800 rounded-lg p-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <h3 className="text-2xl font-bold text-purple-400">{group.name}</h3>
+                    <div className="flex gap-2 text-sm text-gray-400">
+                      <span>🖼️ {group.assets.image ? '1' : '0'} Image</span>
+                      <span>🎥 {group.assets.videos.length} Videos</span>
+                      <span>🎵 {group.assets.voices.length} Voices</span>
+                      <span>📄 {group.assets.jsons.length} JSONs</span>
+                      <span>🏆 {group.assets.rewards.length} Rewards</span>
+                    </div>
+                  </div>
+                  
+                  {/* Render Status Badge */}
+                  <div className="flex items-center gap-2">
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      renderStatus.isComplete 
+                        ? 'bg-green-900 text-green-300 border border-green-600' 
+                        : 'bg-gray-700 text-gray-300 border border-gray-600'
+                    }`}>
+                      {renderStatus.isComplete ? '✅ Ready to Render' : `${renderStatus.completionRate}% Complete`}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Render Status Details */}
+                <div className="mb-4 p-3 bg-gray-700 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-300">Render Status:</span>
+                    <span className={`text-sm font-bold ${renderStatus.statusColor}`}>
+                      {renderStatus.completionRate}% Complete
+                    </span>
+                  </div>
+                  
+                  {/* JSON Requirements */}
+                  {renderStatus.jsonCount > 0 && (
+                    <div className="mb-3 p-2 bg-gray-800 rounded">
+                      <div className="text-xs font-medium text-purple-400 mb-1">
+                        📄 JSON Files: {renderStatus.jsonCount} found
+                      </div>
+                      <div className="text-xs text-gray-300">
+                        Orders: {originalRenderStatus.jsonOrders.sort((a: number, b: number) => a - b).join(', ')}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Voice Requirements */}
+                  <div className="mb-3 p-2 bg-gray-800 rounded">
+                    <div className="text-xs font-medium text-orange-400 mb-1">
+                      🎵 Voice Files: {renderStatus.voiceProgress}
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          originalRenderStatus.availableVoices >= originalRenderStatus.requiredVoices 
+                            ? 'bg-green-500' 
+                            : 'bg-orange-500'
+                        }`}
+                        style={{ 
+                          width: `${Math.min(100, (originalRenderStatus.availableVoices / originalRenderStatus.requiredVoices) * 100)}%` 
+                        }}
+                      ></div>
+                    </div>
+                    <div className="text-xs text-gray-300">
+                      Required: {originalRenderStatus.requiredVoices} voices ({renderStatus.jsonCount} JSONs × 9 voices each)
+                      {renderStatus.missingVoices > 0 && (
+                        <span className="text-red-400 ml-2">Missing: {renderStatus.missingVoices}</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Reward Requirements */}
+                  <div className="mb-3 p-2 bg-gray-800 rounded">
+                    <div className="text-xs font-medium text-yellow-400 mb-1">
+                      🏆 Reward Videos: {renderStatus.rewardProgress}
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          originalRenderStatus.availableRewards >= originalRenderStatus.requiredRewards 
+                            ? 'bg-green-500' 
+                            : 'bg-yellow-500'
+                        }`}
+                        style={{ 
+                          width: `${Math.min(100, (originalRenderStatus.availableRewards / originalRenderStatus.requiredRewards) * 100)}%` 
+                        }}
+                      ></div>
+                    </div>
+                    <div className="text-xs text-gray-300">
+                      Required: {originalRenderStatus.requiredRewards} rewards (1 per JSON)
+                      {renderStatus.missingRewards > 0 && (
+                        <span className="text-red-400 ml-2">Missing: {renderStatus.missingRewards}</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Asset Status Tags */}
+                  <div className="flex flex-wrap gap-2">
+                    {renderStatus.statuses.map((status, index) => (
+                      <span key={index} className="text-xs bg-gray-600 text-gray-200 px-2 py-1 rounded">
+                        {status}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Image */}
+                  {group.assets.image && (
+                    <div 
+                      className="bg-gray-700 rounded-lg p-6 cursor-pointer hover:bg-gray-600 transition-colors border border-gray-600 hover:border-purple-500"
+                      onClick={() => handlePreviewAsset(group.assets.image!)}
+                    >
+                      <div className="flex items-center gap-4 mb-4">
+                        <span className="text-4xl">🖼️</span>
+                        <span className="text-lg font-semibold text-purple-400">Image</span>
+                      </div>
+                      <p className="text-base text-gray-200 truncate mb-3 font-medium">{group.assets.image.name}</p>
+                      <p className="text-base text-gray-400 mb-4">{formatFileSize(group.assets.image.size || 0)}</p>
+                      <div className="text-base text-gray-300 bg-gray-800 rounded-lg px-4 py-2 text-center hover:bg-gray-700 transition-colors">Click to preview</div>
+                    </div>
+                  )}
+                  
+                  {/* Videos */}
+                  {group.assets.videos.map((video, index) => (
+                    <div 
+                      key={`${video.id}-${index}`} 
+                      className="bg-gray-700 rounded-lg p-6 cursor-pointer hover:bg-gray-600 transition-colors border border-gray-600 hover:border-purple-500"
+                      onClick={() => handlePreviewAsset(video)}
+                    >
+                      <div className="flex items-center gap-4 mb-4">
+                        <span className="text-4xl">🎥</span>
+                        <span className="text-lg font-semibold text-blue-400">Video {index + 1}</span>
+                      </div>
+                      <p className="text-base text-gray-200 truncate mb-3 font-medium">{video.name}</p>
+                      <p className="text-base text-gray-400 mb-4">{formatFileSize(video.size || 0)}</p>
+                      <div className="text-base text-gray-300 bg-gray-800 rounded-lg px-4 py-2 text-center hover:bg-gray-700 transition-colors">Click to play</div>
+                    </div>
+                  ))}
+                  
+                  {/* JSONs */}
+                  {group.assets.jsons.map((json, index) => (
+                    <div 
+                      key={`${json.id}-${index}`} 
+                      className="bg-gray-700 rounded-lg p-6 cursor-pointer hover:bg-gray-600 transition-colors border border-gray-600 hover:border-purple-500"
+                      onClick={() => handlePreviewAsset(json)}
+                    >
+                      <div className="flex items-center gap-4 mb-4">
+                        <span className="text-4xl">📄</span>
+                        <span className="text-lg font-semibold text-green-400">JSON {json.order || index + 1}</span>
+                      </div>
+                      <p className="text-base text-gray-200 truncate mb-3 font-medium">{json.name}</p>
+                      <p className="text-base text-gray-400 mb-4">{formatFileSize(json.size || 0)}</p>
+                      <div className="text-base text-gray-300 bg-gray-800 rounded-lg px-4 py-2 text-center hover:bg-gray-700 transition-colors">Click to view</div>
+                    </div>
+                  ))}
+                  
+                  {/* Rewards */}
+                  {group.assets.rewards.map((reward, index) => (
+                    <div 
+                      key={`${reward.id}-${index}`} 
+                      className="bg-gray-700 rounded-lg p-6 cursor-pointer hover:bg-gray-600 transition-colors border border-gray-600 hover:border-purple-500"
+                      onClick={() => handlePreviewAsset(reward)}
+                    >
+                      <div className="flex items-center gap-4 mb-4">
+                        <span className="text-4xl">🏆</span>
+                        <span className="text-lg font-semibold text-yellow-400">Reward {index + 1}</span>
+                      </div>
+                      <p className="text-base text-gray-200 truncate mb-3 font-medium">{reward.name}</p>
+                      <p className="text-base text-gray-400 mb-4">{formatFileSize(reward.size || 0)}</p>
+                      <div className="text-base text-gray-300 bg-gray-800 rounded-lg px-4 py-2 text-center hover:bg-gray-700 transition-colors">Click to play</div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Voice files summary */}
+                {group.assets.voices.length > 0 && (
+                  <div className="mt-6 bg-gray-700 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl">🎵</span>
+                        <span className="text-xl font-semibold text-orange-400">Voice Files ({group.assets.voices.length})</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setPreviewAsset(group.assets.voices[0]);
+                          setShowPreview(true);
+                        }}
+                        className="text-sm bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg transition-colors"
+                      >
+                        Preview Sample
+                      </button>
+                    </div>
+                    <div className="text-base text-gray-300 mb-3">
+                      {group.assets.voices.length} voice files available for {group.name}
+                    </div>
+                    <div className="text-sm text-gray-500 mb-4">
+                      Includes: intro, questions, answers, lesson, and reward voices
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {group.assets.voices.slice(0, 12).map((voice, index) => (
+                        <div 
+                          key={`${voice.id}-${index}`} 
+                          className="text-sm text-gray-400 truncate cursor-pointer hover:text-orange-400 transition-colors p-2 bg-gray-800 rounded hover:bg-gray-700"
+                          onClick={() => handlePreviewAsset(voice)}
+                          title={voice.name}
+                        >
+                          {voice.name}
+                        </div>
+                      ))}
+                      {group.assets.voices.length > 12 && (
+                        <div className="text-sm text-gray-500 p-2 bg-gray-800 rounded">
+                          +{group.assets.voices.length - 12} more...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </motion.div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex justify-center items-center gap-2 mt-8"
+        >
+          <button
+            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 rounded-lg transition-colors"
+          >
+            ← Previous
+          </button>
+          
+          <div className="flex gap-1">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+              
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`px-3 py-2 rounded-lg transition-colors ${
+                    currentPage === pageNum
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+          </div>
+          
+          <button
+            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 rounded-lg transition-colors"
+          >
+            Next →
+          </button>
+          
+          <span className="text-sm text-gray-400 ml-4">
+            Page {currentPage} of {totalPages} ({filteredAssetGroups.length} total)
+          </span>
+        </motion.div>
+      )}
+
+      {/* Upload Dialog */}
+      <AnimatePresence>
+        {showCreateDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gray-800 rounded-lg p-6 w-full max-w-md"
+            >
+              <h2 className="text-xl font-bold mb-4">Upload Assets</h2>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-400 mb-2">
+                  Category
+                </label>
+                <select
+                  value={selectedCategory || ''}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                >
+                  <option value="">Select category</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-400 mb-2">
+                  Files
+                </label>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => e.target.files && handleUploadAssets(e.target.files)}
+                  className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                />
+              </div>
+              
+              {uploading && (
+                <div className="mb-4 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-2"></div>
+                  <p className="text-sm text-gray-400">Uploading assets...</p>
+                </div>
+              )}
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowCreateDialog(false)}
+                  className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* AI Generator Dialog */}
+      <AnimatePresence>
+        {showAIGenerator && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold">AI Content Generator</h2>
+                <button
+                  onClick={() => setShowAIGenerator(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <XCircleIcon className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Input Section */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                      Topic/Subject
+                    </label>
+                    <input
+                      type="text"
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      placeholder="e.g., elephant, lion, tiger"
+                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                      Language
+                    </label>
+                    <select
+                      value={aiLanguage}
+                      onChange={(e) => setAiLanguage(e.target.value)}
+                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                    >
+                      <option value="vietnamese">Vietnamese</option>
+                      <option value="english">English</option>
+                      <option value="spanish">Spanish</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                      Topic Category
+                    </label>
+                    <select
+                      value={aiTopic}
+                      onChange={(e) => setAiTopic(e.target.value)}
+                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                    >
+                      <option value="animals">Animals</option>
+                      <option value="plants">Plants</option>
+                      <option value="science">Science</option>
+                      <option value="history">History</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                      AI Provider
+                    </label>
+                    <select
+                      value={aiProvider}
+                      onChange={(e) => setAiProvider(e.target.value)}
+                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                    >
+                      <option value="grok">Grok (xAI)</option>
+                      <option value="openai">OpenAI (GPT-4)</option>
+                    </select>
+                  </div>
+                  
+                  <button
+                    onClick={generateAIContent}
+                    disabled={aiGenerating || !aiPrompt.trim()}
+                    className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+                  >
+                    {aiGenerating ? (
+                                          <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xl">✨</span>
+                      Generate Content
+                    </>
+                  )}
+                  </button>
+                </div>
+                
+                {/* Preview Section */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Generated Content Preview</h3>
+                  
+                  <div className="bg-gray-700 rounded-lg p-4 space-y-4 max-h-96 overflow-y-auto">
+                    <div>
+                      <h4 className="font-medium text-purple-400 mb-2">Intro</h4>
+                      <p className="text-sm text-gray-300">Text: {aiContent.intro.text}</p>
+                      <p className="text-sm text-gray-300">Voice: {aiContent.intro.voice}</p>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium text-purple-400 mb-2">Quiz 1</h4>
+                      <p className="text-sm text-gray-300">Question: {aiContent.quiz_1.question.text}</p>
+                      <p className="text-sm text-gray-300">Options: {aiContent.quiz_1.options.join(', ')}</p>
+                      <p className="text-sm text-gray-300">Answer: Position {aiContent.quiz_1.answer.position}</p>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium text-purple-400 mb-2">Quiz 2</h4>
+                      <p className="text-sm text-gray-300">Question: {aiContent.quiz_2.question.text}</p>
+                      <p className="text-sm text-gray-300">Options: {aiContent.quiz_2.options.join(', ')}</p>
+                      <p className="text-sm text-gray-300">Answer: Position {aiContent.quiz_2.answer.position}</p>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium text-purple-400 mb-2">Quiz 3</h4>
+                      <p className="text-sm text-gray-300">Question: {aiContent.quiz_3.question.text}</p>
+                      <p className="text-sm text-gray-300">Options: {aiContent.quiz_3.options.join(', ')}</p>
+                      <p className="text-sm text-gray-300">Answer: Position {aiContent.quiz_3.answer.position}</p>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium text-purple-400 mb-2">Lesson</h4>
+                      <p className="text-sm text-gray-300">Voice: {aiContent.lesson.voice}</p>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium text-purple-400 mb-2">Reward</h4>
+                      <p className="text-sm text-gray-300">Voice: {aiContent.reward.voice}</p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={saveGeneratedContent}
+                    disabled={!aiContent.key}
+                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Save as JSON
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Asset Preview Modal */}
+      <AnimatePresence>
+        {showPreview && previewAsset && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+            onClick={handleClosePreview}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-white">{previewAsset.name}</h3>
+                  <p className="text-sm text-gray-400">
+                    {previewAsset.type.toUpperCase()} • {formatFileSize(previewAsset.size || 0)}
+                  </p>
+                </div>
+                <button
+                  onClick={handleClosePreview}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <XCircleIcon className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="mb-4">
+                {getAssetPreviewContent(previewAsset)}
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    // Download functionality
+                    const link = document.createElement('a');
+                    link.href = `/api/assets/preview?path=${encodeURIComponent(previewAsset.path)}`;
+                    link.download = previewAsset.name;
+                    link.click();
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+                >
+                  Download
+                </button>
+                <button
+                  onClick={handleClosePreview}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+} 
