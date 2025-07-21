@@ -1615,6 +1615,39 @@ export default function AssetsPage() {
                   Download
                 </button>
                 <button
+                  onClick={async () => {
+                    if (confirm(`Are you sure you want to delete "${previewAsset.name}"?`)) {
+                      try {
+                        const response = await fetch('/api/assets', {
+                          method: 'DELETE',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({ 
+                            assetIds: [previewAsset.id],
+                            paths: [previewAsset.path]
+                          }),
+                        });
+
+                        if (!response.ok) {
+                          throw new Error('Failed to delete asset');
+                        }
+
+                        // Close the preview and refresh assets
+                        handleClosePreview();
+                        fetchAssets();
+                        alert('Asset deleted successfully!');
+                      } catch (error) {
+                        console.error('Error deleting asset:', error);
+                        alert('Failed to delete asset. Please try again.');
+                      }
+                    }
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition-colors"
+                >
+                  Delete
+                </button>
+                <button
                   onClick={handleClosePreview}
                   className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
                 >

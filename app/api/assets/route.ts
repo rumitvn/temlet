@@ -212,7 +212,7 @@ export async function POST(req: NextRequest) {
 // DELETE /api/assets - Delete assets
 export async function DELETE(req: NextRequest) {
   try {
-    const { assetIds } = await req.json();
+    const { assetIds, paths } = await req.json();
     
     if (!assetIds || !Array.isArray(assetIds)) {
       return NextResponse.json(
@@ -224,11 +224,58 @@ export async function DELETE(req: NextRequest) {
     const deletedAssets: string[] = [];
     const failedAssets: string[] = [];
     
-    for (const assetId of assetIds) {
+    for (let i = 0; i < assetIds.length; i++) {
+      const assetId = assetIds[i];
+      const filePath = paths ? paths[i] : null;
+      
       try {
-        // In a real implementation, you'd look up the asset path by ID
-        // For now, we'll simulate deletion
-        deletedAssets.push(assetId);
+        if (filePath) {
+          // Validate the path is within allowed directories
+          const assetPaths = getAssetPaths();
+          const allowedPaths = [
+            assetPaths.voice,
+            assetPaths.image,
+            assetPaths.video,
+            assetPaths.json,
+            assetPaths.reward,
+            `${assetPaths.reward}/output`,
+            `${assetPaths.reward}/reward_1`,
+            `${assetPaths.reward}/reward_2`,
+            `${assetPaths.reward}/reward_3`,
+            `${assetPaths.reward}/reward_4`,
+            `${assetPaths.reward}/reward_5`
+          ];
+          
+          // Also create backslash versions for Windows paths
+          const allowedPathsBackslash = allowedPaths.map(path => path.replace(/\//g, '\\'));
+          
+          // Check if path starts with any allowed directory
+          const isAllowed = allowedPaths.some(allowedPath => 
+            filePath.startsWith(allowedPath)
+          ) || allowedPathsBackslash.some(allowedPath => 
+            filePath.startsWith(allowedPath)
+          );
+          
+          if (!isAllowed) {
+            console.error(`Access denied for path: ${filePath}`);
+            failedAssets.push(assetId);
+            continue;
+          }
+          
+          // Check if file exists and delete it
+          try {
+            await fs.access(filePath);
+            await fs.unlink(filePath);
+            deletedAssets.push(assetId);
+            console.log(`Successfully deleted file: ${filePath}`);
+          } catch (error) {
+            console.error(`Error deleting file ${filePath}:`, error);
+            failedAssets.push(assetId);
+          }
+        } else {
+          // Fallback to just tracking the deletion
+          deletedAssets.push(assetId);
+        }
       } catch (error) {
         console.error(`Error deleting asset ${assetId}:`, error);
         failedAssets.push(assetId);
