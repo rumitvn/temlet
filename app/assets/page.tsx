@@ -177,9 +177,13 @@ export default function AssetsPage() {
   });
 
   const [aiPrompt, setAiPrompt] = useState("");
+  const [aiDescription, setAiDescription] = useState("");
   const [aiLanguage, setAiLanguage] = useState("vietnamese");
-  const [aiTopic, setAiTopic] = useState("animals");
   const [aiProvider, setAiProvider] = useState("grok");
+  const [existingOrders, setExistingOrders] = useState<number[]>([]);
+  const [previewItems, setPreviewItems] = useState<SK3QLRContent[]>([]);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   // Helper function to extract key and order from filename
   const extractKeyAndOrder = (filename: string, type: string): { key: string; order?: number } => {
@@ -517,15 +521,89 @@ export default function AssetsPage() {
     alert('Upload functionality requires category selection. Please implement category selection first.');
   };
 
+  // Check for duplicate subjects
+  const checkDuplicateSubject = (subject: string) => {
+    if (!subject.trim()) {
+      return false;
+    }
+    
+    const normalizedSubject = subject.toLowerCase().trim();
+    const existingSubjects = assetGroups.map(group => group.key.toLowerCase());
+    
+    if (existingSubjects.includes(normalizedSubject)) {
+      return true;
+    } else {
+      return false;
+    }
+  };
+
+  // Check for existing orders for a subject
+  const checkExistingOrders = (subject: string) => {
+    if (!subject.trim()) {
+      setExistingOrders([]);
+      return;
+    }
+    
+    const normalizedSubject = subject.toLowerCase().trim();
+    const existingJsons = assetGroups
+      .filter(group => group.key.toLowerCase() === normalizedSubject)
+      .flatMap(group => group.assets.jsons);
+    
+    const orders = existingJsons
+      .map(json => json.order)
+      .filter((order): order is number => order !== undefined)
+      .sort((a, b) => a - b);
+    
+    setExistingOrders(orders);
+  };
+
+  // Handle subject input change
+  const handleSubjectChange = (value: string) => {
+    setAiPrompt(value);
+    checkExistingOrders(value);
+  };
+
   const generateAIContent = async () => {
     if (!aiPrompt.trim()) {
-      alert('Please enter a prompt for AI generation');
+      alert('Please enter a subject for AI generation');
       return;
     }
 
     setAiGenerating(true);
     
     try {
+      // Calculate next order number
+      const nextOrder = existingOrders.length > 0 ? Math.max(...existingOrders) + 1 : 1;
+      
+      // Get existing content for this subject to avoid repetition
+      const existingJsons = assetGroups
+        .filter(group => group.key.toLowerCase() === aiPrompt.toLowerCase().trim())
+        .flatMap(group => group.assets.jsons);
+      
+      // Read actual content from existing JSON files
+      const existingContentData = [];
+      for (const json of existingJsons) {
+        try {
+          const response = await fetch(`/api/assets/preview?path=${encodeURIComponent(json.path)}&channel=${selectedChannel}&topic=${selectedTopic}`);
+          if (response.ok) {
+            const content = await response.text();
+            const jsonData = JSON.parse(content);
+            existingContentData.push({
+              filename: json.name,
+              order: json.order,
+              intro: jsonData.intro?.text || '',
+              quiz1: jsonData.quiz_1?.question?.text || '',
+              quiz2: jsonData.quiz_2?.question?.text || '',
+              quiz3: jsonData.quiz_3?.question?.text || '',
+              lesson: jsonData.lesson?.voice || '',
+              reward: jsonData.reward?.voice || ''
+            });
+          }
+        } catch (error) {
+          console.error(`Error reading JSON file ${json.name}:`, error);
+        }
+      }
+      
       const response = await fetch('/api/assets/generate', {
         method: 'POST',
         headers: {
@@ -533,9 +611,21 @@ export default function AssetsPage() {
         },
         body: JSON.stringify({
           prompt: aiPrompt,
+          description: aiDescription,
           language: aiLanguage,
-          topic: aiTopic,
-          provider: aiProvider
+          topic: selectedTopic,
+          provider: aiProvider,
+          order: nextOrder,
+          existingContent: existingContentData,
+          previewItems: previewItems.map(item => ({
+            order: item.order,
+            intro: item.intro.text,
+            quiz1: item.quiz_1.question.text,
+            quiz2: item.quiz_2.question.text,
+            quiz3: item.quiz_3.question.text,
+            lesson: item.lesson.voice,
+            reward: item.reward.voice
+          }))
         }),
       });
 
@@ -544,7 +634,14 @@ export default function AssetsPage() {
       }
 
       const data = await response.json();
-      setAiContent(data.content);
+      const newContent = { ...data.content, order: nextOrder };
+      
+      // Add to preview items
+      setPreviewItems(prev => [...prev, newContent]);
+      
+      // Update existing orders
+      setExistingOrders(prev => [...prev, nextOrder].sort((a, b) => a - b));
+      
     } catch (error) {
       console.error('Error generating AI content:', error);
       alert('Failed to generate content. Please try again.');
@@ -553,35 +650,69 @@ export default function AssetsPage() {
     }
   };
 
-  const saveGeneratedContent = () => {
-    const fileName = `${aiContent.key}_${aiContent.order}.json`;
-    const jsonContent = JSON.stringify(aiContent, null, 2);
-    
-    // Create a blob and download
-    const blob = new Blob([jsonContent], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    // Add to assets list
-    const newAsset: Asset = {
-      id: `json_${Date.now()}`,
-      name: fileName,
-      type: 'json',
-      category: 'json',
-      path: `C:/Users/youruser/Documents/minimate/animals/render/${fileName}`,
-      size: jsonContent.length,
-      lastModified: new Date(),
-      status: 'available'
-    };
-    
-    setAssets(prev => [...prev, newAsset]);
-    setShowAIGenerator(false);
+  const removePreviewItem = (index: number) => {
+    setPreviewItems(prev => {
+      const newItems = prev.filter((_, i) => i !== index);
+      // Recalculate existing orders
+      const removedOrder = prev[index]?.order;
+      if (removedOrder) {
+        setExistingOrders(prev => prev.filter(order => order !== removedOrder));
+      }
+      return newItems;
+    });
+  };
+
+  const clearAllPreviews = () => {
+    setPreviewItems([]);
+    // Reset existing orders to original state
+    checkExistingOrders(aiPrompt);
+  };
+
+  const approveGeneratedContent = async () => {
+    if (previewItems.length === 0) {
+      alert('No content to approve');
+      return;
+    }
+
+    try {
+      // Create all render files
+      const results = [];
+      for (const content of previewItems) {
+        const response = await fetch('/api/assets/render', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            content: content,
+            channel: selectedChannel,
+            topic: selectedTopic
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to create render file for ${content.key}_${content.order}.json`);
+        }
+
+        const data = await response.json();
+        results.push(data.fileName);
+      }
+      
+      // Refresh assets list to show the new files
+      fetchAssets();
+      
+      // Show success dialog
+      setSuccessMessage(`Successfully created ${results.length} render file(s): ${results.join(', ')}`);
+      setShowSuccessDialog(true);
+      
+      // Clear previews and close dialog
+      setPreviewItems([]);
+      setShowAIGenerator(false);
+      
+    } catch (error) {
+      console.error('Error creating render files:', error);
+      alert('Failed to create render files. Please try again.');
+    }
   };
 
   const handlePreviewAsset = (asset: Asset) => {
@@ -1156,14 +1287,32 @@ export default function AssetsPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-400 mb-2">
-                      Topic/Subject
+                      Subject
                     </label>
                     <input
                       type="text"
                       value={aiPrompt}
-                      onChange={(e) => setAiPrompt(e.target.value)}
-                      placeholder="e.g., elephant, lion, tiger"
+                      onChange={(e) => handleSubjectChange(e.target.value)}
+                      placeholder="e.g., capybara, lion, tiger"
                       className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                    />
+                    {existingOrders.length > 0 && (
+                      <p className="text-sm text-blue-400 mt-1">
+                        ℹ️ Existing orders: {existingOrders.join(', ')} → Next: {Math.max(...existingOrders) + 1}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      value={aiDescription}
+                      onChange={(e) => setAiDescription(e.target.value)}
+                      placeholder="Provide more details about the subject for better content generation..."
+                      rows={3}
+                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none resize-none"
                     />
                   </div>
                   
@@ -1178,23 +1327,6 @@ export default function AssetsPage() {
                     >
                       <option value="vietnamese">Vietnamese</option>
                       <option value="english">English</option>
-                      <option value="spanish">Spanish</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
-                      Topic Category
-                    </label>
-                    <select
-                      value={aiTopic}
-                      onChange={(e) => setAiTopic(e.target.value)}
-                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                    >
-                      <option value="animals">Animals</option>
-                      <option value="plants">Plants</option>
-                      <option value="science">Science</option>
-                      <option value="history">History</option>
                     </select>
                   </div>
                   
@@ -1212,74 +1344,102 @@ export default function AssetsPage() {
                     </select>
                   </div>
                   
+                  <div className="text-sm text-gray-400 bg-gray-700 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-purple-400">📁</span>
+                      <span>Target: {selectedChannel}/{selectedTopic}</span>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Content will be generated for the current channel and topic selection.
+                    </div>
+                  </div>
+                  
                   <button
                     onClick={generateAIContent}
                     disabled={aiGenerating || !aiPrompt.trim()}
                     className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
                   >
                     {aiGenerating ? (
-                                          <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-xl">✨</span>
-                      Generate Content
-                    </>
-                  )}
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xl">✨</span>
+                        Generate Content
+                      </>
+                    )}
                   </button>
                 </div>
                 
                 {/* Preview Section */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Generated Content Preview</h3>
-                  
-                  <div className="bg-gray-700 rounded-lg p-4 space-y-4 max-h-96 overflow-y-auto">
-                    <div>
-                      <h4 className="font-medium text-purple-400 mb-2">Intro</h4>
-                      <p className="text-sm text-gray-300">Text: {aiContent.intro.text}</p>
-                      <p className="text-sm text-gray-300">Voice: {aiContent.intro.voice}</p>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-medium text-purple-400 mb-2">Quiz 1</h4>
-                      <p className="text-sm text-gray-300">Question: {aiContent.quiz_1.question.text}</p>
-                      <p className="text-sm text-gray-300">Options: {aiContent.quiz_1.options.join(', ')}</p>
-                      <p className="text-sm text-gray-300">Answer: Position {aiContent.quiz_1.answer.position}</p>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-medium text-purple-400 mb-2">Quiz 2</h4>
-                      <p className="text-sm text-gray-300">Question: {aiContent.quiz_2.question.text}</p>
-                      <p className="text-sm text-gray-300">Options: {aiContent.quiz_2.options.join(', ')}</p>
-                      <p className="text-sm text-gray-300">Answer: Position {aiContent.quiz_2.answer.position}</p>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-medium text-purple-400 mb-2">Quiz 3</h4>
-                      <p className="text-sm text-gray-300">Question: {aiContent.quiz_3.question.text}</p>
-                      <p className="text-sm text-gray-300">Options: {aiContent.quiz_3.options.join(', ')}</p>
-                      <p className="text-sm text-gray-300">Answer: Position {aiContent.quiz_3.answer.position}</p>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-medium text-purple-400 mb-2">Lesson</h4>
-                      <p className="text-sm text-gray-300">Voice: {aiContent.lesson.voice}</p>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-medium text-purple-400 mb-2">Reward</h4>
-                      <p className="text-sm text-gray-300">Voice: {aiContent.reward.voice}</p>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Generated Content Preview</h3>
+                    {previewItems.length > 0 && (
+                      <button
+                        onClick={clearAllPreviews}
+                        className="text-sm text-red-400 hover:text-red-300"
+                      >
+                        Clear All
+                      </button>
+                    )}
                   </div>
                   
+                  {previewItems.length === 0 ? (
+                    <div className="bg-gray-700 rounded-lg p-4 space-y-4 max-h-96 overflow-y-auto">
+                      <div className="text-center text-gray-400 py-8">
+                        <div className="text-4xl mb-2">📝</div>
+                        <p>No preview items yet</p>
+                        <p className="text-sm">Generate content to see previews here</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                      {previewItems.map((item, index) => (
+                        <div key={index} className="bg-gray-700 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-medium text-purple-400">
+                              {item.key}_{item.order}.json
+                            </h4>
+                            <button
+                              onClick={() => removePreviewItem(index)}
+                              className="text-red-400 hover:text-red-300 text-sm"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          
+                          <div className="space-y-3 text-sm">
+                            <div>
+                              <span className="text-gray-400">Intro:</span>
+                              <p className="text-gray-300 truncate">{item.intro.text}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Quiz 1:</span>
+                              <p className="text-gray-300 truncate">{item.quiz_1.question.text}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Quiz 2:</span>
+                              <p className="text-gray-300 truncate">{item.quiz_2.question.text}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Quiz 3:</span>
+                              <p className="text-gray-300 truncate">{item.quiz_3.question.text}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
                   <button
-                    onClick={saveGeneratedContent}
-                    disabled={!aiContent.key}
+                    onClick={approveGeneratedContent}
+                    disabled={previewItems.length === 0}
                     className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
                   >
-                    Save as JSON
+                    Approve & Create {previewItems.length} Render File{previewItems.length !== 1 ? 's' : ''}
                   </button>
                 </div>
               </div>
@@ -1340,6 +1500,37 @@ export default function AssetsPage() {
                 <button
                   onClick={handleClosePreview}
                   className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Success Dialog */}
+      <AnimatePresence>
+        {showSuccessDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gray-800 rounded-lg p-6 w-full max-w-md"
+            >
+              <div className="text-center">
+                <div className="text-6xl mb-4">✅</div>
+                <h3 className="text-xl font-bold text-green-400 mb-2">Success!</h3>
+                <p className="text-gray-300 mb-6">{successMessage}</p>
+                <button
+                  onClick={() => setShowSuccessDialog(false)}
+                  className="w-full bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
                 >
                   Close
                 </button>

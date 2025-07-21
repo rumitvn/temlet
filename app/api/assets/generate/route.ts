@@ -60,7 +60,20 @@ interface SK3QLRContent {
 // POST /api/assets/generate - Generate AI content
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, language, topic, provider = "grok" } = await req.json();
+    const { prompt, description, language, topic, provider = "grok", order = 1, existingContent = [], previewItems = [] } = await req.json();
+    
+    // Debug logging
+    console.log('=== AI GENERATE REQUEST DEBUG ===');
+    console.log('Request body:', {
+      prompt,
+      description,
+      language,
+      topic,
+      provider,
+      order,
+      existingContent,
+      previewItems
+    });
     
     if (!prompt || !language || !topic) {
       return NextResponse.json(
@@ -70,9 +83,9 @@ export async function POST(req: NextRequest) {
     }
     
     // Validate language
-    if (!['vietnamese', 'english', 'spanish'].includes(language)) {
+    if (!['vietnamese', 'english'].includes(language)) {
       return NextResponse.json(
-        { error: 'Invalid language. Supported: vietnamese, english, spanish' },
+        { error: 'Invalid language. Supported: vietnamese, english' },
         { status: 400 }
       );
     }
@@ -86,11 +99,57 @@ export async function POST(req: NextRequest) {
     }
 
     const key = prompt.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-    const order = 1;
 
-    const systemPrompt = `You are an expert content creator for educational children's videos. Create engaging SK3QLR (Short Kids 3 Question with Lesson and Reward) format content. Always output valid JSON only in the exact format specified.`;
+    const systemPrompt = `You are an expert content creator for educational children's videos. Create engaging SK3QLR (Short Kids 3 Question with Lesson and Reward) format content. 
 
-    const userPrompt = `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.
+IMPORTANT: Return ONLY valid JSON in the exact format specified. Do not include any explanatory text, markdown formatting, or additional content before or after the JSON. The response must start with { and end with }.
+
+CRITICAL: Each content piece must be UNIQUE and DIFFERENT from any previous content for the same subject.`;
+
+    // Build uniqueness instructions based on existing content
+    let uniquenessInstructions = "";
+    if (existingContent.length > 0 || previewItems.length > 0) {
+      uniquenessInstructions = "\n\nUNIQUENESS REQUIREMENTS:";
+      uniquenessInstructions += "\n- This is order " + order + " for subject '" + prompt + "'";
+      
+      if (existingContent.length > 0) {
+        uniquenessInstructions += "\n- Existing content that you MUST AVOID repeating:";
+        existingContent.forEach((item: any) => {
+          uniquenessInstructions += `\n  ${item.filename} (Order ${item.order}):`;
+          uniquenessInstructions += `\n    Intro: "${item.intro}"`;
+          uniquenessInstructions += `\n    Quiz1: "${item.quiz1}"`;
+          uniquenessInstructions += `\n    Quiz2: "${item.quiz2}"`;
+          uniquenessInstructions += `\n    Quiz3: "${item.quiz3}"`;
+          uniquenessInstructions += `\n    Lesson: "${item.lesson}"`;
+          uniquenessInstructions += `\n    Reward: "${item.reward}"`;
+        });
+      }
+      
+      if (previewItems.length > 0) {
+        uniquenessInstructions += "\n- Previous preview content that you MUST AVOID repeating:";
+        previewItems.forEach((item: any) => {
+          uniquenessInstructions += `\n  Order ${item.order}:`;
+          uniquenessInstructions += `\n    Intro: "${item.intro}"`;
+          uniquenessInstructions += `\n    Quiz1: "${item.quiz1}"`;
+          uniquenessInstructions += `\n    Quiz2: "${item.quiz2}"`;
+          uniquenessInstructions += `\n    Quiz3: "${item.quiz3}"`;
+          uniquenessInstructions += `\n    Lesson: "${item.lesson}"`;
+          uniquenessInstructions += `\n    Reward: "${item.reward}"`;
+        });
+      }
+      
+      uniquenessInstructions += "\n\nCRITICAL INSTRUCTIONS:";
+      uniquenessInstructions += "\n- Create COMPLETELY DIFFERENT content from all previous versions";
+      uniquenessInstructions += "\n- Use different questions, different facts, different approaches";
+      uniquenessInstructions += "\n- Focus on different aspects of the subject";
+      uniquenessInstructions += "\n- Vary the difficulty level and complexity";
+      uniquenessInstructions += "\n- Do NOT repeat any of the questions, facts, or approaches shown above";
+      uniquenessInstructions += "\n- Each quiz question must be unique and different from all previous ones";
+      uniquenessInstructions += "\n- The lesson content must cover different educational points";
+      uniquenessInstructions += "\n- The reward message must be different from previous versions";
+    }
+
+    const userPrompt = `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${uniquenessInstructions}
 
 Video Format: SK3QLR (Short Kids 3 Question with Lesson and Reward) - 45 seconds total
 - Intro: 1 second
@@ -157,10 +216,20 @@ Requirements:
 - Keep voice scripts natural and conversational
 - For quiz_3, use animal names that can be represented by images (e.g., "elephant", "shark", "eagle", "deer")
 - Ensure all content is factually accurate and educational
+- CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
 
 Language: ${language}
 Topic: ${topic}
-Subject: ${prompt}`;
+Subject: ${prompt}
+Order: ${order}
+
+CRITICAL: Return ONLY the JSON object. Do not include any other text, explanations, or formatting.`;
+
+    // Debug logging for prompts
+    console.log('=== AI PROMPTS DEBUG ===');
+    console.log('System Prompt:', systemPrompt);
+    console.log('User Prompt:', userPrompt);
+    console.log('Uniqueness Instructions:', uniquenessInstructions);
 
     let content = "";
 
@@ -211,8 +280,42 @@ Subject: ${prompt}`;
 
     console.log('AI Generated Content: ', content);
     
+    // Extract JSON from the response (handle cases where AI adds extra text)
+    let jsonContent = content;
+    
+    // Try to find JSON object in the response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonContent = jsonMatch[0];
+    }
+    
     // Parse the JSON response
-    const parsed = JSON.parse(content);
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonContent);
+    } catch (parseError) {
+      console.error('JSON Parse Error:', parseError);
+      console.error('Attempted to parse:', jsonContent);
+      
+      // Try to clean up common JSON issues
+      let cleanedContent = jsonContent
+        .replace(/^[^{]*/, '') // Remove everything before first {
+        .replace(/[^}]*$/, '') // Remove everything after last }
+        .replace(/,\s*}/g, '}') // Remove trailing commas
+        .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
+      
+      try {
+        parsed = JSON.parse(cleanedContent);
+      } catch (secondError) {
+        console.error('Second JSON Parse Error:', secondError);
+        console.error('Cleaned content:', cleanedContent);
+        
+        return NextResponse.json(
+          { error: 'Failed to parse AI response. Please try again.' },
+          { status: 500 }
+        );
+      }
+    }
     
     return NextResponse.json({
       success: true,
