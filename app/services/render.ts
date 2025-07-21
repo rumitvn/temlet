@@ -1,12 +1,8 @@
 import { RenderItem } from "@prisma/client";
 import { TemplateAeAsset } from "../types/render";
+import { config, normalizePath } from "../../lib/config";
 
-// Helper function to normalize paths to use forward slashes
-const normalizePath = (path: string): string => {
-  return path.replace(/\\/g, '/');
-};
-
-export const generateAssets = (renderItem: RenderItem): TemplateAeAsset[] => {
+export const generateAssets = (renderItem: RenderItem, channel: string = "minimate", topic: string = "animals"): TemplateAeAsset[] => {
   const { templateAeRenderFormat, jsonContent } = renderItem;
   const content = typeof jsonContent === 'string' ? JSON.parse(jsonContent) : jsonContent;
   
@@ -28,15 +24,15 @@ export const generateAssets = (renderItem: RenderItem): TemplateAeAsset[] => {
   const order = content.order || 1;
   const keyOrder = `${key}_${order}`;
 
-  // Helper functions for building paths
+  // Helper functions for building paths using configuration with parameters
   const voicePath = (layer: string) =>
-    `file:///C:/Users/youruser/Documents/minimate/animals/voice/${keyOrder}/${layer}.mp3`;
+    config.getAssetFileUrl(config.buildAssetPath("voice", channel, topic, `${keyOrder}/${layer}.mp3`));
 
   const imagePath = (name: string) =>
-    `file:///C:/Users/youruser/Documents/minimate/animals/image/${name}.jpg`;
+    config.getAssetFileUrl(config.buildAssetPath("image", channel, topic, `${name}.jpg`));
 
   const videoPath = (name: string) =>
-    `file:///C:/Users/youruser/Documents/minimate/animals/video/${name}.mp4`;
+    config.getAssetFileUrl(config.buildAssetPath("video", channel, topic, `${name}.mp4`));
 
   // Extract quiz data
   const intro = content.intro || {};
@@ -218,7 +214,7 @@ export const generateAssets = (renderItem: RenderItem): TemplateAeAsset[] => {
     {
       type: "video",
       layerName: "reward_video",
-      src: `file:///C:/Users/youruser/Documents/minimate/animals/reward/output/reward_${order}/${key}.mp4`,
+      src: config.getAssetFileUrl(config.buildAssetPath("reward", channel, topic, `output/reward_${order}/${key}.mp4`)),
     },
     {
       type: "audio",

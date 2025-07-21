@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { config } from "../../lib/config";
 
 /**
  * Example "Create Jobs" page:
@@ -20,7 +21,7 @@ export default function CreateJobPage() {
 
   // 3) Additional inputs: local root path, template, composition, output folder
   const [localRootPath, setLocalRootPath] = useState(
-    "file:///C:/Users/youruser/Documents/minimate/animals"
+    config.getAssetFileUrl(config.getTopicPath("minimate", "animals"))
   );
   const [templateSrc, setTemplateSrc] = useState(
     "file:///C:/Users/youruser/Documents/AEProjects/49801406-boxing-day-sale-instagram-reel-AEdownload.com/Boxing Day Sale Instagram Reel/Boxing Day Sale Instagram Reel (converted)_level_1.aep"

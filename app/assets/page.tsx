@@ -12,6 +12,7 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon
 } from "@heroicons/react/24/solid";
+import { config } from "../../lib/config";
 
 interface Asset {
   id: string;
@@ -111,11 +112,12 @@ interface SK3QLRContent {
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetGroups, setAssetGroups] = useState<AssetGroup[]>([]);
-  const [categories, setCategories] = useState<AssetCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedChannel, setSelectedChannel] = useState("minimate");
+  const [selectedTopic, setSelectedTopic] = useState("animals");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
@@ -126,6 +128,29 @@ export default function AssetsPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(12);
+
+  // Filter options
+  const channelOptions = [
+    { value: "minimate", label: "MiniMate" },
+    { value: "rumitx_studio", label: "RumitX Studio" },
+    { value: "rumitx_shorts", label: "RumitX Shorts" },
+    { value: "rumitx_nature", label: "RumitX Nature" },
+    { value: "rumitx_science", label: "RumitX Science" },
+    { value: "rumitx_history", label: "RumitX History" }
+  ];
+
+  const topicOptions = [
+    { value: "animals", label: "Animals" },
+    { value: "plants", label: "Plants" },
+    { value: "histories", label: "Histories" },
+    { value: "science", label: "Science" },
+    { value: "technology", label: "Technology" },
+    { value: "nature", label: "Nature" },
+    { value: "space", label: "Space" },
+    { value: "ocean", label: "Ocean" },
+    { value: "weather", label: "Weather" },
+    { value: "geography", label: "Geography" }
+  ];
 
   // AI Generator state
   const [aiContent, setAiContent] = useState<SK3QLRContent>({
@@ -155,38 +180,6 @@ export default function AssetsPage() {
   const [aiLanguage, setAiLanguage] = useState("vietnamese");
   const [aiTopic, setAiTopic] = useState("animals");
   const [aiProvider, setAiProvider] = useState("grok");
-
-  // Mock data for demonstration - in real app, this would come from API
-  const mockCategories: AssetCategory[] = [
-    { id: 'voice', name: 'Voice Assets', type: 'voice', count: 45, path: 'C:/Users/youruser/Documents/minimate/animals/voice' },
-    { id: 'image', name: 'Image Assets', type: 'image', count: 32, path: 'C:/Users/youruser/Documents/minimate/animals/image' },
-    { id: 'video', name: 'Video Assets', type: 'video', count: 28, path: 'C:/Users/youruser/Documents/minimate/animals/video' },
-    { id: 'json', name: 'Content JSONs', type: 'json', count: 15, path: 'C:/Users/youruser/Documents/minimate/animals/render' },
-    { id: 'reward', name: 'Reward Videos', type: 'video', count: 12, path: 'C:/Users/youruser/Documents/minimate/animals/reward' }
-  ];
-
-  const mockAssets: Asset[] = [
-    // Voice assets
-    { id: '1', name: 'alligator_1_voice_title.mp3', type: 'voice', category: 'voice', path: 'C:/Users/youruser/Documents/minimate/animals/voice/alligator_1/voice_title.mp3', size: 245760, lastModified: new Date('2024-01-15'), status: 'available' },
-    { id: '2', name: 'alligator_1_voice_q1_title.mp3', type: 'voice', category: 'voice', path: 'C:/Users/youruser/Documents/minimate/animals/voice/alligator_1/voice_q1_title.mp3', size: 512000, lastModified: new Date('2024-01-15'), status: 'available' },
-    { id: '3', name: 'alligator_1_voice_q1_ans.mp3', type: 'voice', category: 'voice', path: 'C:/Users/youruser/Documents/minimate/animals/voice/alligator_1/voice_q1_ans.mp3', size: 384000, lastModified: new Date('2024-01-15'), status: 'available' },
-    
-    // Image assets
-    { id: '4', name: 'alligator.jpg', type: 'image', category: 'image', path: 'C:/Users/youruser/Documents/minimate/animals/image/alligator.jpg', size: 2048576, lastModified: new Date('2024-01-10'), status: 'available' },
-    { id: '5', name: 'hippo.jpg', type: 'image', category: 'image', path: 'C:/Users/youruser/Documents/minimate/animals/image/hippo.jpg', size: 1876544, lastModified: new Date('2024-01-10'), status: 'available' },
-    { id: '6', name: 'camel.jpg', type: 'image', category: 'image', path: 'C:/Users/youruser/Documents/minimate/animals/image/camel.jpg', size: 2153472, lastModified: new Date('2024-01-10'), status: 'available' },
-    
-    // Video assets
-    { id: '7', name: 'alligator.mp4', type: 'video', category: 'video', path: 'C:/Users/youruser/Documents/minimate/animals/video/alligator.mp4', size: 52428800, lastModified: new Date('2024-01-12'), status: 'available' },
-    { id: '8', name: 'hippo.mp4', type: 'video', category: 'video', path: 'C:/Users/youruser/Documents/minimate/animals/video/hippo.mp4', size: 47185920, lastModified: new Date('2024-01-12'), status: 'available' },
-    
-    // JSON assets
-    { id: '9', name: 'alligator_1.json', type: 'json', category: 'json', path: 'C:/Users/youruser/Documents/minimate/animals/render/alligator_1.json', size: 2048, lastModified: new Date('2024-01-15'), status: 'available' },
-    { id: '10', name: 'hippo_1.json', type: 'json', category: 'json', path: 'C:/Users/youruser/Documents/minimate/animals/render/hippo_1.json', size: 1536, lastModified: new Date('2024-01-15'), status: 'available' },
-    
-    // Reward assets
-    { id: '11', name: 'alligator_reward.mp4', type: 'video', category: 'reward', path: 'C:/Users/youruser/Documents/minimate/animals/reward/output/reward_1/alligator.mp4', size: 10485760, lastModified: new Date('2024-01-14'), status: 'available' },
-  ];
 
   // Helper function to extract key and order from filename
   const extractKeyAndOrder = (filename: string, type: string): { key: string; order?: number } => {
@@ -226,8 +219,9 @@ export default function AssetsPage() {
       }
       
       const params = new URLSearchParams();
-      if (selectedCategory) params.append('category', selectedCategory);
       if (searchTerm) params.append('search', searchTerm);
+      if (selectedChannel) params.append('channel', selectedChannel);
+      if (selectedTopic) params.append('topic', selectedTopic);
       
       const response = await fetch(`/api/assets?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch assets');
@@ -340,17 +334,6 @@ export default function AssetsPage() {
       }, {});
       
       setAssetGroups(Object.values(groupedAssets));
-      
-      // Update categories with real counts
-      const categoryCounts = processedAssets.reduce((acc: any, asset: Asset) => {
-        acc[asset.category] = (acc[asset.category] || 0) + 1;
-        return acc;
-      }, {});
-      
-      setCategories(prev => prev.map(cat => ({
-        ...cat,
-        count: categoryCounts[cat.id] || 0
-      })));
     } catch (error) {
       console.error('Error fetching assets:', error);
     } finally {
@@ -360,7 +343,7 @@ export default function AssetsPage() {
         setLoading(false);
       }
     }
-  }, [selectedCategory]);
+  }, [selectedChannel, selectedTopic]);
 
   // Debounced search effect
   useEffect(() => {
@@ -375,19 +358,28 @@ export default function AssetsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery, fetchAssets]);
 
+  // Filter change effect
+  useEffect(() => {
+    fetchAssets();
+  }, [selectedChannel, selectedTopic, fetchAssets]);
+
   // Initial load effect
   useEffect(() => {
     fetchAssets();
   }, [fetchAssets]);
 
+  // Reset to first page when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedChannel, selectedTopic]);
+
   // Client-side filtered assets for immediate search feedback
   const filteredAssets = useMemo(() => {
     return assets.filter(asset => {
       const matchesSearch = asset.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = !selectedCategory || asset.category === selectedCategory;
-      return matchesSearch && matchesCategory;
+      return matchesSearch;
     });
-  }, [assets, searchQuery, selectedCategory]);
+  }, [assets, searchQuery]);
 
   // Client-side filtered asset groups for immediate search feedback
   const filteredAssetGroups = useMemo(() => {
@@ -405,11 +397,6 @@ export default function AssetsPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedAssetGroups = filteredAssetGroups.slice(startIndex, endIndex);
-
-  // Reset to first page when search changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedCategory]);
 
   const getAssetIcon = (type: string) => {
     // Return a simple text representation for now
@@ -527,42 +514,7 @@ export default function AssetsPage() {
   };
 
   const handleUploadAssets = async (files: FileList) => {
-    if (!selectedCategory) {
-      alert('Please select a category first');
-      return;
-    }
-
-    setUploading(true);
-    
-    try {
-      const formData = new FormData();
-      formData.append('category', selectedCategory);
-      
-      Array.from(files).forEach(file => {
-        formData.append('files', file);
-      });
-
-      const response = await fetch('/api/assets', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to upload assets');
-      }
-
-      const data = await response.json();
-      
-      // Refresh assets list
-      fetchAssets();
-      
-      alert(`Successfully uploaded ${data.count} asset(s)`);
-    } catch (error) {
-      console.error('Error uploading assets:', error);
-      alert('Failed to upload assets. Please try again.');
-    } finally {
-      setUploading(false);
-    }
+    alert('Upload functionality requires category selection. Please implement category selection first.');
   };
 
   const generateAIContent = async () => {
@@ -656,7 +608,7 @@ export default function AssetsPage() {
   };
 
   const getAssetPreviewContent = (asset: Asset) => {
-    const previewUrl = `/api/assets/preview?path=${encodeURIComponent(asset.path)}`;
+    const previewUrl = `/api/assets/preview?path=${encodeURIComponent(asset.path)}&channel=${selectedChannel}&topic=${selectedTopic}`;
     
     switch (asset.type) {
       case 'image':
@@ -711,7 +663,7 @@ export default function AssetsPage() {
     useEffect(() => {
       const loadJSON = async () => {
         try {
-          const response = await fetch(`/api/assets/preview?path=${encodeURIComponent(asset.path)}`);
+          const response = await fetch(`/api/assets/preview?path=${encodeURIComponent(asset.path)}&channel=${selectedChannel}&topic=${selectedTopic}`);
           if (response.ok) {
             const content = await response.text();
             setJsonContent(JSON.stringify(JSON.parse(content), null, 2));
@@ -726,7 +678,7 @@ export default function AssetsPage() {
       };
 
       loadJSON();
-    }, [asset.path]);
+    }, [asset.path, selectedChannel, selectedTopic]);
 
     return (
       <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-auto">
@@ -791,70 +743,83 @@ export default function AssetsPage() {
         </div>
       </motion.div>
 
-      {/* Categories Overview */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8"
-      >
-        {categories.map((category) => {
-          const Icon = getAssetIcon(category.type);
-          return (
-            <motion.div
-              key={category.id}
-              whileHover={{ scale: 1.02 }}
-              className={`bg-gray-800 rounded-lg p-4 cursor-pointer transition-all ${
-                selectedCategory === category.id ? 'ring-2 ring-purple-500' : ''
-              }`}
-              onClick={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">{category.type === 'voice' ? '🎵' : category.type === 'image' ? '🖼️' : category.type === 'video' ? '🎥' : '📄'}</span>
-                <div>
-                  <h3 className="font-semibold text-gray-200">{category.name}</h3>
-                  <p className="text-2xl font-bold text-purple-400">{category.count}</p>
-                  <p className="text-sm text-gray-500">{category.type}</p>
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
-      </motion.div>
+
 
       {/* Search and Filters */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex gap-4 mb-6"
+        className="space-y-4 mb-6"
       >
-        <div className="flex-1 relative">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder="Search assets..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
-          />
+        {/* Search Bar */}
+        <div className="flex gap-4">
+          <div className="flex-1 relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search assets..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            {selectedAssets.length > 0 && (
+              <>
+                <button
+                  onClick={handleDeleteSelected}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  Delete ({selectedAssets.length})
+                </button>
+                <button
+                  onClick={handleDeselectAll}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                >
+                  Deselect All
+                </button>
+              </>
+            )}
+          </div>
         </div>
-        
-        <div className="flex gap-2">
-          {selectedAssets.length > 0 && (
-            <>
-              <button
-                onClick={handleDeleteSelected}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-              >
-                Delete ({selectedAssets.length})
-              </button>
-              <button
-                onClick={handleDeselectAll}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-              >
-                Deselect All
-              </button>
-            </>
-          )}
+
+        {/* Filter Bar */}
+        <div className="flex gap-4 items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-300">Channel:</span>
+            <select
+              value={selectedChannel}
+              onChange={(e) => setSelectedChannel(e.target.value)}
+              className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+            >
+              {channelOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-300">Topic:</span>
+            <select
+              value={selectedTopic}
+              onChange={(e) => setSelectedTopic(e.target.value)}
+              className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+            >
+              {topicOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <span>📁</span>
+            <span>{selectedChannel}/{selectedTopic}</span>
+          </div>
         </div>
       </motion.div>
 
@@ -1159,70 +1124,7 @@ export default function AssetsPage() {
         </motion.div>
       )}
 
-      {/* Upload Dialog */}
-      <AnimatePresence>
-        {showCreateDialog && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-gray-800 rounded-lg p-6 w-full max-w-md"
-            >
-              <h2 className="text-xl font-bold mb-4">Upload Assets</h2>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-400 mb-2">
-                  Category
-                </label>
-                <select
-                  value={selectedCategory || ''}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                >
-                  <option value="">Select category</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-400 mb-2">
-                  Files
-                </label>
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => e.target.files && handleUploadAssets(e.target.files)}
-                  className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                />
-              </div>
-              
-              {uploading && (
-                <div className="mb-4 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-2"></div>
-                  <p className="text-sm text-gray-400">Uploading assets...</p>
-                </div>
-              )}
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowCreateDialog(false)}
-                  className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
 
       {/* AI Generator Dialog */}
       <AnimatePresence>

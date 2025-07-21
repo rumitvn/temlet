@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { config } from "../../lib/config";
 
 type QuizResult = {
   fileName: string;   // e.g. "alligator_1.json"
@@ -46,20 +47,20 @@ export default function RenderQuizAnimalsPage() {
   // --------------------------
   // Build the Nexrender request body from one JSON's data
   // --------------------------
-  function buildRequestBody(data: any) {
+  function buildRequestBody(data: any, channel: string = "minimate", topic: string = "animals") {
     const key = data.key || "unknown_key";
     const order = data.order || 1;
     const keyOrder = `${key}_${order}`;
 
-    // Helpers for building paths
+    // Helpers for building paths using configuration with parameters
     const voicePath = (layer: string) =>
-      `file:///C:/Users/youruser/Documents/minimate/animals/voice/${keyOrder}/${layer}.mp3`;
+      config.getAssetFileUrl(config.buildAssetPath("voice", channel, topic, `${keyOrder}/${layer}.mp3`));
 
     const imagePath = (name: string) =>
-      `file:///C:/Users/youruser/Documents/minimate/animals/image/${name}.jpg`;
+      config.getAssetFileUrl(config.buildAssetPath("image", channel, topic, `${name}.jpg`));
 
     const videoPath = (name: string) =>
-      `file:///C:/Users/youruser/Documents/minimate/animals/video/${name}.mp4`;
+      config.getAssetFileUrl(config.buildAssetPath("video", channel, topic, `${name}.mp4`));
 
     // Extract quiz data
     const intro = data.intro || {};
@@ -240,7 +241,7 @@ export default function RenderQuizAnimalsPage() {
       {
         type: "video",
         layerName: "reward_video",
-        src: `file:///C:/Users/youruser/Documents/minimate/animals/reward/output/reward_${order}/${key}.mp4`,
+        src: config.getAssetFileUrl(config.buildAssetPath("reward", channel, topic, `output/reward_${order}/${key}.mp4`)),
       },
       {
         type: "audio",

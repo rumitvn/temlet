@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
+import { config } from "../../../../lib/config";
+
+// Default channel and topic - can be made configurable via API parameters
+const DEFAULT_CHANNEL = "minimate";
+const DEFAULT_TOPIC = "animals";
+
+// Base paths for different asset types - using centralized config
+const getAssetPaths = () => config.getAssetPaths(DEFAULT_CHANNEL, DEFAULT_TOPIC);
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const filePath = searchParams.get('path');
+    const channel = searchParams.get('channel') || DEFAULT_CHANNEL;
+    const topic = searchParams.get('topic') || DEFAULT_TOPIC;
     
     if (!filePath) {
       return NextResponse.json({ error: 'File path is required' }, { status: 400 });
@@ -14,23 +24,26 @@ export async function GET(req: NextRequest) {
     // Decode the URL-encoded path
     const decodedPath = decodeURIComponent(filePath);
     
-    console.log('Original path:', filePath);
-    console.log('Decoded path:', decodedPath);
+    console.log('Preview API - Original path:', filePath);
+    console.log('Preview API - Decoded path:', decodedPath);
 
-    // Validate the path is within the allowed directories
+    // Validate the path is within the allowed directories using same logic as main API
+    const assetPaths = config.getAssetPaths(channel, topic);
     const allowedPaths = [
-      "C:/Users/youruser/Documents/minimate/animals/voice",
-      "C:/Users/youruser/Documents/minimate/animals/image",
-      "C:/Users/youruser/Documents/minimate/animals/video",
-      "C:/Users/youruser/Documents/minimate/animals/render",
-      "C:/Users/youruser/Documents/minimate/animals/reward",
-      "C:/Users/youruser/Documents/minimate/animals/reward/output",
-      "C:/Users/youruser/Documents/minimate/animals/reward/reward_1",
-      "C:/Users/youruser/Documents/minimate/animals/reward/reward_2",
-      "C:/Users/youruser/Documents/minimate/animals/reward/reward_3",
-      "C:/Users/youruser/Documents/minimate/animals/reward/reward_4",
-      "C:/Users/youruser/Documents/minimate/animals/reward/reward_5"
+      assetPaths.voice,
+      assetPaths.image,
+      assetPaths.video,
+      assetPaths.json,
+      assetPaths.reward,
+      `${assetPaths.reward}/output`,
+      `${assetPaths.reward}/reward_1`,
+      `${assetPaths.reward}/reward_2`,
+      `${assetPaths.reward}/reward_3`,
+      `${assetPaths.reward}/reward_4`,
+      `${assetPaths.reward}/reward_5`
     ];
+
+    console.log('Preview API - Allowed paths:', allowedPaths);
 
     // Also create backslash versions for Windows paths
     const allowedPathsBackslash = allowedPaths.map(path => path.replace(/\//g, '\\'));
@@ -43,8 +56,8 @@ export async function GET(req: NextRequest) {
     );
 
     if (!isAllowed) {
-      console.log('Access denied for path:', decodedPath);
-      console.log('Allowed paths:', allowedPaths);
+      console.log('Preview API - Access denied for path:', decodedPath);
+      console.log('Preview API - Allowed paths:', allowedPaths);
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
@@ -52,6 +65,7 @@ export async function GET(req: NextRequest) {
     try {
       await fs.access(decodedPath);
     } catch (error) {
+      console.log('Preview API - File not found:', decodedPath);
       return NextResponse.json({ error: 'File not found' }, { status: 404 });
     }
 
@@ -81,7 +95,7 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error serving file:', error);
+    console.error('Preview API - Error serving file:', error);
     return NextResponse.json({ error: 'Failed to serve file' }, { status: 500 });
   }
 } 

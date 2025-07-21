@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
+import { config } from "../../../lib/config";
 
-// Base paths for different asset types
-const ASSET_PATHS = {
-  voice: "C:/Users/youruser/Documents/minimate/animals/voice",
-  image: "C:/Users/youruser/Documents/minimate/animals/image", 
-  video: "C:/Users/youruser/Documents/minimate/animals/video",
-  json: "C:/Users/youruser/Documents/minimate/animals/render",
-  reward: "C:/Users/youruser/Documents/minimate/animals/reward"
-};
+// Default channel and topic - can be made configurable via API parameters
+const DEFAULT_CHANNEL = "minimate";
+const DEFAULT_TOPIC = "animals";
+
+// Base paths for different asset types - using centralized config
+const getAssetPaths = () => config.getAssetPaths(DEFAULT_CHANNEL, DEFAULT_TOPIC);
 
 interface Asset {
   id: string;
@@ -94,17 +93,20 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get('category');
     const search = searchParams.get('search');
+    const channel = searchParams.get('channel') || DEFAULT_CHANNEL;
+    const topic = searchParams.get('topic') || DEFAULT_TOPIC;
     
     let allAssets: Asset[] = [];
     
     // Scan all asset directories or specific category
+    const assetPaths = config.getAssetPaths(channel, topic);
     const categoriesToScan = category 
       ? [category] 
-      : Object.keys(ASSET_PATHS);
+      : Object.keys(assetPaths);
     
     for (const cat of categoriesToScan) {
-      if (ASSET_PATHS[cat as keyof typeof ASSET_PATHS]) {
-        const assets = await scanDirectory(ASSET_PATHS[cat as keyof typeof ASSET_PATHS], cat);
+      if (assetPaths[cat as keyof typeof assetPaths]) {
+        const assets = await scanDirectory(assetPaths[cat as keyof typeof assetPaths], cat);
         allAssets.push(...assets);
       }
     }
@@ -143,14 +145,15 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    if (!category || !ASSET_PATHS[category as keyof typeof ASSET_PATHS]) {
+    const assetPaths = getAssetPaths();
+    if (!category || !assetPaths[category as keyof typeof assetPaths]) {
       return NextResponse.json(
         { error: 'Invalid category' },
         { status: 400 }
       );
     }
     
-    const uploadPath = ASSET_PATHS[category as keyof typeof ASSET_PATHS];
+    const uploadPath = assetPaths[category as keyof typeof assetPaths];
     const uploadedAssets: Asset[] = [];
     
     for (const file of files) {
