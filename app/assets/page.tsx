@@ -790,14 +790,21 @@ export default function AssetsPage() {
   const JSONPreview = ({ asset }: { asset: Asset }) => {
     const [jsonContent, setJsonContent] = useState<string>('Loading...');
     const [loading, setLoading] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editContent, setEditContent] = useState<string>('');
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
       const loadJSON = async () => {
         try {
-          const response = await fetch(`/api/assets/preview?path=${encodeURIComponent(asset.path)}&channel=${selectedChannel}&topic=${selectedTopic}`);
+          // Add cache-busting parameter to ensure fresh content
+          const timestamp = Date.now();
+          const response = await fetch(`/api/assets/preview?path=${encodeURIComponent(asset.path)}&channel=${selectedChannel}&topic=${selectedTopic}&t=${timestamp}`);
           if (response.ok) {
             const content = await response.text();
-            setJsonContent(JSON.stringify(JSON.parse(content), null, 2));
+            const formattedContent = JSON.stringify(JSON.parse(content), null, 2);
+            setJsonContent(formattedContent);
+            setEditContent(formattedContent);
           } else {
             setJsonContent('Failed to load JSON content');
           }
@@ -811,6 +818,77 @@ export default function AssetsPage() {
       loadJSON();
     }, [asset.path, selectedChannel, selectedTopic]);
 
+    const handleEdit = () => {
+      setIsEditing(true);
+    };
+
+    const handleCancel = () => {
+      setIsEditing(false);
+      setEditContent(jsonContent); // Reset to original content
+    };
+
+    const reloadJsonContent = async () => {
+      try {
+        // Add cache-busting parameter to ensure fresh content
+        const timestamp = Date.now();
+        const response = await fetch(`/api/assets/preview?path=${encodeURIComponent(asset.path)}&channel=${selectedChannel}&topic=${selectedTopic}&t=${timestamp}`);
+        if (response.ok) {
+          const content = await response.text();
+          const formattedContent = JSON.stringify(JSON.parse(content), null, 2);
+          setJsonContent(formattedContent);
+          setEditContent(formattedContent);
+        }
+      } catch (error) {
+        console.error('Error reloading JSON content:', error);
+      }
+    };
+
+    const handleSave = async () => {
+      try {
+        setSaving(true);
+        
+        // Validate JSON
+        let parsedJson;
+        try {
+          parsedJson = JSON.parse(editContent);
+        } catch (error) {
+          alert('Invalid JSON format. Please check your syntax.');
+          return;
+        }
+
+        const response = await fetch('/api/assets/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            path: asset.path,
+            channel: selectedChannel,
+            topic: selectedTopic,
+            content: parsedJson
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save JSON content');
+        }
+
+        // Reload the content from server to ensure we have the latest data
+        await reloadJsonContent();
+        setIsEditing(false);
+        alert('JSON content saved successfully!');
+        
+        // Refresh assets to reflect changes
+        fetchAssets();
+        
+      } catch (error) {
+        console.error('Error saving JSON content:', error);
+        alert('Failed to save JSON content. Please try again.');
+      } finally {
+        setSaving(false);
+      }
+    };
+
     return (
       <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-auto">
         {loading ? (
@@ -818,9 +896,48 @@ export default function AssetsPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
           </div>
         ) : (
-          <pre className="text-sm text-gray-300 whitespace-pre-wrap">
-            {jsonContent}
-          </pre>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h4 className="text-lg font-semibold text-purple-400">JSON Content</h4>
+              {!isEditing ? (
+                <button
+                  onClick={handleEdit}
+                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition-colors"
+                >
+                  Edit
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 rounded text-sm transition-colors"
+                  >
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={handleCancel}
+                    className="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {isEditing ? (
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="w-full h-80 bg-gray-800 text-gray-300 text-sm font-mono p-4 rounded border border-gray-600 focus:border-purple-500 focus:outline-none resize-none"
+                placeholder="Edit JSON content here..."
+              />
+            ) : (
+              <pre className="text-sm text-gray-300 whitespace-pre-wrap">
+                {jsonContent}
+              </pre>
+            )}
+          </div>
         )}
       </div>
     );
