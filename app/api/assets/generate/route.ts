@@ -60,7 +60,7 @@ interface SK3QLRContent {
 // POST /api/assets/generate - Generate AI content
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, description, language, topic, provider = "grok", order = 1, existingContent = [], previewItems = [] } = await req.json();
+    const { prompt, description, language, topic, provider = "grok", order = 1, existingContent = [], previewItems = [], availableInputs = [] } = await req.json();
     
     // Debug logging
     console.log('=== AI GENERATE REQUEST DEBUG ===');
@@ -72,7 +72,8 @@ export async function POST(req: NextRequest) {
       provider,
       order,
       existingContent,
-      previewItems
+      previewItems,
+      availableInputs
     });
     
     if (!prompt || !language || !topic) {
@@ -104,7 +105,13 @@ export async function POST(req: NextRequest) {
 
 IMPORTANT: Return ONLY valid JSON in the exact format specified. Do not include any explanatory text, markdown formatting, or additional content before or after the JSON. The response must start with { and end with }.
 
-CRITICAL: Each content piece must be UNIQUE and DIFFERENT from any previous content for the same subject.`;
+CRITICAL: Each content piece must be UNIQUE and DIFFERENT from any previous content for the same subject.
+
+IMPORTANT QUIZ_3 GUIDELINES:
+- Quiz_3 should NEVER ask "Con nào là [subject]?" - this is too repetitive and boring
+- Instead, ask educational questions about different animals, habitats, characteristics, or behaviors
+- Make quiz_3 about learning something new, not just identifying the main subject
+- Use the available inputs list to create diverse, educational questions`;
 
     // Build uniqueness instructions based on existing content
     let uniquenessInstructions = "";
@@ -146,16 +153,23 @@ CRITICAL: Each content piece must be UNIQUE and DIFFERENT from any previous cont
       uniquenessInstructions += "\n- Do NOT repeat any of the questions, facts, or approaches shown above";
       uniquenessInstructions += "\n- Each quiz question must be unique and different from all previous ones";
       uniquenessInstructions += "\n- The lesson content must cover different educational points";
-      uniquenessInstructions += "\n- The reward message must be different from previous versions";
+      uniquenessInstructions += "\n- The reward message must follow this progression based on order number:";
+      uniquenessInstructions += "\n  * Order 1: \"[Animal Name] Thường\" (e.g., \"Cá sấu Thường\")";
+      uniquenessInstructions += "\n  * Order 2: \"[Animal Name] Hiếm\" (e.g., \"Cá sấu Hiếm\")";
+      uniquenessInstructions += "\n  * Order 3: \"[Animal Name] Tinh Anh\" (e.g., \"Cá sấu Tinh Anh\")";
+      uniquenessInstructions += "\n  * Order 4: \"[Animal Name] Huyền thoại\" (e.g., \"Cá sấu Huyền thoại\")";
+      uniquenessInstructions += "\n  * Order 5: \"[Animal Name] Siêu cấp\" (e.g., \"Cá sấu Siêu cấp\")";
+      uniquenessInstructions += "\n  * Order 6+: Continue with creative variations like \"Siêu phàm\", \"Thần thánh\", etc.";
+      uniquenessInstructions += "\n- IMPORTANT: The reward voice should ONLY contain the reward name, NOT congratulatory text";
     }
 
-    const userPrompt = `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${uniquenessInstructions}
+    const userPrompt = `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${availableInputs.length > 0 ? `\n\nAvailable inputs for quiz_3: ${availableInputs.join(', ')}` : ''}${uniquenessInstructions}
 
 Video Format: SK3QLR (Short Kids 3 Question with Lesson and Reward) - 45 seconds total
 - Intro: 1 second
 - Quiz 1: 8 seconds (4 options)
 - Quiz 2: 8 seconds (2 options) 
-- Quiz 3: 8 seconds (4 image options)
+- Quiz 3: 8 seconds (4 image options - select from available inputs)
 - Lesson: 8 seconds
 - Reward: 5 seconds
 
@@ -191,20 +205,20 @@ Generate content in this exact JSON format:
   },
   "quiz_3": {
     "question": {
-      "text": "Question text",
-      "voice": "Voice script for question"
+      "text": "Con nào sống dưới nước?",
+      "voice": "Hãy chọn con vật sống dưới nước nhé!"
     },
-    "options": ["animal1", "animal2", "animal3", "animal4"],
+    "options": ["shark", "eagle", "elephant", "dolphin"], // Select 4 items from available inputs list
     "answer": {
-      "position": 3,
-      "voice": "Voice script for correct answer"
+      "position": 1,
+      "voice": "Đúng rồi! Cá mập sống dưới nước!"
     }
   },
   "lesson": {
     "voice": "Educational lesson voice script"
   },
   "reward": {
-    "voice": "Reward voice script"
+    "voice": "Cá sấu Huyền thoại"
   }
 }
 
@@ -214,9 +228,26 @@ Requirements:
 - Ensure questions are relevant to the topic and subject
 - Make answer positions logical and varied
 - Keep voice scripts natural and conversational
-- For quiz_3, use animal names that can be represented by images (e.g., "elephant", "shark", "eagle", "deer")
+- For quiz_3, select ONLY 4 items from the provided available inputs list
+- Quiz_3 should be diverse and educational - ask about different animals, habitats, characteristics, or behaviors
+- Examples of good quiz_3 questions:
+  * "Con nào sống dưới nước?" (Which one lives in water?)
+  * "Con nào có cánh và biết bay?" (Which one has wings and can fly?)
+  * "Con nào có vảy?" (Which one has scales?)
+  * "Con nào là động vật ăn cỏ?" (Which one is a herbivore?)
+  * "Con nào sống ở sa mạc?" (Which one lives in the desert?)
+- Avoid repetitive questions like "Con nào là [subject]?" - make it educational about different animals
+- If no available inputs are provided, use animal names that can be represented by images (e.g., "elephant", "shark", "eagle", "deer")
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
+- REWARD PROGRESSION: The reward voice must follow this exact progression based on order number:
+  * Order 1: "[Animal Name] Thường" (e.g., "Cá sấu Thường")
+  * Order 2: "[Animal Name] Hiếm" (e.g., "Cá sấu Hiếm") 
+  * Order 3: "[Animal Name] Tinh Anh" (e.g., "Cá sấu Tinh Anh")
+  * Order 4: "[Animal Name] Huyền thoại" (e.g., "Cá sấu Huyền thoại")
+  * Order 5: "[Animal Name] Siêu cấp" (e.g., "Cá sấu Siêu cấp")
+  * Order 6+: Continue with creative variations like "Siêu phàm", "Thần thánh", etc.
+- IMPORTANT: The reward voice should ONLY contain the reward name (e.g., "Cá sấu Huyền thoại"), NOT congratulatory text
 
 Language: ${language}
 Topic: ${topic}

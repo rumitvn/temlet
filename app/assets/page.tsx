@@ -604,6 +604,12 @@ export default function AssetsPage() {
         }
       }
       
+      // Get available inputs for quiz_3 (images from the current topic)
+      const availableInputs = assets
+        .filter(asset => asset.type === 'image' && asset.category === 'image')
+        .map(asset => asset.key)
+        .filter((key, index, arr) => arr.indexOf(key) === index); // Remove duplicates
+      
       const response = await fetch('/api/assets/generate', {
         method: 'POST',
         headers: {
@@ -625,7 +631,8 @@ export default function AssetsPage() {
             quiz3: item.quiz_3.question.text,
             lesson: item.lesson.voice,
             reward: item.reward.voice
-          }))
+          })),
+          availableInputs: availableInputs
         }),
       });
 
