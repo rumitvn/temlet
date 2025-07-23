@@ -37,6 +37,46 @@ interface AssetCategory {
   path: string;
 }
 
+// New interface for JSON-Voice pairs
+interface JSONVoicePair {
+  json: Asset;
+  voices: Asset[];
+  hasAllVoices: boolean;
+  missingVoices: string[];
+  voiceTypes: {
+    intro: boolean;
+    quiz1_question: boolean;
+    quiz1_answer: boolean;
+    quiz2_question: boolean;
+    quiz2_answer: boolean;
+    quiz3_question: boolean;
+    quiz3_answer: boolean;
+    lesson: boolean;
+    reward: boolean;
+  };
+}
+
+// Updated interface for JSON-Asset pairs (JSON, Voices, and Rewards)
+interface JSONAssetPair {
+  json: Asset;
+  voices: Asset[];
+  reward?: Asset;
+  hasAllVoices: boolean;
+  hasReward: boolean;
+  missingVoices: string[];
+  voiceTypes: {
+    intro: boolean;
+    quiz1_question: boolean;
+    quiz1_answer: boolean;
+    quiz2_question: boolean;
+    quiz2_answer: boolean;
+    quiz3_question: boolean;
+    quiz3_answer: boolean;
+    lesson: boolean;
+    reward: boolean;
+  };
+}
+
 interface AssetGroup {
   key: string;
   name: string;
@@ -46,6 +86,7 @@ interface AssetGroup {
     voices: Asset[];
     jsons: Asset[];
     rewards: Asset[];
+    jsonAssetPairs: JSONAssetPair[]; // Updated field for organized JSON-Asset pairs
   };
   renderStatus: {
     hasJson: boolean;
@@ -214,6 +255,111 @@ export default function AssetsPage() {
     return { key: filename.split('.')[0] };
   };
 
+
+
+  // Helper function to organize JSON files with their corresponding voices and rewards
+  const organizeJSONAssetPairs = (jsons: Asset[], voices: Asset[], rewards: Asset[]): JSONAssetPair[] => {
+    return jsons.map(json => {
+      const jsonOrder = json.order;
+      const jsonKey = json.key;
+      
+      // Find voices that belong to this JSON file
+      const matchingVoices = voices.filter(voice => {
+        // Check if voice belongs to this JSON by matching key and order
+        if (voice.key === jsonKey && voice.order === jsonOrder) {
+          return true;
+        }
+        
+        // Check by path structure: voice/key_order/voice_type.mp3
+        if (voice.path) {
+          const pathMatch = voice.path.match(/voice[\/\\]([^\/\\]+)_(\d+)[\/\\]/);
+          if (pathMatch && pathMatch[1] === jsonKey && parseInt(pathMatch[2]) === jsonOrder) {
+            return true;
+          }
+        }
+        
+        return false;
+      });
+
+      // Find reward that belongs to this JSON file
+      const matchingReward = rewards.find(reward => {
+        // Check by path structure: reward/output/reward_order/key.mp4
+        if (reward.path) {
+          const pathMatch = reward.path.match(/reward[\/\\]output[\/\\]reward_(\d+)[\/\\]([^\/\\]+)\.mp4$/);
+          if (pathMatch && parseInt(pathMatch[1]) === jsonOrder && pathMatch[2] === jsonKey) {
+            return true;
+          }
+        }
+        
+        return false;
+      });
+
+      // Determine which voice types are present based on the actual file naming pattern
+      const voiceTypes = {
+        intro: false,
+        quiz1_question: false,
+        quiz1_answer: false,
+        quiz2_question: false,
+        quiz2_answer: false,
+        quiz3_question: false,
+        quiz3_answer: false,
+        lesson: false,
+        reward: false
+      };
+
+      const missingVoices: string[] = [];
+
+      matchingVoices.forEach(voice => {
+        const voiceName = voice.name.toLowerCase();
+        
+        // Match the actual naming pattern from the image
+        if (voiceName.includes('voice_title')) {
+          voiceTypes.intro = true;
+        } else if (voiceName.includes('voice_q1_title')) {
+          voiceTypes.quiz1_question = true;
+        } else if (voiceName.includes('voice_q1_ans')) {
+          voiceTypes.quiz1_answer = true;
+        } else if (voiceName.includes('voice_q2_title')) {
+          voiceTypes.quiz2_question = true;
+        } else if (voiceName.includes('voice_q2_ans')) {
+          voiceTypes.quiz2_answer = true;
+        } else if (voiceName.includes('voice_q3_title')) {
+          voiceTypes.quiz3_question = true;
+        } else if (voiceName.includes('voice_q3_ans')) {
+          voiceTypes.quiz3_answer = true;
+        } else if (voiceName.includes('voice_lesson')) {
+          voiceTypes.lesson = true;
+        } else if (voiceName.includes('voice_reward')) {
+          voiceTypes.reward = true;
+        }
+      });
+
+      // Check for missing voice types
+      if (!voiceTypes.intro) missingVoices.push('intro');
+      if (!voiceTypes.quiz1_question) missingVoices.push('quiz1_question');
+      if (!voiceTypes.quiz1_answer) missingVoices.push('quiz1_answer');
+      if (!voiceTypes.quiz2_question) missingVoices.push('quiz2_question');
+      if (!voiceTypes.quiz2_answer) missingVoices.push('quiz2_answer');
+      if (!voiceTypes.quiz3_question) missingVoices.push('quiz3_question');
+      if (!voiceTypes.quiz3_answer) missingVoices.push('quiz3_answer');
+      if (!voiceTypes.lesson) missingVoices.push('lesson');
+      if (!voiceTypes.reward) missingVoices.push('reward');
+
+      const hasAllVoices = missingVoices.length === 0;
+      const hasReward = !!matchingReward;
+
+      return {
+        json,
+        voices: matchingVoices,
+        reward: matchingReward,
+        hasAllVoices,
+        hasReward,
+        missingVoices,
+        voiceTypes
+      };
+    });
+  };
+
   const fetchAssets = useCallback(async (searchTerm?: string, isSearch = false) => {
     try {
       if (isSearch) {
@@ -264,7 +410,8 @@ export default function AssetsPage() {
               videos: [],
               voices: [],
               jsons: [],
-              rewards: []
+              rewards: [],
+              jsonAssetPairs: [] // Initialize new field
             },
             renderStatus: {
               hasJson: false,
@@ -336,6 +483,11 @@ export default function AssetsPage() {
         
         return groups;
       }, {});
+      
+      // Organize JSON-Asset pairs for each group
+      Object.values(groupedAssets).forEach((group) => {
+        (group as AssetGroup).assets.jsonAssetPairs = organizeJSONAssetPairs((group as AssetGroup).assets.jsons, (group as AssetGroup).assets.voices, (group as AssetGroup).assets.rewards);
+      });
       
       setAssetGroups(Object.values(groupedAssets));
     } catch (error) {
@@ -950,6 +1102,154 @@ export default function AssetsPage() {
     );
   };
 
+  const handleGenerateVoice = async (jsonAsset: Asset) => {
+    if (!confirm(`Generate voice files for ${jsonAsset.name}?`)) {
+      return;
+    }
+    
+    try {
+      // First, read the JSON content to get the text for voice generation
+      const response = await fetch(`/api/assets/preview?path=${encodeURIComponent(jsonAsset.path)}&channel=${selectedChannel}&topic=${selectedTopic}`);
+      if (!response.ok) {
+        throw new Error('Failed to read JSON content');
+      }
+      
+      const jsonContent = await response.text();
+      const jsonData = JSON.parse(jsonContent);
+      
+      // Extract all voice texts from the JSON
+      const voiceTexts = [
+        { name: 'voice_title.mp3', text: jsonData.intro?.voice || jsonData.intro?.text || '' },
+        { name: 'voice_q1_title.mp3', text: jsonData.quiz_1?.question?.voice || jsonData.quiz_1?.question?.text || '' },
+        { name: 'voice_q1_ans.mp3', text: jsonData.quiz_1?.answer?.voice || '' },
+        { name: 'voice_q2_title.mp3', text: jsonData.quiz_2?.question?.voice || jsonData.quiz_2?.question?.text || '' },
+        { name: 'voice_q2_ans.mp3', text: jsonData.quiz_2?.answer?.voice || '' },
+        { name: 'voice_q3_title.mp3', text: jsonData.quiz_3?.question?.voice || jsonData.quiz_3?.question?.text || '' },
+        { name: 'voice_q3_ans.mp3', text: jsonData.quiz_3?.answer?.voice || '' },
+        { name: 'voice_lesson.mp3', text: jsonData.lesson?.voice || '' },
+        { name: 'voice_reward.mp3', text: jsonData.reward?.voice || '' }
+      ].filter(item => item.text.trim() !== ''); // Only include non-empty texts
+      
+      if (voiceTexts.length === 0) {
+        alert('No voice text found in the JSON file. Please check the JSON content.');
+        return;
+      }
+      
+      // Show progress dialog
+      const progressDialog = document.createElement('div');
+      progressDialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      progressDialog.innerHTML = `
+        <div class="bg-gray-800 rounded-lg p-6 w-96">
+          <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+            <h3 class="text-xl font-bold text-white mb-2">Generating Voice Files</h3>
+            <p class="text-gray-300 mb-4">Creating ${voiceTexts.length} voice files...</p>
+            <div id="voice-progress" class="text-sm text-gray-400"></div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(progressDialog);
+      
+      // Generate each voice file
+      const results = [];
+      for (let i = 0; i < voiceTexts.length; i++) {
+        const voiceItem = voiceTexts[i];
+        
+        // Update progress
+        const progressElement = document.getElementById('voice-progress');
+        if (progressElement) {
+          progressElement.textContent = `Generating ${voiceItem.name} (${i + 1}/${voiceTexts.length})`;
+        }
+        
+        try {
+          const voiceResponse = await fetch('/api/assets/generate-voice', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text: voiceItem.text,
+              filename: voiceItem.name,
+              jsonKey: jsonAsset.key,
+              jsonOrder: jsonAsset.order,
+              channel: selectedChannel,
+              topic: selectedTopic
+            }),
+          });
+          
+          if (!voiceResponse.ok) {
+            throw new Error(`Failed to generate ${voiceItem.name}: ${voiceResponse.statusText}`);
+          }
+          
+          const voiceResult = await voiceResponse.json();
+          results.push({ success: true, file: voiceItem.name, path: voiceResult.path });
+          
+                 } catch (error) {
+           console.error(`Error generating ${voiceItem.name}:`, error);
+           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+           results.push({ success: false, file: voiceItem.name, error: errorMessage });
+         }
+      }
+      
+      // Remove progress dialog
+      document.body.removeChild(progressDialog);
+      
+      // Show results
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+      
+      if (successful > 0) {
+        alert(`✅ Successfully generated ${successful} voice files!\n${failed > 0 ? `❌ Failed to generate ${failed} files.` : ''}`);
+        // Refresh assets to show the new voice files
+        fetchAssets();
+      } else {
+        alert(`❌ Failed to generate any voice files. Please check the console for details.`);
+      }
+      
+    } catch (error) {
+      console.error('Error generating voice files:', error);
+      alert(`Failed to generate voice files: ${(error as Error).message}`);
+    }
+  };
+
+  const handleGenerateReward = async (jsonAsset: Asset) => {
+    if (!confirm(`Generate reward video for ${jsonAsset.name}?`)) {
+      return;
+    }
+    
+    try {
+      // This is a placeholder for the reward generation functionality
+      // You can implement this later with your reward generation API
+      alert(`Reward generation for ${jsonAsset.name} will be implemented soon!`);
+      
+      // Example API call structure:
+      // const response = await fetch('/api/assets/generate-reward', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify({
+      //     jsonPath: jsonAsset.path,
+      //     channel: selectedChannel,
+      //     topic: selectedTopic,
+      //     key: jsonAsset.key,
+      //     order: jsonAsset.order
+      //   }),
+      // });
+      
+      // if (!response.ok) {
+      //   throw new Error('Failed to generate reward video');
+      // }
+      
+      // Refresh assets to show the new reward video
+      // fetchAssets();
+      
+    } catch (error) {
+      console.error('Error generating reward video:', error);
+      alert('Failed to generate reward video. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
@@ -1105,8 +1405,7 @@ export default function AssetsPage() {
                     <div className="flex gap-2 text-sm text-gray-400">
                       <span>🖼️ {group.assets.image ? '1' : '0'} Image</span>
                       <span>🎥 {group.assets.videos.length} Videos</span>
-                      <span>🎵 {group.assets.voices.length} Voices</span>
-                      <span>📄 {group.assets.jsons.length} JSONs</span>
+                      <span>�� {group.assets.jsonAssetPairs.length} JSON-Asset Pairs</span>
                       <span>🏆 {group.assets.rewards.length} Rewards</span>
                     </div>
                   </div>
@@ -1238,20 +1537,122 @@ export default function AssetsPage() {
                     </div>
                   ))}
                   
-                  {/* JSONs */}
-                  {group.assets.jsons.map((json, index) => (
+                  {/* JSONs with Voice and Reward Status */}
+                  {group.assets.jsonAssetPairs.map((pair, index) => (
                     <div 
-                      key={`${json.id}-${index}`} 
-                      className="bg-gray-700 rounded-lg p-6 cursor-pointer hover:bg-gray-600 transition-colors border border-gray-600 hover:border-purple-500"
-                      onClick={() => handlePreviewAsset(json)}
+                      key={`${pair.json.id}-${index}`} 
+                      className="bg-gray-700 rounded-lg p-6 border border-gray-600"
                     >
                       <div className="flex items-center gap-4 mb-4">
                         <span className="text-4xl">📄</span>
-                        <span className="text-lg font-semibold text-green-400">JSON {json.order || index + 1}</span>
+                        <div className="flex-1">
+                          <span className="text-lg font-semibold text-green-400">JSON {pair.json.order || index + 1}</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              pair.hasAllVoices 
+                                ? 'bg-green-900 text-green-300 border border-green-600' 
+                                : 'bg-orange-900 text-orange-300 border border-orange-600'
+                            }`}>
+                              {pair.hasAllVoices ? '✅ All Voices' : `🎵 ${pair.voices.length}/9 Voices`}
+                            </span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              pair.hasReward 
+                                ? 'bg-green-900 text-green-300 border border-green-600' 
+                                : 'bg-yellow-900 text-yellow-300 border border-yellow-600'
+                            }`}>
+                              {pair.hasReward ? '🏆 Has Reward' : '🏆 No Reward'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-base text-gray-200 truncate mb-3 font-medium">{json.name}</p>
-                      <p className="text-base text-gray-400 mb-4">{formatFileSize(json.size || 0)}</p>
-                      <div className="text-base text-gray-300 bg-gray-800 rounded-lg px-4 py-2 text-center hover:bg-gray-700 transition-colors">Click to view</div>
+                      
+                      <p className="text-base text-gray-200 truncate mb-3 font-medium">{pair.json.name}</p>
+                      <p className="text-base text-gray-400 mb-4">{formatFileSize(pair.json.size || 0)}</p>
+                      
+                      {/* Voice Status Details */}
+                      <div className="mb-4 p-3 bg-gray-800 rounded-lg">
+                        <div className="text-sm font-medium text-gray-300 mb-2">Voice Files:</div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.intro ? 'text-green-400' : 'text-red-400'}`}>
+                            <span>{pair.voiceTypes.intro ? '✅' : '❌'}</span>
+                            <span>Intro</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz1_question ? 'text-green-400' : 'text-red-400'}`}>
+                            <span>{pair.voiceTypes.quiz1_question ? '✅' : '❌'}</span>
+                            <span>Quiz 1 Q</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz1_answer ? 'text-green-400' : 'text-red-400'}`}>
+                            <span>{pair.voiceTypes.quiz1_answer ? '✅' : '❌'}</span>
+                            <span>Quiz 1 A</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz2_question ? 'text-green-400' : 'text-red-400'}`}>
+                            <span>{pair.voiceTypes.quiz2_question ? '✅' : '❌'}</span>
+                            <span>Quiz 2 Q</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz2_answer ? 'text-green-400' : 'text-red-400'}`}>
+                            <span>{pair.voiceTypes.quiz2_answer ? '✅' : '❌'}</span>
+                            <span>Quiz 2 A</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz3_question ? 'text-green-400' : 'text-red-400'}`}>
+                            <span>{pair.voiceTypes.quiz3_question ? '✅' : '❌'}</span>
+                            <span>Quiz 3 Q</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz3_answer ? 'text-green-400' : 'text-red-400'}`}>
+                            <span>{pair.voiceTypes.quiz3_answer ? '✅' : '❌'}</span>
+                            <span>Quiz 3 A</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.lesson ? 'text-green-400' : 'text-red-400'}`}>
+                            <span>{pair.voiceTypes.lesson ? '✅' : '❌'}</span>
+                            <span>Lesson</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.reward ? 'text-green-400' : 'text-red-400'}`}>
+                            <span>{pair.voiceTypes.reward ? '✅' : '❌'}</span>
+                            <span>Reward</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Reward Status */}
+                      <div className="mb-4 p-3 bg-gray-800 rounded-lg">
+                        <div className="text-sm font-medium text-gray-300 mb-2">Reward Video:</div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-lg ${pair.hasReward ? 'text-green-400' : 'text-red-400'}`}>
+                            {pair.hasReward ? '✅' : '❌'}
+                          </span>
+                          <span className="text-sm text-gray-300">
+                            {pair.hasReward 
+                              ? `Reward video available (${pair.reward?.name || 'Unknown'})`
+                              : 'No reward video found'
+                            }
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handlePreviewAsset(pair.json)}
+                          className="flex-1 text-base text-gray-300 bg-gray-800 rounded-lg px-4 py-2 text-center hover:bg-gray-700 transition-colors"
+                        >
+                          View JSON
+                        </button>
+                        {!pair.hasAllVoices && (
+                          <button
+                            onClick={() => handleGenerateVoice(pair.json)}
+                            className="flex-1 text-base text-white bg-orange-600 hover:bg-orange-700 rounded-lg px-4 py-2 text-center transition-colors"
+                          >
+                            Generate Voice
+                          </button>
+                        )}
+                        {!pair.hasReward && (
+                          <button
+                            onClick={() => handleGenerateReward(pair.json)}
+                            className="flex-1 text-base text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg px-4 py-2 text-center transition-colors"
+                          >
+                            Generate Reward
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                   
@@ -1273,49 +1674,58 @@ export default function AssetsPage() {
                   ))}
                 </div>
                 
-                {/* Voice files summary */}
-                {group.assets.voices.length > 0 && (
-                  <div className="mt-6 bg-gray-700 rounded-lg p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-3xl">🎵</span>
-                        <span className="text-xl font-semibold text-orange-400">Voice Files ({group.assets.voices.length})</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setPreviewAsset(group.assets.voices[0]);
-                          setShowPreview(true);
-                        }}
-                        className="text-sm bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg transition-colors"
-                      >
-                        Preview Sample
-                      </button>
-                    </div>
-                    <div className="text-base text-gray-300 mb-3">
-                      {group.assets.voices.length} voice files available for {group.name}
-                    </div>
-                    <div className="text-sm text-gray-500 mb-4">
-                      Includes: intro, questions, answers, lesson, and reward voices
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                      {group.assets.voices.slice(0, 12).map((voice, index) => (
-                        <div 
-                          key={`${voice.id}-${index}`} 
-                          className="text-sm text-gray-400 truncate cursor-pointer hover:text-orange-400 transition-colors p-2 bg-gray-800 rounded hover:bg-gray-700"
-                          onClick={() => handlePreviewAsset(voice)}
-                          title={voice.name}
+                {/* Orphaned Voice files summary (voices not associated with any JSON) */}
+                {(() => {
+                  const orphanedVoices = group.assets.voices.filter(voice => {
+                    // Check if this voice belongs to any JSON file
+                    return !group.assets.jsonAssetPairs.some(pair => 
+                      pair.voices.some(v => v.id === voice.id)
+                    );
+                  });
+                  
+                  return orphanedVoices.length > 0 ? (
+                    <div className="mt-6 bg-gray-700 rounded-lg p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-3xl">🎵</span>
+                          <span className="text-xl font-semibold text-orange-400">Orphaned Voice Files ({orphanedVoices.length})</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setPreviewAsset(orphanedVoices[0]);
+                            setShowPreview(true);
+                          }}
+                          className="text-sm bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg transition-colors"
                         >
-                          {voice.name}
-                        </div>
-                      ))}
-                      {group.assets.voices.length > 12 && (
-                        <div className="text-sm text-gray-500 p-2 bg-gray-800 rounded">
-                          +{group.assets.voices.length - 12} more...
-                        </div>
-                      )}
+                          Preview Sample
+                        </button>
+                      </div>
+                      <div className="text-base text-gray-300 mb-3">
+                        {orphanedVoices.length} voice files not associated with any JSON file
+                      </div>
+                      <div className="text-sm text-gray-500 mb-4">
+                        These voices may need to be manually organized or deleted
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {orphanedVoices.slice(0, 12).map((voice, index) => (
+                          <div 
+                            key={`${voice.id}-${index}`} 
+                            className="text-sm text-gray-400 truncate cursor-pointer hover:text-orange-400 transition-colors p-2 bg-gray-800 rounded hover:bg-gray-700"
+                            onClick={() => handlePreviewAsset(voice)}
+                            title={voice.name}
+                          >
+                            {voice.name}
+                          </div>
+                        ))}
+                        {orphanedVoices.length > 12 && (
+                          <div className="text-sm text-gray-500 p-2 bg-gray-800 rounded">
+                            +{orphanedVoices.length - 12} more...
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ) : null;
+                })()}
               </motion.div>
             );
           })}
