@@ -112,11 +112,14 @@ IMPORTANT INTRO GUIDELINES:
 - Voice: Simple mention of subject and part, e.g., "Con cá sấu phần 1"
 
 IMPORTANT VOICE GUIDELINES:
-- Keep all voice scripts short and simple (3 seconds max)
+- Keep all voice scripts short and simple (3-5 seconds max)
 - Avoid lengthy explanations
 - Focus on clear, concise communication
-- Answer voices should be engaging and varied, not repetitive
-- Use different positive responses like: "Tuyệt vời!", "Chính xác!", "Rất giỏi!", "Đúng rồi!", "Hoàn hảo!", "Thông minh!", "Tài giỏi!", "Xuất sắc!"
+- Answer voices should be engaging, educational, and informative
+- Use different positive responses followed by the correct answer:
+  * Examples: "Chính xác! Con cá sấu có 4 chân", "Tuyệt vời! Con sư tử là vua rừng", "Rất giỏi! Cây cối cần ánh sáng để quang hợp"
+  * Other variations: "Đúng rồi! [correct answer]", "Hoàn hảo! [correct answer]", "Thông minh! [correct answer]", "Tài giỏi! [correct answer]", "Xuất sắc! [correct answer]"
+- Always include the correct answer in the voice response to reinforce learning
 
 IMPORTANT DIFFICULTY PROGRESSION:
 - Order 1 (Easy): Basic identification, simple facts, obvious choices
@@ -130,6 +133,13 @@ IMPORTANT QUIZ_3 GUIDELINES:
 - Instead, ask educational questions about different items, characteristics, behaviors, or facts
 - Make quiz_3 about learning something new, not just identifying the main subject
 - Use the available inputs list to create diverse, educational questions
+- CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
+- CRITICAL: Select exactly 4 items from the available inputs list for the options
+- CRITICAL: The correct answer position must correspond to an item that actually answers the question
+- EXAMPLE: If question is "Con nào sống dưới nước?" and available inputs include ["shark", "eagle", "elephant", "dolphin", "lion"], then:
+  * Options should be: ["shark", "eagle", "elephant", "dolphin"] (4 items from available inputs)
+  * Correct answer should be position 1 (shark) or position 4 (dolphin) since they live in water
+  * Voice should be: "Rất giỏi! Cá mập sống dưới nước" or "Rất giỏi! Cá heo sống dưới nước"
 - Adapt questions based on topic and difficulty level:
   * Animals: 
     - Easy: basic habitats, obvious characteristics
@@ -228,7 +238,7 @@ Generate content in this exact JSON format:
     "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
     "answer": {
       "position": 2,
-      "voice": "Tuyệt vời!"
+      "voice": "Tuyệt vời! Con cá sấu có 4 chân"
     }
   },
   "quiz_2": {
@@ -239,7 +249,7 @@ Generate content in this exact JSON format:
     "options": ["Option 1", "Option 2"],
     "answer": {
       "position": 1,
-      "voice": "Chính xác!"
+      "voice": "Chính xác! Con cá sấu sống dưới nước"
     }
   },
   "quiz_3": {
@@ -247,10 +257,10 @@ Generate content in this exact JSON format:
       "text": "Con nào sống dưới nước?",
       "voice": "Hãy chọn con vật sống dưới nước nhé!"
     },
-    "options": ["shark", "eagle", "elephant", "dolphin"], // Select 4 items from available inputs list
+    "options": ["shark", "eagle", "elephant", "dolphin"], // CRITICAL: Must be ENGLISH image names from available inputs
     "answer": {
       "position": 1,
-      "voice": "Rất giỏi!"
+      "voice": "Rất giỏi! Cá mập sống dưới nước"
     }
   },
   "lesson": {
@@ -266,11 +276,15 @@ Requirements:
 - Use appropriate vocabulary for the target age group
 - Ensure questions are relevant to the topic and subject
 - Make answer positions logical and varied
-- Keep voice scripts short and simple (3 seconds max)
-- ANSWER VOICES: Use varied, engaging responses instead of repetitive "Đúng rồi!"
-  * Examples: "Tuyệt vời!", "Chính xác!", "Rất giỏi!", "Hoàn hảo!", "Thông minh!", "Tài giỏi!", "Xuất sắc!", "Đúng rồi!"
+- Keep voice scripts short and simple (3-5 seconds max)
+- ANSWER VOICES: Use varied, engaging responses that include the correct answer
+  * Examples: "Chính xác! Con cá sấu có 4 chân", "Tuyệt vời! Con sư tử là vua rừng", "Rất giỏi! Cây cối cần ánh sáng để quang hợp"
+  * Other variations: "Đúng rồi! [correct answer]", "Hoàn hảo! [correct answer]", "Thông minh! [correct answer]", "Tài giỏi! [correct answer]", "Xuất sắc! [correct answer]"
+  * Always include the correct answer in the voice response to reinforce learning
   * Vary the responses across different quizzes to keep it interesting
 - For quiz_3, select ONLY 4 items from the provided available inputs list
+- CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
+- CRITICAL: The correct answer position must correspond to an item that actually answers the question
 - Quiz_3 should be diverse and educational - ask about different items, characteristics, or facts
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic identification, simple facts, obvious choices
@@ -300,7 +314,7 @@ Requirements:
     - Hard: "Ai là người đầu tiên bay vòng quanh thế giới?", "Sự kiện nào dẫn đến cuộc cách mạng công nghiệp?", "Nơi nào là trung tâm thương mại cổ đại?"
     - Very Hard: "Ai là người phát hiện ra cấu trúc DNA?", "Sự kiện nào dẫn đến sự sụp đổ của đế chế La Mã?", "Nơi nào là trung tâm học thuật cổ đại quan trọng nhất?"
 - Avoid repetitive identification questions like "Con nào là [subject]?" or "Cây nào là [subject]?"
-- If no available inputs are provided, use appropriate names that can be represented by images
+- If no available inputs are provided, use appropriate ENGLISH names that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
 - REWARD PROGRESSION: The reward voice must follow this exact progression based on order number:

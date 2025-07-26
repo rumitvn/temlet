@@ -225,20 +225,30 @@ export default function AssetsPage() {
   const [previewItems, setPreviewItems] = useState<SK3QLRContent[]>([]);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  
+  // Toast notification state
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Helper function to extract key and order from filename
   const extractKeyAndOrder = (filename: string, type: string): { key: string; order?: number } => {
     if (type === 'json') {
-      // Extract from format like "bear_1.json"
+      // Extract from format like "bear_1.json" or "blue_tang_1.json"
+      // Use a more robust regex that handles multi-word names
       const match = filename.match(/^(.+?)_(\d+)\.json$/);
       if (match) {
-        return { key: match[1], order: parseInt(match[2]) };
+        const key = match[1];
+        const order = parseInt(match[2]);
+        console.log(`Extracted from ${filename}: key="${key}", order=${order}`); // Debug log
+        return { key, order };
       }
     } else if (type === 'voice') {
-      // Extract from format like "bear_1_voice_title.mp3" or "voice_lesson.mp3"
+      // Extract from format like "bear_1_voice_title.mp3" or "blue_tang_1_voice_title.mp3"
       const match = filename.match(/^(.+?)_(\d+)_voice_/);
       if (match) {
-        return { key: match[1], order: parseInt(match[2]) };
+        const key = match[1];
+        const order = parseInt(match[2]);
+        console.log(`Extracted from voice ${filename}: key="${key}", order=${order}`); // Debug log
+        return { key, order };
       }
       // For voice files without animal prefix, try to extract from path or use a generic key
       const pathMatch = filename.match(/voice_(.+?)\.mp3/);
@@ -246,7 +256,7 @@ export default function AssetsPage() {
         return { key: 'voice_' + pathMatch[1] };
       }
     } else {
-      // Extract from format like "bear.jpg", "bear.mp4"
+      // Extract from format like "bear.jpg", "bear.mp4", "blue_tang.jpg"
       const match = filename.match(/^(.+?)\.(jpg|mp4|png|gif)$/);
       if (match) {
         return { key: match[1] };
@@ -267,6 +277,7 @@ export default function AssetsPage() {
       const matchingVoices = voices.filter(voice => {
         // Check if voice belongs to this JSON by matching key and order
         if (voice.key === jsonKey && voice.order === jsonOrder) {
+          console.log(`Voice ${voice.name} matched by key/order: ${voice.key}_${voice.order}`); // Debug log
           return true;
         }
         
@@ -274,8 +285,16 @@ export default function AssetsPage() {
         if (voice.path) {
           const pathMatch = voice.path.match(/voice[\/\\]([^\/\\]+)_(\d+)[\/\\]/);
           if (pathMatch && pathMatch[1] === jsonKey && parseInt(pathMatch[2]) === jsonOrder) {
+            console.log(`Voice ${voice.name} matched by path: ${voice.path}`); // Debug log
             return true;
           }
+        }
+        
+        // Additional check for voice filename pattern: key_order_voice_type.mp3
+        const voiceNameMatch = voice.name.match(/^(.+?)_(\d+)_voice_/);
+        if (voiceNameMatch && voiceNameMatch[1] === jsonKey && parseInt(voiceNameMatch[2]) === jsonOrder) {
+          console.log(`Voice ${voice.name} matched by filename pattern`); // Debug log
+          return true;
         }
         
         return false;
@@ -381,6 +400,7 @@ export default function AssetsPage() {
       // Process assets to add key and order information
       const processedAssets = data.assets.map((asset: Asset) => {
         const { key, order } = extractKeyAndOrder(asset.name, asset.type);
+        console.log(`Processing asset: ${asset.name} -> key: "${key}", order: ${order}`); // Debug log
         return { ...asset, key, order };
       });
       
@@ -392,15 +412,23 @@ export default function AssetsPage() {
         
         // For voice files, try to extract the actual animal key from the path
         if (asset.type === 'voice' && asset.path) {
-          // Extract animal key from path like "C:/.../animals/voice/bear_1/voice_title.mp3"
+          // Extract animal key from path like "C:/.../animals/voice/bear_1/voice_title.mp3" or "blue_tang_1/voice_title.mp3"
           const pathMatch = asset.path.match(/animals[\/\\]voice[\/\\]([^\/\\]+)[\/\\]/);
           if (pathMatch) {
-            const animalKey = pathMatch[1].split('_')[0]; // Extract "bear" from "bear_1"
-            if (animalKey && animalKey !== 'voice') {
-              key = animalKey;
+            const fullKey = pathMatch[1]; // This could be "bear_1" or "blue_tang_1"
+            // Extract the animal name part (everything before the last underscore and number)
+            const animalKeyMatch = fullKey.match(/^(.+?)_\d+$/);
+            if (animalKeyMatch) {
+              const animalKey = animalKeyMatch[1]; // This will be "bear" or "blue_tang"
+              if (animalKey && animalKey !== 'voice') {
+                key = animalKey;
+                console.log(`Extracted animal key from voice path: ${fullKey} -> "${animalKey}"`); // Debug log
+              }
             }
           }
         }
+        
+        console.log(`Grouping asset ${asset.name} (${asset.type}) with key: "${key}"`); // Debug log
         
         if (!groups[key]) {
           groups[key] = {
@@ -1035,10 +1063,34 @@ export default function AssetsPage() {
         // Reload the content from server to ensure we have the latest data
         await reloadJsonContent();
         setIsEditing(false);
-        alert('JSON content saved successfully!');
         
-        // Refresh assets to reflect changes
-        fetchAssets();
+        // Show success message without blocking UI
+        setToast({ message: 'JSON content saved successfully!', type: 'success' });
+        setTimeout(() => setToast(null), 3000);
+        
+        // Update the specific asset in the state instead of refreshing all assets
+        setAssetGroups(prevGroups => {
+          return prevGroups.map(group => {
+            if (group.key === asset.key) {
+              return {
+                ...group,
+                assets: {
+                  ...group.assets,
+                  jsons: group.assets.jsons.map(json => {
+                    if (json.id === asset.id) {
+                      return {
+                        ...json,
+                        lastModified: new Date()
+                      };
+                    }
+                    return json;
+                  })
+                }
+              };
+            }
+            return group;
+          });
+        });
         
       } catch (error) {
         console.error('Error saving JSON content:', error);
@@ -1102,10 +1154,14 @@ export default function AssetsPage() {
     );
   };
 
+  // State for tracking voice generation progress per JSON asset
+  const [voiceGeneratingStates, setVoiceGeneratingStates] = useState<{ [key: string]: boolean }>({});
+
   const handleGenerateVoice = async (jsonAsset: Asset) => {
-    if (!confirm(`Generate voice files for ${jsonAsset.name}?`)) {
-      return;
-    }
+    const assetKey = `${jsonAsset.key}_${jsonAsset.order}`;
+    
+    // Set loading state for this specific asset
+    setVoiceGeneratingStates(prev => ({ ...prev, [assetKey]: true }));
     
     try {
       // First, read the JSON content to get the text for voice generation
@@ -1131,35 +1187,13 @@ export default function AssetsPage() {
       ].filter(item => item.text.trim() !== ''); // Only include non-empty texts
       
       if (voiceTexts.length === 0) {
-        alert('No voice text found in the JSON file. Please check the JSON content.');
-        return;
+        throw new Error('No voice text found in the JSON file. Please check the JSON content.');
       }
       
-      // Show progress dialog
-      const progressDialog = document.createElement('div');
-      progressDialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-      progressDialog.innerHTML = `
-        <div class="bg-gray-800 rounded-lg p-6 w-96">
-          <div class="text-center">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-            <h3 class="text-xl font-bold text-white mb-2">Generating Voice Files</h3>
-            <p class="text-gray-300 mb-4">Creating ${voiceTexts.length} voice files...</p>
-            <div id="voice-progress" class="text-sm text-gray-400"></div>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(progressDialog);
-      
       // Generate each voice file
-      const results = [];
+      const results: Array<{ success: boolean; file: string; path?: string; error?: string }> = [];
       for (let i = 0; i < voiceTexts.length; i++) {
         const voiceItem = voiceTexts[i];
-        
-        // Update progress
-        const progressElement = document.getElementById('voice-progress');
-        if (progressElement) {
-          progressElement.textContent = `Generating ${voiceItem.name} (${i + 1}/${voiceTexts.length})`;
-        }
         
         try {
           const voiceResponse = await fetch('/api/assets/generate-voice', {
@@ -1184,31 +1218,83 @@ export default function AssetsPage() {
           const voiceResult = await voiceResponse.json();
           results.push({ success: true, file: voiceItem.name, path: voiceResult.path });
           
-                 } catch (error) {
-           console.error(`Error generating ${voiceItem.name}:`, error);
-           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-           results.push({ success: false, file: voiceItem.name, error: errorMessage });
-         }
+        } catch (error) {
+          console.error(`Error generating ${voiceItem.name}:`, error);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          results.push({ success: false, file: voiceItem.name, error: errorMessage });
+        }
       }
       
-      // Remove progress dialog
-      document.body.removeChild(progressDialog);
-      
-      // Show results
+      // Update the specific asset group with new voice files
       const successful = results.filter(r => r.success).length;
       const failed = results.filter(r => !r.success).length;
       
       if (successful > 0) {
-        alert(`✅ Successfully generated ${successful} voice files!\n${failed > 0 ? `❌ Failed to generate ${failed} files.` : ''}`);
-        // Refresh assets to show the new voice files
-        fetchAssets();
+        // Update the specific asset group instead of refreshing all assets
+        setAssetGroups(prevGroups => {
+          return prevGroups.map(group => {
+            if (group.key === jsonAsset.key) {
+              // Add the new voice files to the group
+              const newVoices = results
+                .filter(r => r.success)
+                .map(result => ({
+                  id: `voice_${Date.now()}_${Math.random()}`, // Generate temporary ID
+                  name: result.file,
+                  type: 'voice' as const,
+                  category: 'voice',
+                  path: result.path!,
+                  key: jsonAsset.key,
+                  order: jsonAsset.order,
+                  status: 'available' as const
+                }));
+              
+              const updatedGroup = {
+                ...group,
+                assets: {
+                  ...group.assets,
+                  voices: [...group.assets.voices, ...newVoices]
+                },
+                renderStatus: {
+                  ...group.renderStatus,
+                  availableVoices: group.renderStatus.availableVoices + successful
+                }
+              };
+              
+              // Reorganize JSON-Asset pairs to update voice status
+              updatedGroup.assets.jsonAssetPairs = organizeJSONAssetPairs(
+                updatedGroup.assets.jsons, 
+                updatedGroup.assets.voices, 
+                updatedGroup.assets.rewards
+              );
+              
+              return updatedGroup;
+            }
+            return group;
+          });
+        });
+        
+        // Show success notification without blocking UI
+        const successMessage = `✅ Generated ${successful} voice files for ${jsonAsset.name}`;
+        if (failed > 0) {
+          console.warn(`❌ Failed to generate ${failed} files. Check console for details.`);
+        }
+        
+        // Show toast notification
+        setToast({ message: successMessage, type: 'success' });
+        setTimeout(() => setToast(null), 3000);
+        
       } else {
-        alert(`❌ Failed to generate any voice files. Please check the console for details.`);
+        throw new Error('Failed to generate any voice files. Please check the console for details.');
       }
       
     } catch (error) {
       console.error('Error generating voice files:', error);
-      alert(`Failed to generate voice files: ${(error as Error).message}`);
+      // Show error toast notification
+      setToast({ message: `Failed to generate voice files: ${(error as Error).message}`, type: 'error' });
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      // Clear loading state for this specific asset
+      setVoiceGeneratingStates(prev => ({ ...prev, [assetKey]: false }));
     }
   };
 
@@ -1639,9 +1725,17 @@ export default function AssetsPage() {
                         {!pair.hasAllVoices && (
                           <button
                             onClick={() => handleGenerateVoice(pair.json)}
-                            className="flex-1 text-base text-white bg-orange-600 hover:bg-orange-700 rounded-lg px-4 py-2 text-center transition-colors"
+                            disabled={voiceGeneratingStates[`${pair.json.key}_${pair.json.order}`]}
+                            className="flex-1 text-base text-white bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:text-gray-400 rounded-lg px-4 py-2 text-center transition-colors"
                           >
-                            Generate Voice
+                            {voiceGeneratingStates[`${pair.json.key}_${pair.json.order}`] ? (
+                              <div className="flex items-center justify-center gap-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Generating...
+                              </div>
+                            ) : (
+                              'Generate Voice'
+                            )}
                           </button>
                         )}
                         {!pair.hasReward && (
@@ -2103,6 +2197,31 @@ export default function AssetsPage() {
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -50, scale: 0.9 }}
+            className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg max-w-md ${
+              toast.type === 'success' 
+                ? 'bg-green-600 text-white' 
+                : toast.type === 'error' 
+                ? 'bg-red-600 text-white' 
+                : 'bg-blue-600 text-white'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-lg">
+                {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}
+              </span>
+              <span className="text-sm font-medium">{toast.message}</span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
