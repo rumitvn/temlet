@@ -107,11 +107,50 @@ IMPORTANT: Return ONLY valid JSON in the exact format specified. Do not include 
 
 CRITICAL: Each content piece must be UNIQUE and DIFFERENT from any previous content for the same subject.
 
+IMPORTANT INTRO GUIDELINES:
+- Title: Simple name with order/part, e.g., "Con cá sấu P1" or "Cá sấu P1" (P = Phần/Part)
+- Voice: Simple mention of subject and part, e.g., "Con cá sấu phần 1"
+
+IMPORTANT VOICE GUIDELINES:
+- Keep all voice scripts short and simple (3 seconds max)
+- Avoid lengthy explanations
+- Focus on clear, concise communication
+- Answer voices should be engaging and varied, not repetitive
+- Use different positive responses like: "Tuyệt vời!", "Chính xác!", "Rất giỏi!", "Đúng rồi!", "Hoàn hảo!", "Thông minh!", "Tài giỏi!", "Xuất sắc!"
+
+IMPORTANT DIFFICULTY PROGRESSION:
+- Order 1 (Easy): Basic identification, simple facts, obvious choices
+- Order 2 (Medium): Slightly more complex, requires basic knowledge
+- Order 3 (Hard): Requires deeper understanding, multiple concepts
+- Order 4 (Hard): Advanced knowledge, complex relationships
+- Order 5 (Very Hard): Expert level, detailed knowledge required
+
 IMPORTANT QUIZ_3 GUIDELINES:
-- Quiz_3 should NEVER ask "Con nào là [subject]?" - this is too repetitive and boring
-- Instead, ask educational questions about different animals, habitats, characteristics, or behaviors
+- Quiz_3 should NEVER ask repetitive identification questions like "Con nào là [subject]?" or "Cây nào là [subject]?"
+- Instead, ask educational questions about different items, characteristics, behaviors, or facts
 - Make quiz_3 about learning something new, not just identifying the main subject
-- Use the available inputs list to create diverse, educational questions`;
+- Use the available inputs list to create diverse, educational questions
+- Adapt questions based on topic and difficulty level:
+  * Animals: 
+    - Easy: basic habitats, obvious characteristics
+    - Medium: diet, behavior patterns
+    - Hard: adaptations, ecosystem roles
+    - Very Hard: scientific classification, complex behaviors
+  * Plants: 
+    - Easy: basic parts, simple identification
+    - Medium: growth patterns, basic uses
+    - Hard: photosynthesis, complex adaptations
+    - Very Hard: scientific classification, ecological relationships
+  * Science: 
+    - Easy: basic concepts, simple experiments
+    - Medium: cause and effect, basic principles
+    - Hard: complex interactions, multiple variables
+    - Very Hard: advanced theories, detailed processes
+  * History: 
+    - Easy: basic facts, simple events
+    - Medium: cause and effect, basic timelines
+    - Hard: complex relationships, multiple factors
+    - Very Hard: detailed analysis, complex historical contexts`;
 
     // Build uniqueness instructions based on existing content
     let uniquenessInstructions = "";
@@ -178,8 +217,8 @@ Generate content in this exact JSON format:
   "key": "${key}",
   "order": ${order},
   "intro": {
-    "text": "Title text for intro",
-    "voice": "Voice script for intro"
+    "text": "Con cá sấu P1",
+    "voice": "Con cá sấu phần 1"
   },
   "quiz_1": {
     "question": {
@@ -189,7 +228,7 @@ Generate content in this exact JSON format:
     "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
     "answer": {
       "position": 2,
-      "voice": "Voice script for correct answer"
+      "voice": "Tuyệt vời!"
     }
   },
   "quiz_2": {
@@ -200,7 +239,7 @@ Generate content in this exact JSON format:
     "options": ["Option 1", "Option 2"],
     "answer": {
       "position": 1,
-      "voice": "Voice script for correct answer"
+      "voice": "Chính xác!"
     }
   },
   "quiz_3": {
@@ -211,7 +250,7 @@ Generate content in this exact JSON format:
     "options": ["shark", "eagle", "elephant", "dolphin"], // Select 4 items from available inputs list
     "answer": {
       "position": 1,
-      "voice": "Đúng rồi! Cá mập sống dưới nước!"
+      "voice": "Rất giỏi!"
     }
   },
   "lesson": {
@@ -227,27 +266,54 @@ Requirements:
 - Use appropriate vocabulary for the target age group
 - Ensure questions are relevant to the topic and subject
 - Make answer positions logical and varied
-- Keep voice scripts natural and conversational
+- Keep voice scripts short and simple (3 seconds max)
+- ANSWER VOICES: Use varied, engaging responses instead of repetitive "Đúng rồi!"
+  * Examples: "Tuyệt vời!", "Chính xác!", "Rất giỏi!", "Hoàn hảo!", "Thông minh!", "Tài giỏi!", "Xuất sắc!", "Đúng rồi!"
+  * Vary the responses across different quizzes to keep it interesting
 - For quiz_3, select ONLY 4 items from the provided available inputs list
-- Quiz_3 should be diverse and educational - ask about different animals, habitats, characteristics, or behaviors
-- Examples of good quiz_3 questions:
-  * "Con nào sống dưới nước?" (Which one lives in water?)
-  * "Con nào có cánh và biết bay?" (Which one has wings and can fly?)
-  * "Con nào có vảy?" (Which one has scales?)
-  * "Con nào là động vật ăn cỏ?" (Which one is a herbivore?)
-  * "Con nào sống ở sa mạc?" (Which one lives in the desert?)
-- Avoid repetitive questions like "Con nào là [subject]?" - make it educational about different animals
-- If no available inputs are provided, use animal names that can be represented by images (e.g., "elephant", "shark", "eagle", "deer")
+- Quiz_3 should be diverse and educational - ask about different items, characteristics, or facts
+- DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
+  * Order 1 (Easy): Basic identification, simple facts, obvious choices
+  * Order 2 (Medium): Slightly more complex, requires basic knowledge  
+  * Order 3 (Hard): Requires deeper understanding, multiple concepts
+  * Order 4 (Hard): Advanced knowledge, complex relationships
+  * Order 5 (Very Hard): Expert level, detailed knowledge required
+- Examples of good quiz_3 questions by topic and difficulty:
+  * Animals: 
+    - Easy: "Con nào sống dưới nước?", "Con nào có 4 chân?", "Con nào có lông?"
+    - Medium: "Con nào ăn cỏ?", "Con nào ngủ vào ban ngày?", "Con nào sống theo bầy?"
+    - Hard: "Con nào có khả năng thay đổi màu sắc?", "Con nào có hệ thống định vị siêu âm?", "Con nào có thể tái sinh các bộ phận?"
+    - Very Hard: "Con nào thuộc lớp bò sát có vảy?", "Con nào có hệ thống tuần hoàn kép?", "Con nào có khả năng quang hợp?"
+  * Plants: 
+    - Easy: "Cây nào có lá xanh?", "Cây nào có hoa?", "Cây nào cao nhất?"
+    - Medium: "Cây nào cần nhiều nước?", "Cây nào mọc nhanh?", "Cây nào có rễ sâu?"
+    - Hard: "Cây nào có thể sống trong điều kiện khô hạn?", "Cây nào có hệ thống rễ cộng sinh?", "Cây nào có thể tự phát sáng?"
+    - Very Hard: "Cây nào thuộc họ cây họ đậu?", "Cây nào có hệ thống vận chuyển nước hiệu quả nhất?", "Cây nào có thể sống hàng nghìn năm?"
+  * Science: 
+    - Easy: "Chất nào tan trong nước?", "Vật nào nổi trên nước?", "Thí nghiệm nào tạo ra bong bóng?"
+    - Medium: "Chất nào thay đổi màu khi gặp axit?", "Vật nào dẫn điện tốt?", "Hiện tượng nào xảy ra khi đun nóng?"
+    - Hard: "Chất nào có thể thay đổi trạng thái ở nhiệt độ phòng?", "Vật nào có từ tính mạnh nhất?", "Hiện tượng nào liên quan đến áp suất khí quyển?"
+    - Very Hard: "Chất nào có cấu trúc tinh thể phức tạp nhất?", "Vật nào có khả năng siêu dẫn ở nhiệt độ cao?", "Hiện tượng nào liên quan đến cơ học lượng tử?"
+  * History: 
+    - Easy: "Ai là vị vua đầu tiên?", "Sự kiện nào xảy ra năm 1945?", "Nơi nào là thủ đô cổ?"
+    - Medium: "Ai phát minh ra điện?", "Cuộc chiến nào kết thúc năm 1975?", "Thành phố nào được xây dựng đầu tiên?"
+    - Hard: "Ai là người đầu tiên bay vòng quanh thế giới?", "Sự kiện nào dẫn đến cuộc cách mạng công nghiệp?", "Nơi nào là trung tâm thương mại cổ đại?"
+    - Very Hard: "Ai là người phát hiện ra cấu trúc DNA?", "Sự kiện nào dẫn đến sự sụp đổ của đế chế La Mã?", "Nơi nào là trung tâm học thuật cổ đại quan trọng nhất?"
+- Avoid repetitive identification questions like "Con nào là [subject]?" or "Cây nào là [subject]?"
+- If no available inputs are provided, use appropriate names that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
 - REWARD PROGRESSION: The reward voice must follow this exact progression based on order number:
-  * Order 1: "[Animal Name] Thường" (e.g., "Cá sấu Thường")
-  * Order 2: "[Animal Name] Hiếm" (e.g., "Cá sấu Hiếm") 
-  * Order 3: "[Animal Name] Tinh Anh" (e.g., "Cá sấu Tinh Anh")
-  * Order 4: "[Animal Name] Huyền thoại" (e.g., "Cá sấu Huyền thoại")
-  * Order 5: "[Animal Name] Siêu cấp" (e.g., "Cá sấu Siêu cấp")
+  * Order 1: "[Subject Name] Thường" (e.g., "Cá sấu Thường", "Cây cối Thường")
+  * Order 2: "[Subject Name] Hiếm" (e.g., "Cá sấu Hiếm", "Cây cối Hiếm") 
+  * Order 3: "[Subject Name] Tinh Anh" (e.g., "Cá sấu Tinh Anh", "Cây cối Tinh Anh")
+  * Order 4: "[Subject Name] Huyền thoại" (e.g., "Cá sấu Huyền thoại", "Cây cối Huyền thoại")
+  * Order 5: "[Subject Name] Siêu cấp" (e.g., "Cá sấu Siêu cấp", "Cây cối Siêu cấp")
   * Order 6+: Continue with creative variations like "Siêu phàm", "Thần thánh", etc.
-- IMPORTANT: The reward voice should ONLY contain the reward name (e.g., "Cá sấu Huyền thoại"), NOT congratulatory text
+- IMPORTANT: The reward voice should ONLY contain the reward name, NOT congratulatory text
+- INTRO REQUIREMENTS:
+  * Title: Simple name with order/part, e.g., "Con cá sấu P1", "Cây cối P1", "Khoa học P1"
+  * Voice: Simple mention of subject and part, e.g., "Con cá sấu phần 1", "Cây cối phần 1"
 
 Language: ${language}
 Topic: ${topic}
