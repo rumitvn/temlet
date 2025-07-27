@@ -1778,6 +1778,94 @@ export default function AssetsPage() {
     setShowImageGenerationDialog(false);
   };
 
+  // State for topic image generation
+  const [imageGeneratingStates, setImageGeneratingStates] = useState<{ [key: string]: boolean }>({});
+
+  const handleGenerateTopicImage = async (group: AssetGroup) => {
+    const assetKey = group.key;
+    
+    // Set loading state for this specific asset group
+    setImageGeneratingStates(prev => ({ ...prev, [assetKey]: true }));
+    
+    try {
+      // Determine the topic based on the current selected topic
+      const topic = selectedTopic || 'animals';
+      
+      // Generate the image using the topic-specific API
+      const response = await fetch('/api/assets/generate-topic-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subject: group.name,
+          topic: topic, // This will handle 'histories' -> 'history' mapping in the API
+          model: 'grok', // Default to Grok
+          size: '1024x1024',
+          quality: 'standard',
+          style: 'vivid',
+          channel: selectedChannel,
+          topicParam: selectedTopic
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate image');
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.savedAsset) {
+        // Update the specific asset group instead of refreshing all assets
+        setAssetGroups(prevGroups => {
+          return prevGroups.map(g => {
+            if (g.key === group.key) {
+              // Add the new image to the group
+              const updatedGroup = {
+                ...g,
+                assets: {
+                  ...g.assets,
+                  image: data.savedAsset
+                },
+                renderStatus: {
+                  ...g.renderStatus,
+                  hasImage: true
+                }
+              };
+              
+              return updatedGroup;
+            }
+            return g;
+          });
+        });
+        
+        // Show success message
+        setToast({
+          message: `Image for "${group.name}" generated and saved successfully!`,
+          type: 'success'
+        });
+        
+        // Auto-dismiss toast after 3 seconds
+        setTimeout(() => setToast(null), 3000);
+      } else {
+        throw new Error('Image generation failed');
+      }
+    } catch (error) {
+      console.error('Error generating topic image:', error);
+      setToast({
+        message: error instanceof Error ? error.message : 'Failed to generate image. Please try again.',
+        type: 'error'
+      });
+      
+      // Auto-dismiss toast after 5 seconds
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      // Clear loading state
+      setImageGeneratingStates(prev => ({ ...prev, [assetKey]: false }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
@@ -2167,8 +2255,19 @@ export default function AssetsPage() {
                       </div>
                       <p className="text-base text-gray-400 mb-3 font-medium">No image file found</p>
                       <p className="text-base text-gray-500 mb-4">Required for video rendering</p>
-                      <button className="w-full text-base text-purple-300 bg-purple-900/50 rounded-lg px-4 py-2 text-center hover:bg-purple-900/70 transition-colors border border-purple-600">
-                        🎨 Generate Image
+                      <button 
+                        onClick={() => handleGenerateTopicImage(group)}
+                        disabled={imageGeneratingStates[group.key]}
+                        className="w-full text-base text-purple-300 bg-purple-900/50 rounded-lg px-4 py-2 text-center hover:bg-purple-900/70 disabled:bg-gray-600 disabled:text-gray-400 transition-colors border border-purple-600"
+                      >
+                        {imageGeneratingStates[group.key] ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-300"></div>
+                            Generating...
+                          </div>
+                        ) : (
+                          '🎨 Generate Image'
+                        )}
                       </button>
                     </div>
                   )}
