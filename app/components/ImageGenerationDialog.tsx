@@ -207,25 +207,25 @@ export default function ImageGenerationDialog({
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
+              className="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between p-6 border-b border-gray-600">
                 <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <PhotoIcon className="w-6 h-6 text-blue-600" />
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <PhotoIcon className="w-6 h-6 text-purple-600" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-semibold text-gray-900">Generate Image</h2>
-                    <p className="text-sm text-gray-500">Create images using AI models</p>
+                    <h2 className="text-xl font-semibold text-white">Generate Image</h2>
+                    <p className="text-sm text-gray-400">Create images using AI models</p>
                   </div>
                 </div>
                 <button
                   onClick={handleClose}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
                 >
-                  <XMarkIcon className="w-6 h-6 text-gray-500" />
+                  <XMarkIcon className="w-6 h-6" />
                 </button>
               </div>
 
@@ -234,7 +234,7 @@ export default function ImageGenerationDialog({
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Model Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                    <label className="block text-sm font-medium text-gray-400 mb-3">
                       AI Model
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -243,20 +243,20 @@ export default function ImageGenerationDialog({
                           key={key}
                           className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all ${
                             formData.model === key
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 hover:border-gray-300'
+                              ? 'border-purple-500 bg-purple-900 bg-opacity-20'
+                              : 'border-gray-600 hover:border-gray-500 bg-gray-700'
                           } ${!model.available ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                     onClick={() => model.available && setFormData(prev => ({ ...prev, model: key as 'openai' | 'grok' | 'comfyui' }))}
+                          onClick={() => model.available && setFormData(prev => ({ ...prev, model: key as 'openai' | 'grok' | 'comfyui' }))}
                         >
                           <div className="flex items-center space-x-3">
                             {getModelIcon(key)}
                             <div className="flex-1">
                               <div className="flex items-center space-x-2">
-                                <span className="font-medium text-gray-900">{model.name}</span>
+                                <span className="font-medium text-white">{model.name}</span>
                                 {getModelStatusIcon(model)}
                               </div>
                               {!model.available && (
-                                <p className="text-xs text-red-500 mt-1">
+                                <p className="text-xs text-red-400 mt-1">
                                   {key === 'openai' ? 'API key not configured' : 'Not available'}
                                 </p>
                               )}
@@ -264,7 +264,7 @@ export default function ImageGenerationDialog({
                           </div>
                           {formData.model === key && (
                             <div className="absolute top-2 right-2">
-                              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                              <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
                             </div>
                           )}
                         </div>
@@ -276,7 +276,7 @@ export default function ImageGenerationDialog({
                           type="button"
                           onClick={checkComfyUI}
                           disabled={isCheckingComfyUI}
-                          className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                          className="text-sm text-purple-400 hover:text-purple-300 disabled:opacity-50"
                         >
                           {isCheckingComfyUI ? 'Checking...' : 'Check ComfyUI Connection'}
                         </button>
@@ -286,7 +286,7 @@ export default function ImageGenerationDialog({
 
                   {/* Prompt */}
                   <div>
-                    <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="prompt" className="block text-sm font-medium text-gray-400 mb-2">
                       Prompt *
                     </label>
                     <textarea
@@ -295,7 +295,7 @@ export default function ImageGenerationDialog({
                       value={formData.prompt}
                       onChange={handleInputChange}
                       rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                      className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
                       placeholder="Describe the image you want to generate..."
                       required
                     />
@@ -305,7 +305,7 @@ export default function ImageGenerationDialog({
                   {formData.model === 'openai' && models?.openai && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label htmlFor="size" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="size" className="block text-sm font-medium text-gray-400 mb-2">
                           Size
                         </label>
                         <select
@@ -313,7 +313,7 @@ export default function ImageGenerationDialog({
                           name="size"
                           value={formData.size}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
                         >
                           {models.openai.sizes?.map(size => (
                             <option key={size} value={size}>{size}</option>
@@ -321,7 +321,7 @@ export default function ImageGenerationDialog({
                         </select>
                       </div>
                       <div>
-                        <label htmlFor="quality" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="quality" className="block text-sm font-medium text-gray-400 mb-2">
                           Quality
                         </label>
                         <select
@@ -329,7 +329,7 @@ export default function ImageGenerationDialog({
                           name="quality"
                           value={formData.quality}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
                         >
                           {models.openai.qualities?.map(quality => (
                             <option key={quality} value={quality}>{quality}</option>
@@ -337,7 +337,7 @@ export default function ImageGenerationDialog({
                         </select>
                       </div>
                       <div>
-                        <label htmlFor="style" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="style" className="block text-sm font-medium text-gray-400 mb-2">
                           Style
                         </label>
                         <select
@@ -345,7 +345,7 @@ export default function ImageGenerationDialog({
                           name="style"
                           value={formData.style}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
                         >
                           {models.openai.styles?.map(style => (
                             <option key={style} value={style}>{style}</option>
@@ -358,7 +358,7 @@ export default function ImageGenerationDialog({
                   {formData.model === 'grok' && models?.grok && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label htmlFor="size" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="size" className="block text-sm font-medium text-gray-400 mb-2">
                           Size (Fixed)
                         </label>
                         <select
@@ -366,7 +366,7 @@ export default function ImageGenerationDialog({
                           name="size"
                           value={formData.size}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
                           disabled
                         >
                           {models.grok.sizes?.map(size => (
@@ -375,7 +375,7 @@ export default function ImageGenerationDialog({
                         </select>
                       </div>
                       <div>
-                        <label htmlFor="quality" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="quality" className="block text-sm font-medium text-gray-400 mb-2">
                           Quality (Fixed)
                         </label>
                         <select
@@ -383,7 +383,7 @@ export default function ImageGenerationDialog({
                           name="quality"
                           value={formData.quality}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
                           disabled
                         >
                           {models.grok.qualities?.map(quality => (
@@ -397,7 +397,7 @@ export default function ImageGenerationDialog({
                   {formData.model === 'comfyui' && models?.comfyui && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label htmlFor="size" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="size" className="block text-sm font-medium text-gray-400 mb-2">
                           Size
                         </label>
                         <select
@@ -405,7 +405,7 @@ export default function ImageGenerationDialog({
                           name="size"
                           value={formData.size}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
                         >
                           {models.comfyui.sizes?.map(size => (
                             <option key={size} value={size}>{size}</option>
@@ -413,7 +413,7 @@ export default function ImageGenerationDialog({
                         </select>
                       </div>
                       <div>
-                        <label htmlFor="comfyuiUrl" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="comfyuiUrl" className="block text-sm font-medium text-gray-400 mb-2">
                           ComfyUI URL
                         </label>
                         <input
@@ -422,7 +422,7 @@ export default function ImageGenerationDialog({
                           name="comfyuiUrl"
                           value={formData.comfyuiUrl}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
                           placeholder="http://localhost:8188"
                         />
                       </div>
@@ -432,7 +432,7 @@ export default function ImageGenerationDialog({
                   {/* File options */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="category" className="block text-sm font-medium text-gray-400 mb-2">
                         Category
                       </label>
                       <input
@@ -441,12 +441,12 @@ export default function ImageGenerationDialog({
                         name="category"
                         value={formData.category}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                        className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
                         placeholder="image"
                       />
                     </div>
                     <div>
-                      <label htmlFor="filename" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="filename" className="block text-sm font-medium text-gray-400 mb-2">
                         Filename (optional)
                       </label>
                       <input
@@ -455,7 +455,7 @@ export default function ImageGenerationDialog({
                         name="filename"
                         value={formData.filename}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                        className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
                         placeholder="generated_image.png"
                       />
                     </div>
@@ -464,10 +464,10 @@ export default function ImageGenerationDialog({
                   {/* Generated Image Preview */}
                   {generatedImageUrl && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-400 mb-2">
                         Generated Image
                       </label>
-                      <div className="border border-gray-200 rounded-lg p-4">
+                      <div className="border border-gray-600 rounded-lg p-4">
                         <img
                           src={generatedImageUrl}
                           alt="Generated"
@@ -478,18 +478,18 @@ export default function ImageGenerationDialog({
                   )}
 
                   {/* Actions */}
-                  <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
+                  <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-600">
                     <button
                       type="button"
                       onClick={handleClose}
-                      className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                      className="px-4 py-2 text-gray-300 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      disabled={isLoading || !formData.prompt.trim() || (models && models[formData.model]?.available !== true)}
-                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+                      disabled={isLoading || !formData.prompt.trim() || (models ? models[formData.model]?.available !== true : true)}
+                      className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
                     >
                       <SparklesIcon className="w-4 h-4" />
                       <span>Generate Image</span>

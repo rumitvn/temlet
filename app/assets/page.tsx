@@ -263,8 +263,8 @@ export default function AssetsPage() {
       // For voice files, extract the key from the directory path
       // Voice files are in directories like "voice/buoyancy_1/voice_lesson.mp3"
       if (path) {
-        // Extract the directory name from the path
-        const pathParts = path.split('/');
+        // Extract the directory name from the path - handle both Windows and Unix separators
+        const pathParts = path.split(/[\/\\]/); // Split by both forward and backward slashes
         const voiceDirIndex = pathParts.findIndex(part => part === 'voice');
         if (voiceDirIndex !== -1 && voiceDirIndex + 1 < pathParts.length) {
           const dirName = pathParts[voiceDirIndex + 1]; // This should be "buoyancy_1"
@@ -450,7 +450,7 @@ export default function AssetsPage() {
           // Voice files are in directories like "voice/buoyancy_1/voice_lesson.mp3"
           // We need to match them with the corresponding JSON file "buoyancy_1.json"
           if (asset.path) {
-            const pathParts = asset.path.split('/');
+            const pathParts = asset.path.split(/[\/\\]/); // Split by both forward and backward slashes
             const voiceDirIndex = pathParts.findIndex(part => part === 'voice');
             if (voiceDirIndex !== -1 && voiceDirIndex + 1 < pathParts.length) {
               const dirName = pathParts[voiceDirIndex + 1]; // This should be "buoyancy_1"
