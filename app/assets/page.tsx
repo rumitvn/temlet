@@ -8,11 +8,15 @@ import {
   FunnelIcon
 } from "@heroicons/react/24/outline";
 import { 
+  PhotoIcon
+} from "@heroicons/react/24/solid";
+import { 
   CheckCircleIcon,
   XCircleIcon,
   ExclamationTriangleIcon
 } from "@heroicons/react/24/solid";
 import { config } from "../../lib/config";
+import ImageGenerationDialog from "../components/ImageGenerationDialog";
 
 interface Asset {
   id: string;
@@ -162,6 +166,7 @@ export default function AssetsPage() {
   const [selectedTopic, setSelectedTopic] = useState("animals");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [showImageGenerationDialog, setShowImageGenerationDialog] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -1756,6 +1761,23 @@ export default function AssetsPage() {
     }
   };
 
+  const handleImageGenerated = (asset: Asset) => {
+    // Add the new generated image to the assets list
+    setAssets(prev => [...prev, asset]);
+    
+    // Show success message
+    setToast({
+      message: `Image "${asset.name}" generated and saved successfully!`,
+      type: 'success'
+    });
+    
+    // Auto-dismiss toast after 3 seconds
+    setTimeout(() => setToast(null), 3000);
+    
+    // Close the dialog
+    setShowImageGenerationDialog(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
@@ -1790,6 +1812,16 @@ export default function AssetsPage() {
           >
             <span className="text-xl">✨</span>
             <span>AI Generator</span>
+          </motion.button>
+          
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
+            onClick={() => setShowImageGenerationDialog(true)}
+          >
+            <PhotoIcon className="w-5 h-5" />
+            <span>Generate Image</span>
           </motion.button>
           
           <motion.button
@@ -2933,6 +2965,16 @@ export default function AssetsPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Image Generation Dialog */}
+      <ImageGenerationDialog
+        isOpen={showImageGenerationDialog}
+        onClose={() => setShowImageGenerationDialog(false)}
+        onImageGenerated={handleImageGenerated}
+        category="image"
+        channel={selectedChannel}
+        topic={selectedTopic}
+      />
 
       {/* Toast Notification */}
       <AnimatePresence>
