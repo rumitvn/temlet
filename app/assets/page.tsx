@@ -103,6 +103,7 @@ interface AssetGroup {
 }
 
 interface SK3QLRContent {
+  id: string; // Add unique ID to prevent duplicate keys
   key: string;
   order: number;
   intro: {
@@ -199,6 +200,7 @@ export default function AssetsPage() {
 
   // AI Generator state
   const [aiContent, setAiContent] = useState<SK3QLRContent>({
+    id: "",
     key: "",
     order: 1,
     intro: { text: "", voice: "" },
@@ -229,6 +231,13 @@ export default function AssetsPage() {
   const [previewItems, setPreviewItems] = useState<SK3QLRContent[]>([]);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  
+  // New batch generation state
+  const [batchSize, setBatchSize] = useState(1);
+  const [subjectsList, setSubjectsList] = useState("");
+  const [batchGenerating, setBatchGenerating] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; subject: string } | null>(null);
+  const [isBatchMode, setIsBatchMode] = useState(false);
   
   // Toast notification state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -821,6 +830,35 @@ export default function AssetsPage() {
     checkExistingOrders(value);
   };
 
+  // Parse subjects list from text input
+  const parseSubjectsList = (text: string): string[] => {
+    return text
+      .split(/[\n,;]/)
+      .map(subject => subject.trim())
+      .filter(subject => subject.length > 0);
+  };
+
+  // Get existing orders for multiple subjects
+  const getExistingOrdersForSubjects = (subjects: string[]): { [key: string]: number[] } => {
+    const result: { [key: string]: number[] } = {};
+    
+    subjects.forEach(subject => {
+      const normalizedSubject = subject.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      const existingJsons = assetGroups
+        .filter(group => group.key.toLowerCase() === normalizedSubject)
+        .flatMap(group => group.assets.jsons);
+      
+      const orders = existingJsons
+        .map(json => json.order)
+        .filter((order): order is number => order !== undefined)
+        .sort((a, b) => a - b);
+      
+      result[normalizedSubject] = orders;
+    });
+    
+    return result;
+  };
+
   const generateAIContent = async () => {
     if (!aiPrompt.trim()) {
       alert('Please enter a subject for AI generation');
@@ -899,7 +937,7 @@ export default function AssetsPage() {
       }
 
       const data = await response.json();
-      const newContent = { ...data.content, order: nextOrder };
+      const newContent = { ...data.content, order: nextOrder, id: `${data.content.key}_${nextOrder}_${Date.now()}` };
       
       // Add to preview items
       setPreviewItems(prev => [...prev, newContent]);
@@ -915,14 +953,219 @@ export default function AssetsPage() {
     }
   };
 
+  const generateBatchAIContent = async () => {
+    console.log('🔥 BATCH GENERATION FUNCTION CALLED 🔥');
+    
+    // Prevent multiple simultaneous batch generations
+    if (batchGenerating) {
+      console.log('Batch generation already in progress, ignoring duplicate call');
+      return;
+    }
+
+    const subjects = parseSubjectsList(subjectsList);
+    if (subjects.length === 0) {
+      alert('Please enter at least one subject for batch generation');
+      return;
+    }
+
+    if (batchSize < 1) {
+      alert('Please enter a valid batch size (minimum 1)');
+      return;
+    }
+
+    console.log('=== STARTING BATCH GENERATION ===');
+    console.log('Subjects:', subjects);
+    console.log('Batch size:', batchSize);
+    console.log('Current preview items count:', previewItems.length);
+
+    setBatchGenerating(true);
+    setBatchProgress({ current: 0, total: subjects.length * batchSize, subject: '' });
+    
+    try {
+      const allNewContent: SK3QLRContent[] = [];
+      const existingOrdersMap = getExistingOrdersForSubjects(subjects);
+      
+      // Maintain a local array of preview items that gets updated synchronously
+      let currentPreviewItems = [...previewItems];
+      
+      // Get available inputs for quiz_3 (images from the current topic)
+      const availableInputs = assets
+        .filter(asset => asset.type === 'image' && asset.category === 'image')
+        .map(asset => asset.key)
+        .filter((key, index, arr) => arr.indexOf(key) === index); // Remove duplicates
+      
+      for (let subjectIndex = 0; subjectIndex < subjects.length; subjectIndex++) {
+        const subject = subjects[subjectIndex];
+        // Normalize subject the same way the API does
+        const normalizedSubject = subject.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+        const existingOrders = existingOrdersMap[normalizedSubject] || [];
+        
+        // Get existing preview items for this subject to calculate next order
+        // Normalize subject the same way the API does
+        const existingPreviewItems = currentPreviewItems.filter(item => item.key.toLowerCase() === normalizedSubject);
+        const existingPreviewOrders = existingPreviewItems.map(item => item.order);
+        
+        console.log(`🔍 KEY MATCHING DEBUG for ${subject}:`);
+        console.log('Subject (original):', subject);
+        console.log('Subject (normalized):', normalizedSubject);
+        console.log('All preview items keys:', previewItems.map(item => item.key));
+        console.log('Matching preview items:', existingPreviewItems);
+        console.log('Found orders:', existingPreviewOrders);
+        
+        // Combine existing orders from both sources
+        const allExistingOrders = [...existingOrders, ...existingPreviewOrders];
+        const maxExistingOrder = allExistingOrders.length > 0 ? Math.max(...allExistingOrders) : 0;
+        
+        // Track the current highest order for this subject within this batch
+        let currentBatchMaxOrder = maxExistingOrder;
+        
+        console.log(`=== BATCH GENERATION DEBUG for ${subject} ===`);
+        console.log('Existing orders from disk:', existingOrders);
+        console.log('Existing preview orders:', existingPreviewOrders);
+        console.log('All existing orders:', allExistingOrders);
+        console.log('Max existing order:', maxExistingOrder);
+        console.log('Starting currentBatchMaxOrder:', currentBatchMaxOrder);
+        
+        for (let batchIndex = 0; batchIndex < batchSize; batchIndex++) {
+          const currentProgress = subjectIndex * batchSize + batchIndex + 1;
+          setBatchProgress({ 
+            current: currentProgress, 
+            total: subjects.length * batchSize, 
+            subject: subject 
+          });
+          
+          // Calculate next order number for this subject
+          const nextOrder = currentBatchMaxOrder + 1;
+          
+          console.log(`--- Generating item ${batchIndex + 1} for ${subject} ---`);
+          console.log('Current batch max order:', currentBatchMaxOrder);
+          console.log('Calculated next order:', nextOrder);
+          
+          // Get existing content for this subject to avoid repetition
+          const existingJsons = assetGroups
+            .filter(group => group.key.toLowerCase() === normalizedSubject)
+            .flatMap(group => group.assets.jsons);
+          
+          // Read actual content from existing JSON files
+          const existingContentData = [];
+          for (const json of existingJsons) {
+            try {
+              const response = await fetch(`/api/assets/preview?path=${encodeURIComponent(json.path)}&channel=${selectedChannel}&topic=${selectedTopic}`);
+              if (response.ok) {
+                const content = await response.text();
+                const jsonData = JSON.parse(content);
+                existingContentData.push({
+                  filename: json.name,
+                  order: json.order,
+                  intro: jsonData.intro?.text || '',
+                  quiz1: jsonData.quiz_1?.question?.text || '',
+                  quiz2: jsonData.quiz_2?.question?.text || '',
+                  quiz3: jsonData.quiz_3?.question?.text || '',
+                  lesson: jsonData.lesson?.voice || '',
+                  reward: jsonData.reward?.voice || ''
+                });
+              }
+            } catch (error) {
+              console.error(`Error reading JSON file ${json.name}:`, error);
+            }
+          }
+          
+          // Get existing preview items for this specific subject only
+          const existingPreviewItemsForSubject = currentPreviewItems.filter(item => 
+            item.key.toLowerCase() === normalizedSubject
+          );
+          
+          // Convert preview items to the format expected by the API
+          const existingPreviewContent = existingPreviewItemsForSubject.map(item => ({
+            order: item.order,
+            intro: item.intro.text,
+            quiz1: item.quiz_1.question.text,
+            quiz2: item.quiz_2.question.text,
+            quiz3: item.quiz_3.question.text,
+            lesson: item.lesson.voice,
+            reward: item.reward.voice
+          }));
+          
+          try {
+            const response = await fetch('/api/assets/generate', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                prompt: subject,
+                description: aiDescription,
+                language: aiLanguage,
+                topic: selectedTopic,
+                provider: aiProvider,
+                order: nextOrder,
+                existingContent: existingContentData,
+                previewItems: existingPreviewContent, // Only send content for this specific subject
+                availableInputs: availableInputs
+              }),
+            });
+
+            if (!response.ok) {
+              throw new Error(`Failed to generate content for ${subject}_${nextOrder}`);
+            }
+
+            const data = await response.json();
+            const newContent = { 
+              ...data.content, 
+              order: nextOrder, 
+              id: `${data.content.key}_${nextOrder}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+            };
+            allNewContent.push(newContent);
+            
+            // Update both the React state and local array immediately so subsequent generations can see this content
+            setPreviewItems(prev => {
+              const newPreviewItems = [...prev, newContent];
+              console.log(`✓ Updated previewItems for ${subject} order ${nextOrder}`);
+              console.log('Current previewItems count:', newPreviewItems.length);
+              return newPreviewItems;
+            });
+            
+            // Update local array synchronously for next iteration
+            currentPreviewItems.push(newContent);
+            console.log(`✓ Updated local currentPreviewItems for ${subject} order ${nextOrder}`);
+            console.log('Local currentPreviewItems count:', currentPreviewItems.length);
+            
+            console.log(`✓ Successfully generated ${subject} order ${nextOrder}`);
+            console.log('New content added:', newContent);
+            
+            // Update the current batch max order for the next iteration
+            currentBatchMaxOrder = nextOrder;
+            console.log('Updated currentBatchMaxOrder to:', currentBatchMaxOrder);
+          } catch (error) {
+            console.error(`Error generating content for ${subject}_${nextOrder}:`, error);
+            // Continue with other items even if one fails
+          }
+        }
+      }
+      
+      // Show success message
+      setToast({ 
+        message: `Successfully generated ${allNewContent.length} content items for ${subjects.length} subjects`, 
+        type: 'success' 
+      });
+      setTimeout(() => setToast(null), 5000);
+      
+    } catch (error) {
+      console.error('Error in batch generation:', error);
+      setToast({ 
+        message: `Batch generation failed: ${(error as Error).message}`, 
+        type: 'error' 
+      });
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setBatchGenerating(false);
+      setBatchProgress(null);
+    }
+  };
+
   const removePreviewItem = (index: number) => {
     setPreviewItems(prev => {
       const newItems = prev.filter((_, i) => i !== index);
-      // Recalculate existing orders
-      const removedOrder = prev[index]?.order;
-      if (removedOrder) {
-        setExistingOrders(prev => prev.filter(order => order !== removedOrder));
-      }
       return newItems;
     });
   };
@@ -930,7 +1173,15 @@ export default function AssetsPage() {
   const clearAllPreviews = () => {
     setPreviewItems([]);
     // Reset existing orders to original state
-    checkExistingOrders(aiPrompt);
+    if (isBatchMode) {
+      // For batch mode, reset all subjects' orders
+      const subjects = parseSubjectsList(subjectsList);
+      subjects.forEach(subject => {
+        checkExistingOrders(subject);
+      });
+    } else {
+      checkExistingOrders(aiPrompt);
+    }
   };
 
   const approveGeneratedContent = async () => {
@@ -2027,24 +2278,174 @@ export default function AssetsPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Input Section */}
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
-                      Subject
-                    </label>
-                    <input
-                      type="text"
-                      value={aiPrompt}
-                      onChange={(e) => handleSubjectChange(e.target.value)}
-                      placeholder="e.g., capybara, lion, tiger"
-                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                    />
-                    {existingOrders.length > 0 && (
-                      <p className="text-sm text-blue-400 mt-1">
-                        ℹ️ Existing orders: {existingOrders.join(', ')} → Next: {Math.max(...existingOrders) + 1}
-                      </p>
-                    )}
+                  {/* Generation Mode Tabs */}
+                  <div className="flex bg-gray-700 rounded-lg p-1">
+                    <button
+                      onClick={() => {
+                        setAiPrompt("");
+                        setSubjectsList("");
+                        setBatchSize(1);
+                        setIsBatchMode(false);
+                      }}
+                      className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                        !isBatchMode ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Single Subject
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAiPrompt("");
+                        setSubjectsList("");
+                        setBatchSize(1);
+                        setIsBatchMode(true);
+                      }}
+                      className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                        isBatchMode ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Batch Generation
+                    </button>
                   </div>
-                  
+
+                  {/* Single Subject Mode */}
+                  {!isBatchMode && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                          Subject
+                        </label>
+                        <input
+                          type="text"
+                          value={aiPrompt}
+                          onChange={(e) => handleSubjectChange(e.target.value)}
+                          placeholder="e.g., capybara, lion, tiger"
+                          className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                        />
+                        {existingOrders.length > 0 && (
+                          <p className="text-sm text-blue-400 mt-1">
+                            ℹ️ Existing orders: {existingOrders.join(', ')} → Next: {Math.max(...existingOrders) + 1}
+                          </p>
+                        )}
+                      </div>
+                      
+                      <button
+                        onClick={generateAIContent}
+                        disabled={aiGenerating || !aiPrompt.trim()}
+                        className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+                      >
+                        {aiGenerating ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-xl">✨</span>
+                            Generate Content
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Batch Generation Mode */}
+                  {isBatchMode && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                          Subjects List (one per line, comma, or semicolon)
+                        </label>
+                        <textarea
+                          value={subjectsList}
+                          onChange={(e) => setSubjectsList(e.target.value)}
+                          placeholder="capybara&#10;lion&#10;tiger&#10;elephant"
+                          rows={4}
+                          className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none resize-none"
+                        />
+                        {(() => {
+                          const subjects = parseSubjectsList(subjectsList);
+                          const existingOrdersMap = getExistingOrdersForSubjects(subjects);
+                          return subjects.length > 0 ? (
+                            <div className="mt-2 space-y-1">
+                              <p className="text-sm text-blue-400">
+                                📋 {subjects.length} subjects detected
+                              </p>
+                              {subjects.slice(0, 3).map((subject, index) => {
+                                const normalizedSubject = subject.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+                                const orders = existingOrdersMap[normalizedSubject] || [];
+                                return (
+                                  <p key={index} className="text-xs text-gray-400">
+                                    • {subject}: {orders.length > 0 ? `Orders ${orders.join(', ')}` : 'No existing orders'}
+                                  </p>
+                                );
+                              })}
+                              {subjects.length > 3 && (
+                                <p className="text-xs text-gray-500">
+                                  ... and {subjects.length - 3} more subjects
+                                </p>
+                              )}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                          Content per Subject
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={batchSize}
+                          onChange={(e) => setBatchSize(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Will generate {batchSize} content item(s) for each subject
+                        </p>
+                      </div>
+
+                      {batchGenerating && batchProgress && (
+                        <div className="mb-3">
+                          <div className="flex justify-between text-xs text-gray-400 mb-1">
+                            <span>Progress: {batchProgress.current}/{batchProgress.total}</span>
+                            <span>{Math.round((batchProgress.current / batchProgress.total) * 100)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-700 rounded-full h-2">
+                            <div 
+                              className="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Currently generating: {batchProgress.subject}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <button
+                        onClick={generateBatchAIContent}
+                        disabled={batchGenerating || parseSubjectsList(subjectsList).length === 0}
+                        className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+                      >
+                        {batchGenerating ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            <span>Generating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-xl">✨</span>
+                            Generate {parseSubjectsList(subjectsList).length * batchSize} Items
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Common Settings */}
                   <div>
                     <label className="block text-sm font-medium text-gray-400 mb-2">
                       Description
@@ -2058,32 +2459,34 @@ export default function AssetsPage() {
                     />
                   </div>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
-                      Language
-                    </label>
-                    <select
-                      value={aiLanguage}
-                      onChange={(e) => setAiLanguage(e.target.value)}
-                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                    >
-                      <option value="vietnamese">Vietnamese</option>
-                      <option value="english">English</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
-                      AI Provider
-                    </label>
-                    <select
-                      value={aiProvider}
-                      onChange={(e) => setAiProvider(e.target.value)}
-                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                    >
-                      <option value="grok">Grok (xAI)</option>
-                      <option value="openai">OpenAI (GPT-4)</option>
-                    </select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-400 mb-2">
+                        Language
+                      </label>
+                      <select
+                        value={aiLanguage}
+                        onChange={(e) => setAiLanguage(e.target.value)}
+                        className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      >
+                        <option value="vietnamese">Vietnamese</option>
+                        <option value="english">English</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-400 mb-2">
+                        AI Provider
+                      </label>
+                      <select
+                        value={aiProvider}
+                        onChange={(e) => setAiProvider(e.target.value)}
+                        className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      >
+                        <option value="grok">Grok (xAI)</option>
+                        <option value="openai">OpenAI (GPT-4)</option>
+                      </select>
+                    </div>
                   </div>
                   
                   <div className="text-sm text-gray-400 bg-gray-700 rounded-lg p-3">
@@ -2095,24 +2498,6 @@ export default function AssetsPage() {
                       Content will be generated for the current channel and topic selection.
                     </div>
                   </div>
-                  
-                  <button
-                    onClick={generateAIContent}
-                    disabled={aiGenerating || !aiPrompt.trim()}
-                    className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
-                  >
-                    {aiGenerating ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-xl">✨</span>
-                        Generate Content
-                      </>
-                    )}
-                  </button>
                 </div>
                 
                 {/* Preview Section */}
@@ -2139,40 +2524,75 @@ export default function AssetsPage() {
                     </div>
                   ) : (
                     <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {previewItems.map((item, index) => (
-                        <div key={index} className="bg-gray-700 rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-medium text-purple-400">
-                              {item.key}_{item.order}.json
-                            </h4>
-                            <button
-                              onClick={() => removePreviewItem(index)}
-                              className="text-red-400 hover:text-red-300 text-sm"
-                            >
-                              Remove
-                            </button>
+                      {/* Group preview items by subject */}
+                      {(() => {
+                        const groupedItems = previewItems.reduce((groups, item) => {
+                          const subject = item.key;
+                          if (!groups[subject]) {
+                            groups[subject] = [];
+                          }
+                          groups[subject].push(item);
+                          return groups;
+                        }, {} as { [key: string]: SK3QLRContent[] });
+
+                        return Object.entries(groupedItems).map(([subject, items]) => (
+                          <div key={subject} className="bg-gray-700 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-medium text-purple-400 text-lg">
+                                📁 {subject} ({items.length} items)
+                              </h4>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    // Remove all items for this subject
+                                    setPreviewItems(prev => prev.filter(item => item.key !== subject));
+                                  }}
+                                  className="text-red-400 hover:text-red-300 text-sm"
+                                >
+                                  Remove All
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              {items.sort((a, b) => (a.order || 0) - (b.order || 0)).map((item, index) => (
+                                <div key={item.id} className="bg-gray-800 rounded-lg p-3">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h5 className="font-medium text-blue-400 text-sm">
+                                      Order {item.order}
+                                    </h5>
+                                    <button
+                                      onClick={() => removePreviewItem(previewItems.findIndex(p => p.id === item.id))}
+                                      className="text-red-400 hover:text-red-300 text-xs"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                  
+                                  <div className="space-y-2 text-xs">
+                                    <div>
+                                      <span className="text-gray-400">Intro:</span>
+                                      <p className="text-gray-300 truncate">{item.intro.text}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-400">Quiz 1:</span>
+                                      <p className="text-gray-300 truncate">{item.quiz_1.question.text}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-400">Quiz 2:</span>
+                                      <p className="text-gray-300 truncate">{item.quiz_2.question.text}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-400">Quiz 3:</span>
+                                      <p className="text-gray-300 truncate">{item.quiz_3.question.text}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                          
-                          <div className="space-y-3 text-sm">
-                            <div>
-                              <span className="text-gray-400">Intro:</span>
-                              <p className="text-gray-300 truncate">{item.intro.text}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Quiz 1:</span>
-                              <p className="text-gray-300 truncate">{item.quiz_1.question.text}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Quiz 2:</span>
-                              <p className="text-gray-300 truncate">{item.quiz_2.question.text}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Quiz 3:</span>
-                              <p className="text-gray-300 truncate">{item.quiz_3.question.text}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                        ));
+                      })()}
                     </div>
                   )}
                   
