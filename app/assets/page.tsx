@@ -170,6 +170,10 @@ export default function AssetsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(12);
 
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'name' | 'createDate'>('createDate');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
   // Filter options
   const channelOptions = [
     { value: "minimate", label: "MiniMate" },
@@ -514,7 +518,11 @@ export default function AssetsPage() {
       
       // Organize JSON-Asset pairs for each group
       Object.values(groupedAssets).forEach((group) => {
-        (group as AssetGroup).assets.jsonAssetPairs = organizeJSONAssetPairs((group as AssetGroup).assets.jsons, (group as AssetGroup).assets.voices, (group as AssetGroup).assets.rewards);
+        (group as AssetGroup).assets.jsonAssetPairs = organizeJSONAssetPairs(
+          (group as AssetGroup).assets.jsons, 
+          (group as AssetGroup).assets.voices, 
+          (group as AssetGroup).assets.rewards
+        );
       });
       
       setAssetGroups(Object.values(groupedAssets));
@@ -555,7 +563,7 @@ export default function AssetsPage() {
   // Reset to first page when search or filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedChannel, selectedTopic]);
+  }, [searchQuery, selectedChannel, selectedTopic, sortBy, sortOrder]);
 
   // Client-side filtered assets for immediate search feedback
   const filteredAssets = useMemo(() => {
@@ -567,14 +575,56 @@ export default function AssetsPage() {
 
   // Client-side filtered asset groups for immediate search feedback
   const filteredAssetGroups = useMemo(() => {
-    return assetGroups.filter(group => 
+    let filtered = assetGroups.filter(group => 
       searchQuery === '' || 
       group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       group.assets.jsons.some(json => json.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       group.assets.videos.some(video => video.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       group.assets.voices.some(voice => voice.name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
-  }, [assetGroups, searchQuery]);
+
+    // Sort the filtered groups
+    console.log(`Sorting by: ${sortBy}, Order: ${sortOrder}, Groups: ${filtered.length}`);
+    filtered.sort((a, b) => {
+      if (sortBy === 'createDate') {
+        // Get the earliest JSON file creation date for each group
+        const getEarliestJsonDate = (group: AssetGroup): Date => {
+          if (group.assets.jsons.length === 0) {
+            // If no JSON files, use a very old date to push to the end
+            return new Date(0);
+          }
+          
+          // Find the JSON with the earliest lastModified date
+          const earliestJson = group.assets.jsons.reduce((earliest, current) => {
+            const earliestDate = earliest.lastModified ? new Date(earliest.lastModified) : new Date(0);
+            const currentDate = current.lastModified ? new Date(current.lastModified) : new Date(0);
+            return earliestDate < currentDate ? earliest : current;
+          });
+          
+          return earliestJson.lastModified ? new Date(earliestJson.lastModified) : new Date(0);
+        };
+
+        const dateA = getEarliestJsonDate(a);
+        const dateB = getEarliestJsonDate(b);
+        
+        if (sortOrder === 'asc') {
+          return dateA.getTime() - dateB.getTime();
+        } else {
+          return dateB.getTime() - dateA.getTime();
+        }
+      } else {
+        // Sort by name
+        console.log(`Comparing names: "${a.name}" vs "${b.name}"`);
+        if (sortOrder === 'asc') {
+          return a.name.localeCompare(b.name);
+        } else {
+          return b.name.localeCompare(a.name);
+        }
+      }
+    });
+
+    return filtered;
+  }, [assetGroups, searchQuery, sortBy, sortOrder]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredAssetGroups.length / itemsPerPage);
@@ -638,6 +688,34 @@ export default function AssetsPage() {
       missingVoices: Math.max(0, renderStatus.requiredVoices - renderStatus.availableVoices),
       missingRewards: Math.max(0, renderStatus.requiredRewards - renderStatus.availableRewards)
     };
+  };
+
+  // Helper function to get the earliest JSON creation date for a group
+  const getEarliestJsonDate = (group: AssetGroup): Date | null => {
+    if (group.assets.jsons.length === 0) {
+      return null;
+    }
+    
+    // Find the JSON with the earliest lastModified date
+    const earliestJson = group.assets.jsons.reduce((earliest, current) => {
+      const earliestDate = earliest.lastModified ? new Date(earliest.lastModified) : new Date(0);
+      const currentDate = current.lastModified ? new Date(current.lastModified) : new Date(0);
+      return earliestDate < currentDate ? earliest : current;
+    });
+    
+    return earliestJson.lastModified ? new Date(earliestJson.lastModified) : null;
+  };
+
+  // Helper function to format date for display
+  const formatDate = (date: Date | null): string => {
+    if (!date) return 'No date';
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const formatFileSize = (bytes: number) => {
@@ -1457,9 +1535,42 @@ export default function AssetsPage() {
             </select>
           </div>
 
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-300">Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'name' | 'createDate')}
+              className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+            >
+              <option value="createDate">Creation Date</option>
+              <option value="name">Name</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-300">Order:</span>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+              className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+            >
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </div>
+
           <div className="flex items-center gap-2 text-sm text-gray-400">
             <span>📁</span>
             <span>{selectedChannel}/{selectedTopic}</span>
+          </div>
+
+          {/* Sort indicator */}
+          <div className="flex items-center gap-2 text-sm text-purple-400 bg-purple-900 bg-opacity-20 px-3 py-1 rounded-lg">
+            <span>🔄</span>
+            <span>
+              {sortBy === 'createDate' ? 'Date' : 'Name'} 
+              ({sortOrder === 'asc' ? 'A→Z' : 'Z→A'})
+            </span>
           </div>
         </div>
       </motion.div>
@@ -1479,7 +1590,7 @@ export default function AssetsPage() {
             const originalRenderStatus = group.renderStatus;
             return (
               <motion.div
-                key={group.key}
+                key={`${group.key}-${sortBy}-${sortOrder}`}
                 layout
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1491,8 +1602,11 @@ export default function AssetsPage() {
                     <div className="flex gap-2 text-sm text-gray-400">
                       <span>🖼️ {group.assets.image ? '1' : '0'} Image</span>
                       <span>🎥 {group.assets.videos.length} Videos</span>
-                      <span>�� {group.assets.jsonAssetPairs.length} JSON-Asset Pairs</span>
+                      <span>📄 {group.assets.jsonAssetPairs.length} JSON-Asset Pairs</span>
                       <span>🏆 {group.assets.rewards.length} Rewards</span>
+                      <span className="text-blue-400">
+                        📅 {formatDate(getEarliestJsonDate(group))}
+                      </span>
                     </div>
                   </div>
                   
