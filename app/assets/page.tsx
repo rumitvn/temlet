@@ -243,7 +243,7 @@ export default function AssetsPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Helper function to extract key and order from filename
-  const extractKeyAndOrder = (filename: string, type: string): { key: string; order?: number } => {
+  const extractKeyAndOrder = (filename: string, type: string, path?: string): { key: string; order?: number } => {
     if (type === 'json') {
       // Extract from format like "bear_1.json" or "blue_tang_1.json"
       // Use a more robust regex that handles multi-word names
@@ -255,18 +255,28 @@ export default function AssetsPage() {
         return { key, order };
       }
     } else if (type === 'voice') {
-      // Extract from format like "bear_1_voice_title.mp3" or "blue_tang_1_voice_title.mp3"
-      const match = filename.match(/^(.+?)_(\d+)_voice_/);
-      if (match) {
-        const key = match[1];
-        const order = parseInt(match[2]);
-        console.log(`Extracted from voice ${filename}: key="${key}", order=${order}`); // Debug log
-        return { key, order };
+      // For voice files, extract the key from the directory path
+      // Voice files are in directories like "voice/buoyancy_1/voice_lesson.mp3"
+      if (path) {
+        // Extract the directory name from the path
+        const pathParts = path.split('/');
+        const voiceDirIndex = pathParts.findIndex(part => part === 'voice');
+        if (voiceDirIndex !== -1 && voiceDirIndex + 1 < pathParts.length) {
+          const dirName = pathParts[voiceDirIndex + 1]; // This should be "buoyancy_1"
+          const dirMatch = dirName.match(/^(.+?)_(\d+)$/);
+          if (dirMatch) {
+            const key = dirMatch[1];
+            const order = parseInt(dirMatch[2]);
+            console.log(`Extracted from voice path ${path}: key="${key}", order=${order}`); // Debug log
+            return { key, order };
+          }
+        }
       }
-      // For voice files without animal prefix, try to extract from path or use a generic key
-      const pathMatch = filename.match(/voice_(.+?)\.mp3/);
-      if (pathMatch) {
-        return { key: 'voice_' + pathMatch[1] };
+      
+      // Fallback: extract from filename if path method fails
+      const match = filename.match(/voice_(.+?)\.mp3/);
+      if (match) {
+        return { key: 'voice_' + match[1] };
       }
     } else {
       // Extract from format like "bear.jpg", "bear.mp4", "blue_tang.jpg"
@@ -412,10 +422,17 @@ export default function AssetsPage() {
       
       // Process assets to add key and order information
       const processedAssets = data.assets.map((asset: Asset) => {
-        const { key, order } = extractKeyAndOrder(asset.name, asset.type);
-        console.log(`Processing asset: ${asset.name} -> key: "${key}", order: ${order}`); // Debug log
+        const { key, order } = extractKeyAndOrder(asset.name, asset.type, asset.path);
+        console.log(`Processing asset: ${asset.name} -> key: "${key}", order: ${order}, path: ${asset.path}`); // Debug log
         return { ...asset, key, order };
       });
+      
+      console.log('=== ASSET PROCESSING DEBUG ===');
+      console.log('Total assets:', processedAssets.length);
+      console.log('JSON files:', processedAssets.filter((a: Asset) => a.type === 'json').map((a: Asset) => a.name));
+      console.log('Voice files:', processedAssets.filter((a: Asset) => a.type === 'voice').map((a: Asset) => a.name));
+      console.log('Image files:', processedAssets.filter((a: Asset) => a.type === 'image').map((a: Asset) => a.name));
+      console.log('Video files:', processedAssets.filter((a: Asset) => a.type === 'video').map((a: Asset) => a.name));
       
       setAssets(processedAssets);
       
@@ -423,22 +440,91 @@ export default function AssetsPage() {
       const groupedAssets = processedAssets.reduce((groups: { [key: string]: AssetGroup }, asset: Asset) => {
         let key = asset.key || 'unknown';
         
-        // For voice files, try to extract the actual animal key from the path
-        if (asset.type === 'voice' && asset.path) {
-          // Extract animal key from path like "C:/.../animals/voice/bear_1/voice_title.mp3" or "blue_tang_1/voice_title.mp3"
-          const pathMatch = asset.path.match(/animals[\/\\]voice[\/\\]([^\/\\]+)[\/\\]/);
-          if (pathMatch) {
-            const fullKey = pathMatch[1]; // This could be "bear_1" or "blue_tang_1"
-            // Extract the animal name part (everything before the last underscore and number)
-            const animalKeyMatch = fullKey.match(/^(.+?)_\d+$/);
-            if (animalKeyMatch) {
-              const animalKey = animalKeyMatch[1]; // This will be "bear" or "blue_tang"
-              if (animalKey && animalKey !== 'voice') {
-                key = animalKey;
-                console.log(`Extracted animal key from voice path: ${fullKey} -> "${animalKey}"`); // Debug log
+        // Special handling for voice files - they should be grouped with their corresponding JSON files
+        if (asset.type === 'voice') {
+          // Voice files are in directories like "voice/buoyancy_1/voice_lesson.mp3"
+          // We need to match them with the corresponding JSON file "buoyancy_1.json"
+          if (asset.path) {
+            const pathParts = asset.path.split('/');
+            const voiceDirIndex = pathParts.findIndex(part => part === 'voice');
+            if (voiceDirIndex !== -1 && voiceDirIndex + 1 < pathParts.length) {
+              const dirName = pathParts[voiceDirIndex + 1]; // This should be "buoyancy_1"
+              const dirMatch = dirName.match(/^(.+?)_(\d+)$/);
+              if (dirMatch) {
+                const voiceKey = dirMatch[1];
+                const voiceOrder = parseInt(dirMatch[2]);
+                
+                // Find the JSON file that matches this key and order
+                const matchingJson = processedAssets.find((a: Asset) => 
+                  a.type === 'json' && 
+                  a.key === voiceKey && 
+                  a.order === voiceOrder
+                );
+                
+                if (matchingJson) {
+                  key = voiceKey;
+                  console.log(`Grouping voice file ${asset.name} with JSON key: "${key}" (matched by directory: ${dirName})`);
+                } else {
+                  // If no matching JSON found, use the voice key
+                  key = voiceKey;
+                  console.log(`No matching JSON found for voice file ${asset.name}, using key: "${key}"`);
+                }
+              } else {
+                // Fallback: use the first available JSON file
+                const firstJson = processedAssets.find((a: Asset) => 
+                  a.type === 'json' && 
+                  a.key && 
+                  a.key !== 'unknown' &&
+                  !a.key.startsWith('voice_')
+                );
+                
+                if (firstJson) {
+                  key = firstJson.key;
+                  console.log(`Grouping voice file ${asset.name} with JSON key: "${key}" (fallback)`);
+                } else {
+                  key = 'voice_files';
+                  console.log(`No JSON files found, grouping voice file ${asset.name} as: "${key}"`);
+                }
+              }
+            } else {
+              // Fallback: use the first available JSON file
+              const firstJson = processedAssets.find((a: Asset) => 
+                a.type === 'json' && 
+                a.key && 
+                a.key !== 'unknown' &&
+                !a.key.startsWith('voice_')
+              );
+              
+              if (firstJson) {
+                key = firstJson.key;
+                console.log(`Grouping voice file ${asset.name} with JSON key: "${key}" (fallback)`);
+              } else {
+                key = 'voice_files';
+                console.log(`No JSON files found, grouping voice file ${asset.name} as: "${key}"`);
               }
             }
+          } else {
+            // Fallback: use the first available JSON file
+            const firstJson = processedAssets.find((a: Asset) => 
+              a.type === 'json' && 
+              a.key && 
+              a.key !== 'unknown' &&
+              !a.key.startsWith('voice_')
+            );
+            
+            if (firstJson) {
+              key = firstJson.key;
+              console.log(`Grouping voice file ${asset.name} with JSON key: "${key}" (fallback)`);
+            } else {
+              key = 'voice_files';
+              console.log(`No JSON files found, grouping voice file ${asset.name} as: "${key}"`);
+            }
           }
+        }
+        
+        // Skip .DS_Store files
+        if (asset.name === '.DS_Store') {
+          return groups;
         }
         
         console.log(`Grouping asset ${asset.name} (${asset.type}) with key: "${key}"`); // Debug log
@@ -695,7 +781,12 @@ export default function AssetsPage() {
       voiceProgress: `${renderStatus.availableVoices}/${renderStatus.requiredVoices}`,
       rewardProgress: `${renderStatus.availableRewards}/${renderStatus.requiredRewards}`,
       missingVoices: Math.max(0, renderStatus.requiredVoices - renderStatus.availableVoices),
-      missingRewards: Math.max(0, renderStatus.requiredRewards - renderStatus.availableRewards)
+      missingRewards: Math.max(0, renderStatus.requiredRewards - renderStatus.availableRewards),
+      // Add image and video status
+      hasImage: renderStatus.hasImage,
+      hasVideos: renderStatus.hasVideos,
+      imageStatus: renderStatus.hasImage ? 'Available' : 'Missing',
+      videoStatus: renderStatus.hasVideos ? 'Available' : 'Missing'
     };
   };
 
@@ -1894,6 +1985,56 @@ export default function AssetsPage() {
                     </div>
                   )}
                   
+                  {/* Image Requirements */}
+                  <div className="mb-3 p-2 bg-gray-800 rounded">
+                    <div className="text-xs font-medium text-blue-400 mb-1">
+                      🖼️ Image: {renderStatus.imageStatus}
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          originalRenderStatus.hasImage 
+                            ? 'bg-green-500' 
+                            : 'bg-red-500'
+                        }`}
+                        style={{ 
+                          width: `${originalRenderStatus.hasImage ? 100 : 0}%` 
+                        }}
+                      ></div>
+                    </div>
+                    <div className="text-xs text-gray-300">
+                      Required: 1 image per subject
+                      {!originalRenderStatus.hasImage && (
+                        <span className="text-red-400 ml-2">Missing: Image file</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Video Requirements */}
+                  <div className="mb-3 p-2 bg-gray-800 rounded">
+                    <div className="text-xs font-medium text-cyan-400 mb-1">
+                      🎥 Videos: {renderStatus.videoStatus}
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          originalRenderStatus.hasVideos 
+                            ? 'bg-green-500' 
+                            : 'bg-red-500'
+                        }`}
+                        style={{ 
+                          width: `${originalRenderStatus.hasVideos ? 100 : 0}%` 
+                        }}
+                      ></div>
+                    </div>
+                    <div className="text-xs text-gray-300">
+                      Required: At least 1 video per subject
+                      {!originalRenderStatus.hasVideos && (
+                        <span className="text-red-400 ml-2">Missing: Video files</span>
+                      )}
+                    </div>
+                  </div>
+                  
                   {/* Voice Requirements */}
                   <div className="mb-3 p-2 bg-gray-800 rounded">
                     <div className="text-xs font-medium text-orange-400 mb-1">
@@ -1963,11 +2104,40 @@ export default function AssetsPage() {
                     >
                       <div className="flex items-center gap-4 mb-4">
                         <span className="text-4xl">🖼️</span>
-                        <span className="text-lg font-semibold text-purple-400">Image</span>
+                        <div className="flex-1">
+                          <span className="text-lg font-semibold text-purple-400">Image</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-900 text-green-300 border border-green-600">
+                              ✅ Available
+                            </span>
+                          </div>
+                        </div>
                       </div>
                       <p className="text-base text-gray-200 truncate mb-3 font-medium">{group.assets.image.name}</p>
                       <p className="text-base text-gray-400 mb-4">{formatFileSize(group.assets.image.size || 0)}</p>
                       <div className="text-base text-gray-300 bg-gray-800 rounded-lg px-4 py-2 text-center hover:bg-gray-700 transition-colors">Click to preview</div>
+                    </div>
+                  )}
+                  
+                  {/* Missing Image Placeholder */}
+                  {!group.assets.image && (
+                    <div className="bg-gray-700 rounded-lg p-6 border border-gray-600 border-dashed">
+                      <div className="flex items-center gap-4 mb-4">
+                        <span className="text-4xl">🖼️</span>
+                        <div className="flex-1">
+                          <span className="text-lg font-semibold text-gray-400">Image</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-900 text-red-300 border border-red-600">
+                              ❌ Missing
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-base text-gray-400 mb-3 font-medium">No image file found</p>
+                      <p className="text-base text-gray-500 mb-4">Required for video rendering</p>
+                      <button className="w-full text-base text-purple-300 bg-purple-900/50 rounded-lg px-4 py-2 text-center hover:bg-purple-900/70 transition-colors border border-purple-600">
+                        🎨 Generate Image
+                      </button>
                     </div>
                   )}
                   
@@ -1980,13 +2150,42 @@ export default function AssetsPage() {
                     >
                       <div className="flex items-center gap-4 mb-4">
                         <span className="text-4xl">🎥</span>
-                        <span className="text-lg font-semibold text-blue-400">Video {index + 1}</span>
+                        <div className="flex-1">
+                          <span className="text-lg font-semibold text-blue-400">Video {index + 1}</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-900 text-green-300 border border-green-600">
+                              ✅ Available
+                            </span>
+                          </div>
+                        </div>
                       </div>
                       <p className="text-base text-gray-200 truncate mb-3 font-medium">{video.name}</p>
                       <p className="text-base text-gray-400 mb-4">{formatFileSize(video.size || 0)}</p>
                       <div className="text-base text-gray-300 bg-gray-800 rounded-lg px-4 py-2 text-center hover:bg-gray-700 transition-colors">Click to play</div>
                     </div>
                   ))}
+                  
+                  {/* Missing Videos Placeholder */}
+                  {group.assets.videos.length === 0 && (
+                    <div className="bg-gray-700 rounded-lg p-6 border border-gray-600 border-dashed">
+                      <div className="flex items-center gap-4 mb-4">
+                        <span className="text-4xl">🎥</span>
+                        <div className="flex-1">
+                          <span className="text-lg font-semibold text-gray-400">Videos</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-900 text-red-300 border border-red-600">
+                              ❌ Missing
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-base text-gray-400 mb-3 font-medium">No video files found</p>
+                      <p className="text-base text-gray-500 mb-4">Required for video rendering</p>
+                      <button className="w-full text-base text-blue-300 bg-blue-900/50 rounded-lg px-4 py-2 text-center hover:bg-blue-900/70 transition-colors border border-blue-600">
+                        🎬 Generate Videos
+                      </button>
+                    </div>
+                  )}
                   
                   {/* JSONs with Voice and Reward Status */}
                   {group.assets.jsonAssetPairs.map((pair, index) => (

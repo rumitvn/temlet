@@ -12,6 +12,10 @@ export async function GET(req: Request) {
       return new NextResponse('Monitoring completed', { status: 200 });
     } catch (error) {
       console.error('Error in cron job:', error);
+      // Return success even if monitoring fails due to database issues
+      if (error instanceof Error && error.message.includes('database')) {
+        return new NextResponse('Monitoring skipped - database not available', { status: 200 });
+      }
       return new NextResponse('Internal Server Error', { status: 500 });
     }
   }
@@ -30,6 +34,10 @@ export async function GET(req: Request) {
     return new NextResponse('Monitoring completed', { status: 200 });
   } catch (error) {
     console.error('Error in cron job:', error);
+    // Return success even if monitoring fails due to database issues
+    if (error instanceof Error && error.message.includes('database')) {
+      return new NextResponse('Monitoring skipped - database not available', { status: 200 });
+    }
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 } 

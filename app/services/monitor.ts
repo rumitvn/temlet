@@ -30,6 +30,14 @@ function mapNexrenderStatus(nexrenderState: string): string {
 // Background monitoring function
 export async function startMonitoring() {
   try {
+    // Check if database is available
+    try {
+      await prisma.$connect();
+    } catch (dbError) {
+      console.log('Database not available, skipping monitoring:', dbError);
+      return;
+    }
+
     // Get all renders that need monitoring
     const renders = await prisma.renderItem.findMany({
       where: {
@@ -143,5 +151,12 @@ export async function startMonitoring() {
     }
   } catch (error) {
     console.error('Error in monitoring:', error);
+  } finally {
+    // Always disconnect from database
+    try {
+      await prisma.$disconnect();
+    } catch (disconnectError) {
+      console.log('Error disconnecting from database:', disconnectError);
+    }
   }
 }
