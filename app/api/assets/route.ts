@@ -13,7 +13,7 @@ const getAssetPaths = () => config.getAssetPaths(DEFAULT_CHANNEL, DEFAULT_TOPIC)
 interface Asset {
   id: string;
   name: string;
-  type: 'voice' | 'image' | 'video' | 'json';
+  type: 'voice' | 'image' | 'video' | 'json' | 'other';
   category: string;
   path: string;
   size?: number;
@@ -56,7 +56,7 @@ async function scanDirectory(dirPath: string, category: string): Promise<Asset[]
       } else if (entry.isFile()) {
         // Determine file type based on extension
         const ext = path.extname(entry.name).toLowerCase();
-        let type: 'voice' | 'image' | 'video' | 'json' = 'json';
+        let type: 'voice' | 'image' | 'video' | 'json' | 'other' = 'other';
         
         if (['.mp3', '.wav', '.aac'].includes(ext)) {
           type = 'voice';
@@ -64,20 +64,25 @@ async function scanDirectory(dirPath: string, category: string): Promise<Asset[]
           type = 'image';
         } else if (['.mp4', '.avi', '.mov', '.wmv'].includes(ext)) {
           type = 'video';
+        } else if (ext === '.json') {
+          type = 'json';
         }
         
-        const stats = await getFileStats(fullPath);
-        
-        assets.push({
-          id: `${category}_${entry.name}_${Date.now()}`,
-          name: entry.name,
-          type,
-          category,
-          path: fullPath,
-          size: stats.size,
-          lastModified: stats.lastModified,
-          status: stats.exists ? 'available' : 'missing'
-        });
+        // Only include files that match expected asset types
+        if (type !== 'other') {
+          const stats = await getFileStats(fullPath);
+          
+          assets.push({
+            id: `${category}_${entry.name}_${Date.now()}`,
+            name: entry.name,
+            type,
+            category,
+            path: fullPath,
+            size: stats.size,
+            lastModified: stats.lastModified,
+            status: stats.exists ? 'available' : 'missing'
+          });
+        }
       }
     }
   } catch (error) {
@@ -170,7 +175,7 @@ export async function POST(req: NextRequest) {
         
         // Determine file type
         const ext = path.extname(fileName).toLowerCase();
-        let type: 'voice' | 'image' | 'video' | 'json' = 'json';
+        let type: 'voice' | 'image' | 'video' | 'json' | 'other' = 'other';
         
         if (['.mp3', '.wav', '.aac'].includes(ext)) {
           type = 'voice';
@@ -178,18 +183,23 @@ export async function POST(req: NextRequest) {
           type = 'image';
         } else if (['.mp4', '.avi', '.mov', '.wmv'].includes(ext)) {
           type = 'video';
+        } else if (ext === '.json') {
+          type = 'json';
         }
         
-        uploadedAssets.push({
-          id: `${category}_${fileName}_${Date.now()}`,
-          name: fileName,
-          type,
-          category,
-          path: filePath,
-          size: stats.size,
-          lastModified: stats.lastModified,
-          status: 'available'
-        });
+        // Only process files that match expected asset types
+        if (type !== 'other') {
+          uploadedAssets.push({
+            id: `${category}_${fileName}_${Date.now()}`,
+            name: fileName,
+            type,
+            category,
+            path: filePath,
+            size: stats.size,
+            lastModified: stats.lastModified,
+            status: 'available'
+          });
+        }
       } catch (error) {
         console.error(`Error uploading file ${file.name}:`, error);
       }

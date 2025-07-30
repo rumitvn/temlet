@@ -79,6 +79,14 @@ interface JSONAssetPair {
     lesson: boolean;
     reward: boolean;
   };
+  // Quiz 3 image options status
+  quiz3ImageOptions: {
+    options: string[];
+    availableImages: string[];
+    missingImages: string[];
+    hasAllImages: boolean;
+    completionRate: number;
+  };
 }
 
 interface AssetGroup {
@@ -103,6 +111,10 @@ interface AssetGroup {
     requiredRewards: number; // 1 reward per JSON
     availableRewards: number;
     jsonOrders: number[]; // Which JSON orders exist (1, 2, 3, etc.)
+    // Quiz 3 image options status
+    hasQuiz3Images: boolean;
+    requiredQuiz3Images: number; // 4 images per JSON
+    availableQuiz3Images: number;
   };
 }
 
@@ -178,7 +190,7 @@ export default function AssetsPage() {
 
   // Sorting state
   const [sortBy, setSortBy] = useState<'name' | 'createDate'>('createDate');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Filter options
   const channelOptions = [
@@ -296,7 +308,8 @@ export default function AssetsPage() {
 
 
   // Helper function to organize JSON files with their corresponding voices and rewards
-  const organizeJSONAssetPairs = (jsons: Asset[], voices: Asset[], rewards: Asset[]): JSONAssetPair[] => {
+  const organizeJSONAssetPairs = (jsons: Asset[], voices: Asset[], rewards: Asset[], allImages: Asset[], jsonOptionsMap: Map<string, string[]> = new Map()): JSONAssetPair[] => {
+    console.log('🔧 organizeJSONAssetPairs called with:', jsons.length, 'JSONs');
     return jsons.map(json => {
       const jsonOrder = json.order;
       const jsonKey = json.key;
@@ -356,28 +369,42 @@ export default function AssetsPage() {
 
       const missingVoices: string[] = [];
 
+      console.log(`🔍 Checking voices for ${json.name} (${jsonKey}_${jsonOrder}):`, matchingVoices.map(v => v.name));
+      
       matchingVoices.forEach(voice => {
         const voiceName = voice.name.toLowerCase();
+        console.log(`🎵 Processing voice: ${voice.name} (${voiceName})`);
         
-        // Match the actual naming pattern from the image
-        if (voiceName.includes('voice_title')) {
+        // EXACT filename matching - no partial matches allowed
+        if (voiceName === 'voice_title.mp3') {
           voiceTypes.intro = true;
-        } else if (voiceName.includes('voice_q1_title')) {
+          console.log(`  ✅ Matched intro (exact match)`);
+        } else if (voiceName === 'voice_q1_title.mp3') {
           voiceTypes.quiz1_question = true;
-        } else if (voiceName.includes('voice_q1_ans')) {
+          console.log(`  ✅ Matched quiz1_question (exact match)`);
+        } else if (voiceName === 'voice_q1_ans.mp3') {
           voiceTypes.quiz1_answer = true;
-        } else if (voiceName.includes('voice_q2_title')) {
+          console.log(`  ✅ Matched quiz1_answer (exact match)`);
+        } else if (voiceName === 'voice_q2_title.mp3') {
           voiceTypes.quiz2_question = true;
-        } else if (voiceName.includes('voice_q2_ans')) {
+          console.log(`  ✅ Matched quiz2_question (exact match)`);
+        } else if (voiceName === 'voice_q2_ans.mp3') {
           voiceTypes.quiz2_answer = true;
-        } else if (voiceName.includes('voice_q3_title')) {
+          console.log(`  ✅ Matched quiz2_answer (exact match)`);
+        } else if (voiceName === 'voice_q3_title.mp3') {
           voiceTypes.quiz3_question = true;
-        } else if (voiceName.includes('voice_q3_ans')) {
+          console.log(`  ✅ Matched quiz3_question (exact match)`);
+        } else if (voiceName === 'voice_q3_ans.mp3') {
           voiceTypes.quiz3_answer = true;
-        } else if (voiceName.includes('voice_lesson')) {
+          console.log(`  ✅ Matched quiz3_answer (exact match)`);
+        } else if (voiceName === 'voice_lesson.mp3') {
           voiceTypes.lesson = true;
-        } else if (voiceName.includes('voice_reward')) {
+          console.log(`  ✅ Matched lesson (exact match)`);
+        } else if (voiceName === 'voice_reward.mp3') {
           voiceTypes.reward = true;
+          console.log(`  ✅ Matched reward (exact match)`);
+        } else {
+          console.log(`  ❌ No exact match for voice: ${voice.name} (expected exact filename)`);
         }
       });
 
@@ -392,8 +419,19 @@ export default function AssetsPage() {
       if (!voiceTypes.lesson) missingVoices.push('lesson');
       if (!voiceTypes.reward) missingVoices.push('reward');
 
+      console.log(`📊 Voice types status for ${json.name}:`, voiceTypes);
+      console.log(`❌ Missing voices for ${json.name}:`, missingVoices);
+
       const hasAllVoices = missingVoices.length === 0;
       const hasReward = !!matchingReward;
+
+      // Check quiz 3 image options using pre-loaded JSON content
+      const normalizedPath = json.path.replace(/\\/g, '/');
+      const jsonOptions = jsonOptionsMap.get(normalizedPath) || [];
+      console.log(`🔍 Looking for options for ${json.name} at path: ${normalizedPath}`);
+      console.log(`📋 Found options:`, jsonOptions);
+      console.log(`🔑 JSON key: ${json.key}, order: ${json.order}`);
+      const quiz3ImageOptions = checkQuiz3ImageOptions(json, allImages, jsonOptions);
 
       return {
         json,
@@ -402,12 +440,182 @@ export default function AssetsPage() {
         hasAllVoices,
         hasReward,
         missingVoices,
-        voiceTypes
+        voiceTypes,
+        quiz3ImageOptions
       };
     });
   };
 
+  // Function to pre-load JSON content for quiz 3 options
+  const loadJSONContentBatch = async (jsonAssets: Asset[]) => {
+    console.log('🔧 loadJSONContentBatch called for:', jsonAssets.length, 'files');
+    try {
+      if (jsonAssets.length === 0) {
+        return new Map<string, string[]>();
+      }
+
+      const paths = jsonAssets.map(asset => asset.path);
+      console.log(`📄 Loading JSON content for ${jsonAssets.length} files`);
+      
+      const response = await fetch('/api/assets/json-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          paths,
+          channel: selectedChannel,
+          topic: selectedTopic
+        })
+      });
+      
+      console.log(`📡 Response status: ${response.status}, ok: ${response.ok}`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`✅ Batch loaded JSON content for ${Object.keys(result).length} files`);
+        
+        // Convert the result to a Map for easier lookup
+        const jsonOptionsMap = new Map<string, string[]>();
+        for (const [path, data] of Object.entries(result)) {
+          const normalizedPath = path.replace(/\\/g, '/');
+          const typedData = data as { options?: string[]; error?: string };
+          if ('options' in typedData && Array.isArray(typedData.options)) {
+            // Find the corresponding JSON asset
+            const jsonAsset = jsonAssets.find(asset => 
+              asset.path.replace(/\\/g, '/') === normalizedPath
+            );
+            
+            if (jsonAsset) {
+              // Get valid options without modifying the JSON file
+              const optionsInfo = getValidOptionsForAvailableImages(jsonAsset, assets, typedData.options);
+              jsonOptionsMap.set(normalizedPath, optionsInfo.originalOptions);
+              console.log(`🎯 Quiz 3 options for ${path}:`, optionsInfo.originalOptions);
+              if (optionsInfo.hasMismatch) {
+                console.log(`⚠️ Warning: JSON has ${optionsInfo.originalOptions.length - optionsInfo.validOptions.length} invalid options`);
+              }
+            } else {
+              jsonOptionsMap.set(normalizedPath, typedData.options);
+              console.log(`🎯 Quiz 3 options for ${path}:`, typedData.options);
+            }
+          } else if ('error' in typedData) {
+            console.error(`❌ Error loading ${path}:`, typedData.error);
+            jsonOptionsMap.set(normalizedPath, []);
+          }
+        }
+        
+        console.log('📊 Final JSON options map size:', jsonOptionsMap.size);
+        console.log('📊 JSON options map keys:', Array.from(jsonOptionsMap.keys()));
+        
+        return jsonOptionsMap;
+      } else {
+        console.error(`❌ Failed to load JSON content batch:`, response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('❌ Error loading JSON content batch:', error);
+    }
+    return new Map<string, string[]>();
+  };
+
+  // Function to check quiz 3 image options availability (synchronous version)
+  const checkQuiz3ImageOptions = (jsonAsset: Asset, allImages: Asset[], jsonOptions: string[] = []) => {
+    console.log('🔧 checkQuiz3ImageOptions called for:', jsonAsset.name, 'with options:', jsonOptions);
+    console.log('🔍 Available images in options folder:', allImages.filter(img => img.path.includes('options')).map(img => img.name));
+    try {
+      const options = jsonOptions.length > 0 ? jsonOptions : [];
+      
+      // Check which images are available in the options folder
+      const availableImages: string[] = [];
+      const missingImages: string[] = [];
+
+      options.forEach((option: string) => {
+        // Look for images in the options folder with exact name matching
+        const optionImage = allImages.find(img => {
+          if (img.type !== 'image' || !img.path.includes('options')) {
+            return false;
+          }
+          
+          // Get the filename without extension
+          const fileNameWithoutExt = img.name.replace(/\.(jpg|jpeg|png|gif|bmp)$/i, '');
+          
+          // Check for exact match (case-insensitive)
+          return fileNameWithoutExt.toLowerCase() === option.toLowerCase();
+        });
+        
+        if (optionImage) {
+          availableImages.push(option);
+          console.log(`✅ Found image for option "${option}": ${optionImage.name}`);
+        } else {
+          missingImages.push(option);
+          console.log(`❌ Missing image for option "${option}"`);
+        }
+      });
+
+      const hasAllImages = missingImages.length === 0;
+      const completionRate = options.length > 0 ? (availableImages.length / options.length) * 100 : 0;
+
+      console.log(`📊 Quiz 3 image options summary for ${jsonAsset.name}:`);
+      console.log(`  Available: ${availableImages.length}/${options.length}`);
+      console.log(`  Missing: ${missingImages.length}`);
+      console.log(`  Available images:`, availableImages);
+      console.log(`  Missing images:`, missingImages);
+
+      return {
+        options,
+        availableImages,
+        missingImages,
+        hasAllImages,
+        completionRate
+      };
+    } catch (error) {
+      console.error('Error checking quiz 3 image options:', error);
+      return {
+        options: [],
+        availableImages: [],
+        missingImages: [],
+        hasAllImages: false,
+        completionRate: 0
+      };
+    }
+  };
+
+  const getValidOptionsForAvailableImages = (jsonAsset: Asset, allImages: Asset[], jsonOptions: string[]) => {
+    console.log('🔧 getValidOptionsForAvailableImages called for:', jsonAsset.name);
+    
+    // Get available images in options folder
+    const availableOptionImages = allImages.filter(img => 
+      img.type === 'image' && img.path.includes('options')
+    );
+    
+    console.log('📸 Available option images:', availableOptionImages.map(img => img.name));
+    
+    // Get the base names of available images (without extension)
+    const availableOptions = availableOptionImages.map(img => 
+      img.name.replace(/\.(jpg|jpeg|png|gif|bmp)$/i, '').toLowerCase()
+    );
+    
+    console.log('📋 Available options (base names):', availableOptions);
+    
+    // Filter JSON options to only include those that have corresponding images
+    const validOptions = jsonOptions.filter(option => 
+      availableOptions.includes(option.toLowerCase())
+    );
+    
+    console.log('✅ Valid options (with images):', validOptions);
+    console.log('❌ Invalid options (no images):', jsonOptions.filter(option => 
+      !availableOptions.includes(option.toLowerCase())
+    ));
+    
+    // Return the original options but mark which ones are valid
+    return {
+      originalOptions: jsonOptions,
+      validOptions: validOptions,
+      hasMismatch: validOptions.length !== jsonOptions.length
+    };
+  };
+
   const fetchAssets = useCallback(async (searchTerm?: string, isSearch = false) => {
+    console.log('🚀 fetchAssets called with:', { searchTerm, isSearch, selectedChannel, selectedTopic });
     try {
       if (isSearch) {
         setSearching(true);
@@ -555,7 +763,11 @@ export default function AssetsPage() {
               availableVoices: 0,
               requiredRewards: 0,
               availableRewards: 0,
-              jsonOrders: []
+              jsonOrders: [],
+              // Quiz 3 image options status
+              hasQuiz3Images: false,
+              requiredQuiz3Images: 0,
+              availableQuiz3Images: 0
             }
           };
         }
@@ -578,14 +790,11 @@ export default function AssetsPage() {
           groups[key].assets.jsons.push(asset);
         }
         
-        // Update render status
+        // Update basic render status (JSON orders, basic asset presence)
         if (asset.type === 'image' && asset.category === 'image') {
           groups[key].renderStatus.hasImage = true;
         } else if (asset.type === 'video' && asset.category === 'video') {
           groups[key].renderStatus.hasVideos = true;
-        } else if (asset.type === 'voice') {
-          groups[key].renderStatus.hasVoices = true;
-          groups[key].renderStatus.availableVoices++;
         } else if (asset.type === 'json') {
           groups[key].renderStatus.hasJson = true;
           // Extract order from JSON filename (e.g., "alligator_1.json" -> 1)
@@ -604,25 +813,153 @@ export default function AssetsPage() {
         const jsonCount = groups[key].renderStatus.jsonOrders.length;
         groups[key].renderStatus.requiredVoices = jsonCount * 9; // 9 voices per JSON
         groups[key].renderStatus.requiredRewards = jsonCount; // 1 reward per JSON
-        
-        // Check if complete (has all required assets)
-        const hasRequiredAssets = groups[key].renderStatus.hasJson && 
-                                 groups[key].renderStatus.hasImage && 
-                                 groups[key].renderStatus.hasVideos && 
-                                 groups[key].renderStatus.availableVoices >= groups[key].renderStatus.requiredVoices &&
-                                 groups[key].renderStatus.availableRewards >= groups[key].renderStatus.requiredRewards;
-        groups[key].renderStatus.isComplete = hasRequiredAssets;
+        groups[key].renderStatus.requiredQuiz3Images = jsonCount * 4; // 4 images per JSON for quiz 3 options
         
         return groups;
       }, {});
+      
+      // Pre-load JSON content for quiz 3 options
+      const jsonAssets = processedAssets.filter((asset: Asset) => asset.type === 'json');
+      
+      console.log('=== JSON LOADING DEBUG ===');
+      console.log('Search term:', searchTerm);
+      console.log('Total JSON assets found:', jsonAssets.length);
+      console.log('JSON assets:', jsonAssets.map((a: Asset) => ({ name: a.name, path: a.path, key: a.key })));
+      
+      // Load JSON content for all JSON files in a single batch request
+      const jsonOptionsMap = await loadJSONContentBatch(jsonAssets);
+
+      console.log('=== JSON OPTIONS MAP ===');
+      console.log('Map size:', jsonOptionsMap.size);
+      for (const [path, options] of jsonOptionsMap.entries()) {
+        console.log(`Path: ${path} -> Options:`, options);
+      }
+      
+      // Debug: Show what paths we're looking for
+      console.log('=== PATH DEBUG ===');
+      jsonAssets.forEach((asset: Asset) => {
+        const normalizedPath = asset.path.replace(/\\/g, '/');
+        console.log(`Asset: ${asset.name}`);
+        console.log(`  Original path: ${asset.path}`);
+        console.log(`  Normalized path: ${normalizedPath}`);
+        console.log(`  In map: ${jsonOptionsMap.has(normalizedPath)}`);
+      });
+
+      // For quiz 3 image checking and voice checking, we need ALL available assets, not just search results
+      // So we'll load all assets separately for this purpose
+      let allImagesForChecking: Asset[] = [];
+      let allVoicesForChecking: Asset[] = [];
+      
+      if (searchTerm) {
+        // If searching, we need to get all assets for checking
+        try {
+          const allAssetsResponse = await fetch(`/api/assets?channel=${selectedChannel}&topic=${selectedTopic}`);
+          if (allAssetsResponse.ok) {
+            const allAssetsData = await allAssetsResponse.json();
+            const allAssets = allAssetsData.assets.map((asset: Asset) => {
+              const { key, order } = extractKeyAndOrder(asset.name, asset.type, asset.path);
+              return { ...asset, key, order };
+            });
+            
+            allImagesForChecking = allAssets.filter((asset: Asset) => asset.type === 'image');
+            allVoicesForChecking = allAssets.filter((asset: Asset) => asset.type === 'voice');
+          }
+        } catch (error) {
+          console.error('Error loading all assets for checking:', error);
+          allImagesForChecking = processedAssets.filter((asset: Asset) => asset.type === 'image');
+          allVoicesForChecking = processedAssets.filter((asset: Asset) => asset.type === 'voice');
+        }
+      } else {
+        // If not searching, use the current processed assets
+        allImagesForChecking = processedAssets.filter((asset: Asset) => asset.type === 'image');
+        allVoicesForChecking = processedAssets.filter((asset: Asset) => asset.type === 'voice');
+      }
+      
+      console.log('🔍 Images available for quiz 3 checking:', allImagesForChecking.length);
+      console.log('🎵 Voices available for checking:', allVoicesForChecking.length);
+      
+      // Now calculate the complete render status using the complete asset lists
+      Object.values(groupedAssets).forEach((group) => {
+        const groupKey = (group as AssetGroup).key;
+        
+        // Calculate voice availability from complete voice list with EXACT filename matching
+        const groupVoices = allVoicesForChecking.filter(voice => voice.key === groupKey);
+        (group as AssetGroup).renderStatus.hasVoices = groupVoices.length > 0;
+        
+        // Count only voices with exact correct filenames
+        let validVoiceCount = 0;
+        groupVoices.forEach(voice => {
+          const voiceName = voice.name.toLowerCase();
+          // Check for exact filename matches only
+          if (voiceName === 'voice_title.mp3' ||
+              voiceName === 'voice_q1_title.mp3' ||
+              voiceName === 'voice_q1_ans.mp3' ||
+              voiceName === 'voice_q2_title.mp3' ||
+              voiceName === 'voice_q2_ans.mp3' ||
+              voiceName === 'voice_q3_title.mp3' ||
+              voiceName === 'voice_q3_ans.mp3' ||
+              voiceName === 'voice_lesson.mp3' ||
+              voiceName === 'voice_reward.mp3') {
+            validVoiceCount++;
+          }
+        });
+        
+        (group as AssetGroup).renderStatus.availableVoices = validVoiceCount;
+        
+        // Calculate quiz 3 image availability from complete image list
+        const groupQuiz3Images = allImagesForChecking.filter(img => 
+          img.category === 'options' && img.key === groupKey
+        );
+        (group as AssetGroup).renderStatus.hasQuiz3Images = groupQuiz3Images.length > 0;
+        (group as AssetGroup).renderStatus.availableQuiz3Images = groupQuiz3Images.length;
+        
+        // Check if complete (has all required assets)
+        const hasRequiredAssets = (group as AssetGroup).renderStatus.hasJson && 
+                                 (group as AssetGroup).renderStatus.hasImage && 
+                                 (group as AssetGroup).renderStatus.hasVideos && 
+                                 (group as AssetGroup).renderStatus.availableVoices >= (group as AssetGroup).renderStatus.requiredVoices &&
+                                 (group as AssetGroup).renderStatus.availableRewards >= (group as AssetGroup).renderStatus.requiredRewards &&
+                                 (group as AssetGroup).renderStatus.availableQuiz3Images >= (group as AssetGroup).renderStatus.requiredQuiz3Images;
+        (group as AssetGroup).renderStatus.isComplete = hasRequiredAssets;
+        
+        console.log(`📊 Render status for ${groupKey}:`, {
+          totalVoices: groupVoices.length,
+          validVoices: validVoiceCount,
+          requiredVoices: (group as AssetGroup).renderStatus.requiredVoices,
+          availableQuiz3Images: (group as AssetGroup).renderStatus.availableQuiz3Images,
+          requiredQuiz3Images: (group as AssetGroup).renderStatus.requiredQuiz3Images
+        });
+      });
       
       // Organize JSON-Asset pairs for each group
       Object.values(groupedAssets).forEach((group) => {
         (group as AssetGroup).assets.jsonAssetPairs = organizeJSONAssetPairs(
           (group as AssetGroup).assets.jsons, 
-          (group as AssetGroup).assets.voices, 
-          (group as AssetGroup).assets.rewards
+          allVoicesForChecking, // Always use complete voice list for checking
+          (group as AssetGroup).assets.rewards,
+          allImagesForChecking, // Always use complete image list for quiz 3 checking
+          jsonOptionsMap
         );
+        
+        // Calculate quiz 3 image options status
+        const groupAsAssetGroup = group as AssetGroup;
+        let totalAvailableQuiz3Images = 0;
+        let hasQuiz3Images = false;
+        
+        groupAsAssetGroup.assets.jsonAssetPairs.forEach(pair => {
+          if (pair.quiz3ImageOptions.hasAllImages) {
+            totalAvailableQuiz3Images += pair.quiz3ImageOptions.options.length; // Use actual options length
+            hasQuiz3Images = true;
+          } else {
+            totalAvailableQuiz3Images += pair.quiz3ImageOptions.availableImages.length;
+            if (pair.quiz3ImageOptions.availableImages.length > 0) {
+              hasQuiz3Images = true;
+            }
+          }
+        });
+        
+        groupAsAssetGroup.renderStatus.availableQuiz3Images = totalAvailableQuiz3Images;
+        groupAsAssetGroup.renderStatus.hasQuiz3Images = hasQuiz3Images;
       });
       
       setAssetGroups(Object.values(groupedAssets));
@@ -641,11 +978,13 @@ export default function AssetsPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchQuery.trim()) {
+        console.log('🔍 Triggering server-side search for:', searchQuery);
         fetchAssets(searchQuery, true); // isSearch = true
       } else {
+        console.log('🔄 Resetting to all assets');
         fetchAssets('', true); // Reset to all assets, but still use search state
       }
-    }, 300); // 300ms delay
+    }, 500); // Increased delay to 500ms for better typing experience
 
     return () => clearTimeout(timer);
   }, [searchQuery, fetchAssets]);
@@ -675,55 +1014,105 @@ export default function AssetsPage() {
 
   // Client-side filtered asset groups for immediate search feedback
   const filteredAssetGroups = useMemo(() => {
-    let filtered = assetGroups.filter(group => 
-      searchQuery === '' || 
-      group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      group.assets.jsons.some(json => json.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      group.assets.videos.some(video => video.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      group.assets.voices.some(voice => voice.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    // If there's a search query, use the server-side search results (assetGroups)
+    // instead of client-side filtering to ensure proper JSON content
+    if (searchQuery.trim()) {
+      console.log('🔍 Using server-side search results for query:', searchQuery);
+      let filtered = assetGroups.filter(group => 
+        group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        group.assets.jsons.some(json => json.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        group.assets.videos.some(video => video.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        group.assets.voices.some(voice => voice.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
 
-    // Sort the filtered groups
-    console.log(`Sorting by: ${sortBy}, Order: ${sortOrder}, Groups: ${filtered.length}`);
-    filtered.sort((a, b) => {
-      if (sortBy === 'createDate') {
-        // Get the earliest JSON file creation date for each group
-        const getEarliestJsonDate = (group: AssetGroup): Date => {
-          if (group.assets.jsons.length === 0) {
-            // If no JSON files, use a very old date to push to the end
-            return new Date(0);
+      // Sort the filtered groups
+      console.log(`Sorting server-side results by: ${sortBy}, Order: ${sortOrder}, Groups: ${filtered.length}`);
+      filtered.sort((a, b) => {
+        if (sortBy === 'createDate') {
+          // Get the earliest JSON file creation date for each group
+          const getEarliestJsonDate = (group: AssetGroup): Date => {
+            if (group.assets.jsons.length === 0) {
+              // If no JSON files, use a very old date to push to the end
+              return new Date(0);
+            }
+            
+            // Find the JSON with the earliest lastModified date
+            const earliestJson = group.assets.jsons.reduce((earliest, current) => {
+              const earliestDate = earliest.lastModified ? new Date(earliest.lastModified) : new Date(0);
+              const currentDate = current.lastModified ? new Date(current.lastModified) : new Date(0);
+              return earliestDate < currentDate ? earliest : current;
+            });
+            
+            return earliestJson.lastModified ? new Date(earliestJson.lastModified) : new Date(0);
+          };
+
+          const dateA = getEarliestJsonDate(a);
+          const dateB = getEarliestJsonDate(b);
+          
+          if (sortOrder === 'asc') {
+            return dateA.getTime() - dateB.getTime();
+          } else {
+            return dateB.getTime() - dateA.getTime();
           }
-          
-          // Find the JSON with the earliest lastModified date
-          const earliestJson = group.assets.jsons.reduce((earliest, current) => {
-            const earliestDate = earliest.lastModified ? new Date(earliest.lastModified) : new Date(0);
-            const currentDate = current.lastModified ? new Date(current.lastModified) : new Date(0);
-            return earliestDate < currentDate ? earliest : current;
-          });
-          
-          return earliestJson.lastModified ? new Date(earliestJson.lastModified) : new Date(0);
-        };
-
-        const dateA = getEarliestJsonDate(a);
-        const dateB = getEarliestJsonDate(b);
-        
-        if (sortOrder === 'asc') {
-          return dateA.getTime() - dateB.getTime();
         } else {
-          return dateB.getTime() - dateA.getTime();
+          // Sort by name
+          console.log(`Comparing names: "${a.name}" vs "${b.name}"`);
+          if (sortOrder === 'asc') {
+            return a.name.localeCompare(b.name);
+          } else {
+            return b.name.localeCompare(a.name);
+          }
         }
-      } else {
-        // Sort by name
-        console.log(`Comparing names: "${a.name}" vs "${b.name}"`);
-        if (sortOrder === 'asc') {
-          return a.name.localeCompare(b.name);
-        } else {
-          return b.name.localeCompare(a.name);
-        }
-      }
-    });
+      });
 
-    return filtered;
+      return filtered;
+    } else {
+      // No search query, use all asset groups with client-side filtering for sorting only
+      console.log('📋 No search query, using all asset groups');
+      let filtered = assetGroups;
+
+      // Sort the filtered groups
+      console.log(`Sorting all groups by: ${sortBy}, Order: ${sortOrder}, Groups: ${filtered.length}`);
+      filtered.sort((a, b) => {
+        if (sortBy === 'createDate') {
+          // Get the earliest JSON file creation date for each group
+          const getEarliestJsonDate = (group: AssetGroup): Date => {
+            if (group.assets.jsons.length === 0) {
+              // If no JSON files, use a very old date to push to the end
+              return new Date(0);
+            }
+            
+            // Find the JSON with the earliest lastModified date
+            const earliestJson = group.assets.jsons.reduce((earliest, current) => {
+              const earliestDate = earliest.lastModified ? new Date(earliest.lastModified) : new Date(0);
+              const currentDate = current.lastModified ? new Date(current.lastModified) : new Date(0);
+              return earliestDate < currentDate ? earliest : current;
+            });
+            
+            return earliestJson.lastModified ? new Date(earliestJson.lastModified) : new Date(0);
+          };
+
+          const dateA = getEarliestJsonDate(a);
+          const dateB = getEarliestJsonDate(b);
+          
+          if (sortOrder === 'asc') {
+            return dateA.getTime() - dateB.getTime();
+          } else {
+            return dateB.getTime() - dateA.getTime();
+          }
+        } else {
+          // Sort by name
+          console.log(`Comparing names: "${a.name}" vs "${b.name}"`);
+          if (sortOrder === 'asc') {
+            return a.name.localeCompare(b.name);
+          } else {
+            return b.name.localeCompare(a.name);
+          }
+        }
+      });
+
+      return filtered;
+    }
   }, [assetGroups, searchQuery, sortBy, sortOrder]);
 
   // Pagination logic
@@ -762,14 +1151,16 @@ export default function AssetsPage() {
     if (renderStatus.hasVideos) statuses.push('🎥 Videos');
     if (renderStatus.hasVoices) statuses.push(`🎵 Voices (${renderStatus.availableVoices}/${renderStatus.requiredVoices})`);
     if (renderStatus.availableRewards > 0) statuses.push(`🏆 Rewards (${renderStatus.availableRewards}/${renderStatus.requiredRewards})`);
+    if (renderStatus.hasQuiz3Images) statuses.push(`🖼️ Quiz 3 Images (${renderStatus.availableQuiz3Images}/${renderStatus.requiredQuiz3Images})`);
     
     // Calculate completion rate based on all requirements
-    const totalRequirements = 4; // JSON, Image, Videos, Voices
+    const totalRequirements = 5; // JSON, Image, Videos, Voices+Rewards, Quiz 3 Images
     const metRequirements = [
       renderStatus.hasJson,
       renderStatus.hasImage,
       renderStatus.hasVideos,
-      renderStatus.availableVoices >= renderStatus.requiredVoices && renderStatus.availableRewards >= renderStatus.requiredRewards
+      renderStatus.availableVoices >= renderStatus.requiredVoices && renderStatus.availableRewards >= renderStatus.requiredRewards,
+      renderStatus.availableQuiz3Images >= renderStatus.requiredQuiz3Images
     ].filter(Boolean).length;
     
     const completionRate = Math.round((metRequirements / totalRequirements) * 100);
@@ -791,7 +1182,10 @@ export default function AssetsPage() {
       hasImage: renderStatus.hasImage,
       hasVideos: renderStatus.hasVideos,
       imageStatus: renderStatus.hasImage ? 'Available' : 'Missing',
-      videoStatus: renderStatus.hasVideos ? 'Available' : 'Missing'
+      videoStatus: renderStatus.hasVideos ? 'Available' : 'Missing',
+      // Add quiz 3 image options status
+      quiz3ImageProgress: `${renderStatus.availableQuiz3Images}/${renderStatus.requiredQuiz3Images}`,
+      missingQuiz3Images: Math.max(0, renderStatus.requiredQuiz3Images - renderStatus.availableQuiz3Images)
     };
   };
 
@@ -1689,7 +2083,9 @@ export default function AssetsPage() {
               updatedGroup.assets.jsonAssetPairs = organizeJSONAssetPairs(
                 updatedGroup.assets.jsons, 
                 updatedGroup.assets.voices, 
-                updatedGroup.assets.rewards
+                updatedGroup.assets.rewards,
+                assets.filter(asset => asset.type === 'image'),
+                new Map() // Empty map for this case since we don't need to reload JSON content
               );
               
               return updatedGroup;
@@ -2205,6 +2601,31 @@ export default function AssetsPage() {
                     </div>
                   </div>
                   
+                  {/* Quiz 3 Image Options Requirements */}
+                  <div className="mb-3 p-2 bg-gray-800 rounded">
+                    <div className="text-xs font-medium text-purple-400 mb-1">
+                      🖼️ Quiz 3 Image Options: {renderStatus.quiz3ImageProgress}
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          originalRenderStatus.availableQuiz3Images >= originalRenderStatus.requiredQuiz3Images 
+                            ? 'bg-green-500' 
+                            : 'bg-purple-500'
+                        }`}
+                        style={{ 
+                          width: `${Math.min(100, (originalRenderStatus.availableQuiz3Images / originalRenderStatus.requiredQuiz3Images) * 100)}%` 
+                        }}
+                      ></div>
+                    </div>
+                    <div className="text-xs text-gray-300">
+                      Required: {originalRenderStatus.requiredQuiz3Images} images ({renderStatus.jsonCount} JSONs × 4 images each)
+                      {renderStatus.missingQuiz3Images > 0 && (
+                        <span className="text-red-400 ml-2">Missing: {renderStatus.missingQuiz3Images}</span>
+                      )}
+                    </div>
+                  </div>
+                  
                   {/* Asset Status Tags */}
                   <div className="flex flex-wrap gap-2">
                     {renderStatus.statuses.map((status, index) => (
@@ -2343,6 +2764,20 @@ export default function AssetsPage() {
                             }`}>
                               {pair.hasReward ? '🏆 Has Reward' : '🏆 No Reward'}
                             </span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              pair.quiz3ImageOptions.options.length === 0
+                                ? 'bg-gray-900 text-gray-300 border border-gray-600'
+                                : pair.quiz3ImageOptions.hasAllImages 
+                                  ? 'bg-green-900 text-green-300 border border-green-600' 
+                                  : 'bg-red-900 text-red-300 border border-red-600'
+                            }`}>
+                              {pair.quiz3ImageOptions.options.length === 0 
+                                ? '🖼️ No Options'
+                                : pair.quiz3ImageOptions.hasAllImages 
+                                  ? '🖼️ All Images' 
+                                  : `🖼️ ${pair.quiz3ImageOptions.availableImages.length}/${pair.quiz3ImageOptions.options.length} Images`
+                              }
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -2406,6 +2841,68 @@ export default function AssetsPage() {
                               : 'No reward video found'
                             }
                           </span>
+                        </div>
+                      </div>
+                      
+                      {/* Quiz 3 Image Options Status */}
+                      <div className="mb-4 p-3 bg-gray-800 rounded-lg">
+                        <div className="text-sm font-medium text-gray-300 mb-2">Quiz 3 Image Options:</div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`text-lg ${pair.quiz3ImageOptions.hasAllImages ? 'text-green-400' : 'text-red-400'}`}>
+                            {pair.quiz3ImageOptions.hasAllImages ? '✅' : '❌'}
+                          </span>
+                          <span className="text-sm text-gray-300">
+                            {pair.quiz3ImageOptions.options.length === 0 
+                              ? 'No quiz 3 options found'
+                              : pair.quiz3ImageOptions.hasAllImages 
+                                ? `${pair.quiz3ImageOptions.availableImages.length}/${pair.quiz3ImageOptions.options.length} Images Available`
+                                : `${pair.quiz3ImageOptions.availableImages.length}/${pair.quiz3ImageOptions.options.length} Images Available`
+                            }
+                          </span>
+                        </div>
+                        
+                        {/* Progress bar */}
+                        <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+                          <div 
+                            className={`h-2 rounded-full ${
+                              pair.quiz3ImageOptions.hasAllImages 
+                                ? 'bg-green-500' 
+                                : 'bg-red-500'
+                            }`}
+                            style={{ 
+                              width: `${pair.quiz3ImageOptions.completionRate}%` 
+                            }}
+                          ></div>
+                        </div>
+                        
+                        {/* Options list */}
+                        <div className="text-xs text-gray-300 mb-2">
+                          {pair.quiz3ImageOptions.options.length === 0 
+                            ? 'No quiz 3 options found in JSON'
+                            : `Required: ${pair.quiz3ImageOptions.options.length} images for quiz 3 options`
+                          }
+                          {pair.quiz3ImageOptions.missingImages.length > 0 && (
+                            <span className="text-red-400 ml-2">Missing: {pair.quiz3ImageOptions.missingImages.join(', ')}</span>
+                          )}
+                        </div>
+                        
+                        {/* Individual option status */}
+                        <div className="grid grid-cols-2 gap-1 text-xs">
+                          {pair.quiz3ImageOptions.options.map((option, idx) => (
+                            <div 
+                              key={idx}
+                              className={`flex items-center gap-1 ${
+                                pair.quiz3ImageOptions.availableImages.includes(option) 
+                                  ? 'text-green-400' 
+                                  : 'text-red-400'
+                              }`}
+                            >
+                              <span>
+                                {pair.quiz3ImageOptions.availableImages.includes(option) ? '✅' : '❌'}
+                              </span>
+                              <span className="truncate">{option}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
                       

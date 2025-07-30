@@ -72,6 +72,10 @@ export async function GET(req: NextRequest) {
     // Read file content
     const fileContent = await fs.readFile(decodedPath);
     const ext = path.extname(decodedPath).toLowerCase();
+    
+    console.log('Preview API - File content preview (first 200 chars):', fileContent.toString().substring(0, 200));
+    console.log('Preview API - File extension:', ext);
+    console.log('Preview API - File size:', fileContent.length);
 
     // Determine content type
     let contentType = 'application/octet-stream';
