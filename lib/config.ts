@@ -11,32 +11,32 @@ export const config = {
   
   // Helper function to build asset paths with channel and topic parameters
   buildAssetPath: (category: string, channel: string, topic: string, subPath: string = '') => {
-    const basePath = `${config.workingDirectory}/${channel}/${topic}/${category}`;
+    const basePath = `${config.workingDirectory}/${channel.toLowerCase()}/${topic.toLowerCase()}/${category}`;
     return subPath ? `${basePath}/${subPath}` : basePath;
   },
   
   // Helper function to get the base channel path
   getChannelPath: (channel: string) => {
-    return `${config.workingDirectory}/${channel}`;
+    return `${config.workingDirectory}/${channel.toLowerCase()}`;
   },
   
   // Helper function to get the topic path
   getTopicPath: (channel: string, topic: string) => {
-    return `${config.getChannelPath(channel)}/${topic}`;
+    return `${config.getChannelPath(channel)}/${topic.toLowerCase()}`;
   },
   
   // Helper function to get asset paths for a specific channel and topic
   getAssetPaths: (channel: string, topic: string) => {
-    // Check if working directory already includes the channel name
-    const hasChannel = config.workingDirectory.includes(channel);
+    // Check if working directory already includes the channel name (case insensitive)
+    const hasChannel = config.workingDirectory.toLowerCase().includes(channel.toLowerCase());
     
     let basePath;
     if (hasChannel) {
       // Working directory already includes channel, so just add topic
-      basePath = `${config.workingDirectory}/${topic}`;
+      basePath = `${config.workingDirectory}/${topic.toLowerCase()}`;
     } else {
       // Working directory doesn't include channel, so add channel and topic
-      basePath = `${config.workingDirectory}/${channel}/${topic}`;
+      basePath = `${config.workingDirectory}/${channel.toLowerCase()}/${topic.toLowerCase()}`;
     }
     
     return {

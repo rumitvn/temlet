@@ -23,6 +23,82 @@ interface JSONContentResponse {
   };
 }
 
+// GET /api/assets/json-content?path=... - Read a single JSON file
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const filePath = searchParams.get('path');
+    const channel = searchParams.get('channel') || DEFAULT_CHANNEL;
+    const topic = searchParams.get('topic') || DEFAULT_TOPIC;
+    
+    if (!filePath) {
+      return NextResponse.json({ error: 'Path parameter is required' }, { status: 400 });
+    }
+
+    console.log('JSON Content API GET - Processing path:', filePath);
+    console.log('JSON Content API GET - Channel:', channel, 'Topic:', topic);
+
+    // Validate the path is within the allowed directories
+    const assetPaths = config.getAssetPaths(channel, topic);
+    const allowedPaths = [
+      assetPaths.voice,
+      assetPaths.image,
+      assetPaths.video,
+      assetPaths.json,
+      assetPaths.reward,
+      `${assetPaths.reward}/output`,
+      `${assetPaths.reward}/reward_1`,
+      `${assetPaths.reward}/reward_2`,
+      `${assetPaths.reward}/reward_3`,
+      `${assetPaths.reward}/reward_4`,
+      `${assetPaths.reward}/reward_5`
+    ];
+
+    // Also create backslash versions for Windows paths
+    const allowedPathsBackslash = allowedPaths.map(path => path.replace(/\//g, '\\'));
+
+    // Decode the URL-encoded path
+    const decodedPath = decodeURIComponent(filePath);
+    
+    // Check if path starts with any allowed directory (including subdirectories)
+    const isAllowed = allowedPaths.some(allowedPath => 
+      decodedPath.startsWith(allowedPath)
+    ) || allowedPathsBackslash.some(allowedPath => 
+      decodedPath.startsWith(allowedPath)
+    );
+
+    if (!isAllowed) {
+      console.log('JSON Content API GET - Access denied for path:', decodedPath);
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
+    // Check if file exists
+    try {
+      await fs.access(decodedPath);
+    } catch (error) {
+      console.log('JSON Content API GET - File not found:', decodedPath);
+      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    }
+
+    // Read file content
+    const fileContent = await fs.readFile(decodedPath, 'utf-8');
+    
+    // Check if content looks like JSON
+    if (fileContent.trim().startsWith('{') || fileContent.trim().startsWith('[')) {
+      const jsonData = JSON.parse(fileContent);
+      console.log(`JSON Content API GET - Successfully read ${path.basename(decodedPath)}`);
+      return NextResponse.json(jsonData);
+    } else {
+      console.error(`JSON Content API GET - Content is not valid JSON for ${path.basename(decodedPath)}`);
+      return NextResponse.json({ error: 'Invalid JSON format' }, { status: 400 });
+    }
+
+  } catch (error) {
+    console.error('JSON Content API GET - Error processing request:', error);
+    return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: JSONContentRequest = await req.json();
