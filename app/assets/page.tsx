@@ -2080,13 +2080,64 @@ export default function AssetsPage() {
               };
               
               // Reorganize JSON-Asset pairs to update voice status
-              updatedGroup.assets.jsonAssetPairs = organizeJSONAssetPairs(
-                updatedGroup.assets.jsons, 
-                updatedGroup.assets.voices, 
-                updatedGroup.assets.rewards,
-                assets.filter(asset => asset.type === 'image'),
-                new Map() // Empty map for this case since we don't need to reload JSON content
-              );
+              // We need to reload JSON content to maintain Quiz 3 image options information
+              // For now, we'll use the existing jsonAssetPairs but update the voice information
+              // The Quiz 3 image options will be preserved from the existing pairs
+              updatedGroup.assets.jsonAssetPairs = updatedGroup.assets.jsonAssetPairs.map(pair => {
+                if (pair.json.key === jsonAsset.key && pair.json.order === jsonAsset.order) {
+                  // Update the voices for this specific JSON pair
+                  const updatedVoices = [...pair.voices, ...newVoices];
+                  
+                  // Recalculate voice types and missing voices
+                  const voiceTypes = {
+                    intro: false,
+                    quiz1_question: false,
+                    quiz1_answer: false,
+                    quiz2_question: false,
+                    quiz2_answer: false,
+                    quiz3_question: false,
+                    quiz3_answer: false,
+                    lesson: false,
+                    reward: false
+                  };
+                  
+                  const missingVoices: string[] = [];
+                  
+                  updatedVoices.forEach(voice => {
+                    const voiceName = voice.name.toLowerCase();
+                    if (voiceName === 'voice_title.mp3') voiceTypes.intro = true;
+                    else if (voiceName === 'voice_q1_title.mp3') voiceTypes.quiz1_question = true;
+                    else if (voiceName === 'voice_q1_ans.mp3') voiceTypes.quiz1_answer = true;
+                    else if (voiceName === 'voice_q2_title.mp3') voiceTypes.quiz2_question = true;
+                    else if (voiceName === 'voice_q2_ans.mp3') voiceTypes.quiz2_answer = true;
+                    else if (voiceName === 'voice_q3_title.mp3') voiceTypes.quiz3_question = true;
+                    else if (voiceName === 'voice_q3_ans.mp3') voiceTypes.quiz3_answer = true;
+                    else if (voiceName === 'voice_lesson.mp3') voiceTypes.lesson = true;
+                    else if (voiceName === 'voice_reward.mp3') voiceTypes.reward = true;
+                  });
+                  
+                  // Check for missing voice types
+                  if (!voiceTypes.intro) missingVoices.push('intro');
+                  if (!voiceTypes.quiz1_question) missingVoices.push('quiz1_question');
+                  if (!voiceTypes.quiz1_answer) missingVoices.push('quiz1_answer');
+                  if (!voiceTypes.quiz2_question) missingVoices.push('quiz2_question');
+                  if (!voiceTypes.quiz2_answer) missingVoices.push('quiz2_answer');
+                  if (!voiceTypes.quiz3_question) missingVoices.push('quiz3_question');
+                  if (!voiceTypes.quiz3_answer) missingVoices.push('quiz3_answer');
+                  if (!voiceTypes.lesson) missingVoices.push('lesson');
+                  if (!voiceTypes.reward) missingVoices.push('reward');
+                  
+                  return {
+                    ...pair,
+                    voices: updatedVoices,
+                    hasAllVoices: missingVoices.length === 0,
+                    missingVoices,
+                    voiceTypes
+                    // Keep the existing quiz3ImageOptions unchanged
+                  };
+                }
+                return pair;
+              });
               
               return updatedGroup;
             }

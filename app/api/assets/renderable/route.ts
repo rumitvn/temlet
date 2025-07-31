@@ -14,6 +14,7 @@ interface Asset {
   status: 'available' | 'missing' | 'processing';
   key?: string;
   order?: number;
+  rendered?: boolean; // Whether this asset has been rendered
 }
 
 interface AssetGroup {
@@ -61,37 +62,131 @@ async function getFileStats(filePath: string) {
   }
 }
 
+// Helper function to check if a JSON file has been rendered
+async function checkIfRendered(jsonAsset: Asset, outputFolderPath: string): Promise<boolean> {
+  try {
+    // Extract key and order from JSON filename (e.g., "alligator_4.json" -> key="alligator", order=4)
+    const { key, order } = extractKeyAndOrder(jsonAsset.name, 'json');
+    if (!key || !order) return false;
+    
+    // Check for rendered output file in the output folder
+    // The rendered file would be named like "alligator_4.mp4" in the output folder
+    const renderedFileName = `${key}_${order}.mp4`;
+    const renderedFilePath = path.join(outputFolderPath, renderedFileName);
+    
+    const stats = await fs.stat(renderedFilePath);
+    return stats.isFile();
+  } catch (error) {
+    // File doesn't exist or other error
+    return false;
+  }
+}
+
 // Helper function to extract key and order from filename
-function extractKeyAndOrder(filename: string, type: string): { key: string; order?: number } {
-  const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
-  
+function extractKeyAndOrder(filename: string, type: string, filePath?: string): { key: string; order?: number } {
   if (type === 'json') {
-    // For JSON files: key_order.json (e.g., bear_1.json)
-    const match = nameWithoutExt.match(/^(.+?)_(\d+)$/);
+    // Extract from format like "bear_1.json" or "blue_tang_1.json"
+    const match = filename.match(/^(.+?)_(\d+)\.json$/);
     if (match) {
-      return { key: match[1], order: parseInt(match[2]) };
+      const key = match[1];
+      const order = parseInt(match[2]);
+      return { key, order };
     }
   } else if (type === 'voice') {
-    // For voice files: key_voicetype_order.mp3 (e.g., bear_intro_1.mp3)
-    const match = nameWithoutExt.match(/^(.+?)_(.+?)_(\d+)$/);
-    if (match) {
-      return { key: match[1], order: parseInt(match[3]) };
+    // For voice files, extract the key from the directory path
+    // Voice files are in directories like "voice/buoyancy_1/voice_lesson.mp3"
+    if (filePath) {
+      // Extract the directory name from the path - handle both Windows and Unix separators
+      const pathParts = filePath.split(/[\/\\]/); // Split by both forward and backward slashes
+      const voiceDirIndex = pathParts.findIndex(part => part === 'voice');
+      if (voiceDirIndex !== -1 && voiceDirIndex + 1 < pathParts.length) {
+        const dirName = pathParts[voiceDirIndex + 1]; // This should be "buoyancy_1"
+        const dirMatch = dirName.match(/^(.+?)_(\d+)$/);
+        if (dirMatch) {
+          const key = dirMatch[1];
+          const order = parseInt(dirMatch[2]);
+          return { key, order };
+        }
+      }
     }
-  } else if (type === 'image') {
-    // For image files: key_order.jpg (e.g., bear_1.jpg)
-    const match = nameWithoutExt.match(/^(.+?)_(\d+)$/);
+    
+    // Fallback: extract from filename if path method fails
+    const match = filename.match(/voice_(.+?)\.mp3/);
     if (match) {
-      return { key: match[1], order: parseInt(match[2]) };
+      return { key: 'voice_' + match[1] };
     }
-  } else if (type === 'video') {
-    // For video files: key_order.mp4 (e.g., bear_1.mp4)
-    const match = nameWithoutExt.match(/^(.+?)_(\d+)$/);
+  } else {
+    // Extract from format like "bear.jpg", "bear.mp4", "blue_tang.jpg"
+    const match = filename.match(/^(.+?)\.(jpg|mp4|png|gif)$/);
     if (match) {
-      return { key: match[1], order: parseInt(match[2]) };
+      return { key: match[1] };
     }
   }
-  
-  return { key: nameWithoutExt };
+  return { key: filename.split('.')[0] };
+}
+
+// Helper function to load JSON content and extract quiz 3 options
+async function loadJSONContent(jsonPath: string): Promise<string[]> {
+  try {
+    const content = await fs.readFile(jsonPath, 'utf-8');
+    const jsonData = JSON.parse(content);
+    return jsonData.quiz_3?.options || [];
+  } catch (error) {
+    console.error(`Error loading JSON content from ${jsonPath}:`, error);
+    return [];
+  }
+}
+
+// Helper function to check quiz 3 image options
+function checkQuiz3ImageOptions(jsonAsset: Asset, allImages: Asset[], jsonOptions: string[] = []) {
+  try {
+    const options = jsonOptions.length > 0 ? jsonOptions : [];
+    
+    // Check which images are available in the options folder
+    const availableImages: string[] = [];
+    const missingImages: string[] = [];
+
+    options.forEach((option: string) => {
+      // Look for images in the options folder with exact name matching
+      const optionImage = allImages.find(img => {
+        if (img.type !== 'image' || !img.path.includes('options')) {
+          return false;
+        }
+        
+        // Get the filename without extension
+        const fileNameWithoutExt = img.name.replace(/\.(jpg|jpeg|png|gif|bmp)$/i, '');
+        
+        // Check for exact match (case-insensitive)
+        return fileNameWithoutExt.toLowerCase() === option.toLowerCase();
+      });
+      
+      if (optionImage) {
+        availableImages.push(option);
+      } else {
+        missingImages.push(option);
+      }
+    });
+
+    const hasAllImages = missingImages.length === 0;
+    const completionRate = options.length > 0 ? (availableImages.length / options.length) * 100 : 0;
+
+    return {
+      options,
+      availableImages,
+      missingImages,
+      hasAllImages,
+      completionRate
+    };
+  } catch (error) {
+    console.error('Error checking quiz 3 image options:', error);
+    return {
+      options: [],
+      availableImages: [],
+      missingImages: [],
+      hasAllImages: false,
+      completionRate: 0
+    };
+  }
 }
 
 // Helper function to scan directory recursively
@@ -126,7 +221,7 @@ async function scanDirectory(dirPath: string, category: string): Promise<Asset[]
         }
         
         const stats = await getFileStats(fullPath);
-        const { key, order } = extractKeyAndOrder(entry.name, type);
+        const { key, order } = extractKeyAndOrder(entry.name, type, fullPath);
         
         assets.push({
           id: `${category}_${entry.name}_${Date.now()}`,
@@ -155,6 +250,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const channel = searchParams.get('channel');
     const topic = searchParams.get('topic');
+    const outputFolder = searchParams.get('outputFolder'); // Optional output folder to check render status
     
     if (!channel || !topic) {
       return NextResponse.json(
@@ -167,19 +263,18 @@ export async function GET(req: NextRequest) {
     const assetPaths = config.getAssetPaths(channel, topic);
     
     // Scan all asset directories
-    const [jsonAssets, voiceAssets, imageAssets, videoAssets, rewardAssets] = await Promise.all([
+    const [jsonAssets, voiceAssets, imageAssets, videoAssets] = await Promise.all([
       scanDirectory(assetPaths.json, 'json'),
       scanDirectory(assetPaths.voice, 'voice'),
       scanDirectory(assetPaths.image, 'image'),
-      scanDirectory(assetPaths.video, 'video'),
-      scanDirectory(assetPaths.reward, 'reward')
+      scanDirectory(assetPaths.video, 'video')
     ]);
 
-    // Group assets by key
+    // Group assets by key first
     const groupedAssets: { [key: string]: AssetGroup } = {};
     
     // Process JSON assets first to establish groups
-    jsonAssets.forEach(jsonAsset => {
+    for (const jsonAsset of jsonAssets) {
       if (jsonAsset.key && jsonAsset.order) {
         const key = jsonAsset.key;
         if (!groupedAssets[key]) {
@@ -210,15 +305,87 @@ export async function GET(req: NextRequest) {
             }
           };
         }
+        
+        // Check if this JSON has been rendered
+        if (outputFolder) {
+          jsonAsset.rendered = await checkIfRendered(jsonAsset, outputFolder);
+        } else {
+          jsonAsset.rendered = false;
+        }
+        
         groupedAssets[key].assets.jsons.push(jsonAsset);
         groupedAssets[key].renderStatus.jsonOrders.push(jsonAsset.order);
       }
+    }
+
+    // Now scan rewards specifically for each group
+    const rewardAssets: Asset[] = [];
+    for (const group of Object.values(groupedAssets)) {
+      for (const jsonAsset of group.assets.jsons) {
+        // Look for reward file: reward/output/reward_order/key.mp4
+        const rewardPath = path.join(assetPaths.reward, 'output', `reward_${jsonAsset.order}`, `${group.key}.mp4`);
+        try {
+          const stats = await fs.stat(rewardPath);
+          if (stats.isFile()) {
+            rewardAssets.push({
+              id: `reward_${group.key}_${jsonAsset.order}_${Date.now()}`,
+              name: `${group.key}.mp4`,
+              type: 'video',
+              category: 'reward',
+              path: rewardPath,
+              size: stats.size,
+              lastModified: stats.mtime,
+              status: 'available',
+              key: group.key,
+              order: jsonAsset.order
+            });
+          }
+        } catch (error) {
+          // Reward file doesn't exist, which is fine
+        }
+      }
+    }
+
+    console.log(`Found ${rewardAssets.length} reward assets:`);
+    rewardAssets.forEach(reward => {
+      console.log(`  - ${reward.name}: ${reward.path}`);
     });
+
+
 
     // Process other asset types
     voiceAssets.forEach(voiceAsset => {
-      if (voiceAsset.key && groupedAssets[voiceAsset.key]) {
-        groupedAssets[voiceAsset.key].assets.voices.push(voiceAsset);
+      // Find the matching JSON group for this voice
+      let matchedGroup = null;
+      
+      // First try matching by key and order
+      if (voiceAsset.key && voiceAsset.order && groupedAssets[voiceAsset.key]) {
+        const group = groupedAssets[voiceAsset.key];
+        // Check if this group has a JSON with the same order
+        const hasMatchingJson = group.assets.jsons.some(json => json.order === voiceAsset.order);
+        if (hasMatchingJson) {
+          matchedGroup = group;
+        }
+      }
+      
+      // If no match by key/order, try matching by path structure
+      if (!matchedGroup && voiceAsset.path) {
+        const pathMatch = voiceAsset.path.match(/voice[\/\\]([^\/\\]+)_(\d+)[\/\\]/);
+        if (pathMatch) {
+          const key = pathMatch[1];
+          const order = parseInt(pathMatch[2]);
+          if (groupedAssets[key]) {
+            const group = groupedAssets[key];
+            const hasMatchingJson = group.assets.jsons.some(json => json.order === order);
+            if (hasMatchingJson) {
+              matchedGroup = group;
+            }
+          }
+        }
+      }
+      
+      if (matchedGroup) {
+        matchedGroup.assets.voices.push(voiceAsset);
       }
     });
 
@@ -236,14 +403,16 @@ export async function GET(req: NextRequest) {
       }
     });
 
+    // Add rewards to their respective groups
     rewardAssets.forEach(rewardAsset => {
       if (rewardAsset.key && groupedAssets[rewardAsset.key]) {
+        console.log(`Adding reward ${rewardAsset.name} to group ${rewardAsset.key}`);
         groupedAssets[rewardAsset.key].assets.rewards.push(rewardAsset);
       }
     });
 
     // Calculate render status for each group
-    Object.values(groupedAssets).forEach(group => {
+    for (const group of Object.values(groupedAssets)) {
       // Set basic status flags
       group.renderStatus.hasJson = group.assets.jsons.length > 0;
       group.renderStatus.hasImage = !!group.assets.image;
@@ -255,8 +424,32 @@ export async function GET(req: NextRequest) {
       group.renderStatus.availableVoices = group.assets.voices.length;
       group.renderStatus.requiredRewards = group.assets.jsons.length; // 1 reward per JSON
       group.renderStatus.availableRewards = group.assets.rewards.length;
-      group.renderStatus.requiredQuiz3Images = group.assets.jsons.length * 4; // 4 images per JSON
-      group.renderStatus.availableQuiz3Images = 0; // Will be calculated based on quiz 3 options
+      
+      console.log(`Group ${group.key}: ${group.assets.rewards.length} rewards for ${group.assets.jsons.length} JSONs`);
+      if (group.assets.rewards.length > 0) {
+        group.assets.rewards.forEach(reward => {
+          console.log(`  - Reward: ${reward.name} (${reward.path})`);
+        });
+      }
+      
+      // Calculate quiz 3 image options
+      let totalQuiz3Images = 0;
+      let totalRequiredQuiz3Images = 0;
+      
+      for (const jsonAsset of group.assets.jsons) {
+        try {
+          const jsonOptions = await loadJSONContent(jsonAsset.path);
+          const quiz3Status = checkQuiz3ImageOptions(jsonAsset, imageAssets, jsonOptions);
+          totalQuiz3Images += quiz3Status.availableImages.length;
+          totalRequiredQuiz3Images += quiz3Status.options.length;
+        } catch (error) {
+          console.error(`Error processing quiz 3 options for ${jsonAsset.name}:`, error);
+        }
+      }
+      
+      group.renderStatus.requiredQuiz3Images = totalRequiredQuiz3Images;
+      group.renderStatus.availableQuiz3Images = totalQuiz3Images;
+      group.renderStatus.hasQuiz3Images = totalQuiz3Images >= totalRequiredQuiz3Images;
       
       // Check if complete (has all required assets)
       const hasRequiredAssets = group.renderStatus.hasJson && 
@@ -264,9 +457,9 @@ export async function GET(req: NextRequest) {
                                group.renderStatus.hasVideos && 
                                group.renderStatus.availableVoices >= group.renderStatus.requiredVoices &&
                                group.renderStatus.availableRewards >= group.renderStatus.requiredRewards &&
-                               group.renderStatus.availableQuiz3Images >= group.renderStatus.requiredQuiz3Images;
+                               group.renderStatus.hasQuiz3Images;
       group.renderStatus.isComplete = hasRequiredAssets;
-    });
+    }
 
     // Filter to only include complete groups
     const renderableGroups = Object.values(groupedAssets).filter(group => group.renderStatus.isComplete);
