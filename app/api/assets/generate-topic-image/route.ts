@@ -24,6 +24,7 @@ interface GenerateTopicImageRequest {
   style?: 'vivid' | 'natural';
   channel?: string;
   topicParam?: string;
+  isQuiz3Option?: boolean;
 }
 
 // Helper function to generate topic-specific prompts
@@ -150,8 +151,11 @@ export async function POST(req: NextRequest) {
         const assetPaths = config.getAssetPaths(channel, topicParam);
         const imagePath = assetPaths.image;
         
+        // If this is a quiz 3 option, save to the options subfolder
+        const targetImagePath = body.isQuiz3Option ? path.join(imagePath, 'options') : imagePath;
+        
         // Ensure the directory exists
-        await fs.mkdir(imagePath, { recursive: true });
+        await fs.mkdir(targetImagePath, { recursive: true });
         
         // Download the image
         const imageResponse = await fetch(result.imageUrl);
@@ -161,7 +165,7 @@ export async function POST(req: NextRequest) {
         
         const imageBuffer = await imageResponse.arrayBuffer();
         const filename = `${body.subject.toLowerCase().replace(/[^a-z0-9]/g, '_')}.jpg`;
-        const filePath = path.join(imagePath, filename);
+        const filePath = path.join(targetImagePath, filename);
         
         // Save the image
         await fs.writeFile(filePath, Buffer.from(imageBuffer));

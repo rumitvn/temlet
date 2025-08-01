@@ -2706,6 +2706,129 @@ export default function AssetsPage() {
     }
   };
 
+  const handleGenerateMissingQuiz3Images = async (pair: JSONAssetPair) => {
+    if (pair.quiz3ImageOptions.missingImages.length === 0) {
+      setToast({
+        message: 'No missing images to generate',
+        type: 'info'
+      });
+      return;
+    }
+
+    const pairKey = `${pair.json.key}_${pair.json.order}`;
+    
+    // Set loading state for this specific JSON pair
+    setImageGeneratingStates(prev => ({ ...prev, [pairKey]: true }));
+    
+    try {
+      const topic = selectedTopic || 'animals';
+      const generatedImages: Asset[] = [];
+      
+      // Generate each missing image
+      for (const missingImage of pair.quiz3ImageOptions.missingImages) {
+        try {
+          const response = await fetch('/api/assets/generate-topic-image', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              subject: missingImage,
+              topic: topic,
+              model: 'grok',
+              size: '1024x1024',
+              quality: 'standard',
+              style: 'vivid',
+              channel: selectedChannel,
+              topicParam: selectedTopic,
+              // Specify that this is for quiz 3 options
+              isQuiz3Option: true
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to generate image for ${missingImage}`);
+          }
+
+          const data = await response.json();
+
+          if (data.success && data.savedAsset) {
+            generatedImages.push(data.savedAsset);
+          } else {
+            throw new Error(`Image generation failed for ${missingImage}`);
+          }
+        } catch (error) {
+          console.error(`Error generating image for ${missingImage}:`, error);
+          throw error;
+        }
+      }
+
+      // Update the asset groups to reflect the new images
+      setAssetGroups(prevGroups => {
+        return prevGroups.map(group => {
+          const updatedJsonAssetPairs = group.assets.jsonAssetPairs.map(jsonPair => {
+            if (jsonPair.json.id === pair.json.id) {
+              // Update the quiz 3 image options status
+              const updatedMissingImages = pair.quiz3ImageOptions.missingImages.filter(
+                missing => !generatedImages.some(img => img.key === missing.toLowerCase().replace(/[^a-z0-9]/g, '_'))
+              );
+              
+              const updatedAvailableImages = [
+                ...pair.quiz3ImageOptions.availableImages,
+                ...pair.quiz3ImageOptions.missingImages.filter(
+                  missing => generatedImages.some(img => img.key === missing.toLowerCase().replace(/[^a-z0-9]/g, '_'))
+                )
+              ];
+
+              return {
+                ...jsonPair,
+                quiz3ImageOptions: {
+                  ...jsonPair.quiz3ImageOptions,
+                  availableImages: updatedAvailableImages,
+                  missingImages: updatedMissingImages,
+                  hasAllImages: updatedMissingImages.length === 0,
+                  completionRate: updatedAvailableImages.length / pair.quiz3ImageOptions.options.length * 100
+                }
+              };
+            }
+            return jsonPair;
+          });
+
+          return {
+            ...group,
+            assets: {
+              ...group.assets,
+              jsonAssetPairs: updatedJsonAssetPairs
+            }
+          };
+        });
+      });
+
+      // Show success message
+      setToast({
+        message: `Generated ${generatedImages.length} missing quiz 3 images successfully!`,
+        type: 'success'
+      });
+      
+      // Auto-dismiss toast after 3 seconds
+      setTimeout(() => setToast(null), 3000);
+      
+    } catch (error) {
+      console.error('Error generating missing quiz 3 images:', error);
+      setToast({
+        message: error instanceof Error ? error.message : 'Failed to generate missing images. Please try again.',
+        type: 'error'
+      });
+      
+      // Auto-dismiss toast after 5 seconds
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      // Clear loading state
+      setImageGeneratingStates(prev => ({ ...prev, [pairKey]: false }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
@@ -3377,6 +3500,24 @@ export default function AssetsPage() {
                             </div>
                           ))}
                         </div>
+                        
+                        {/* Generate missing images button */}
+                        {pair.quiz3ImageOptions.missingImages.length > 0 && (
+                          <button
+                            onClick={() => handleGenerateMissingQuiz3Images(pair)}
+                            disabled={imageGeneratingStates[`${pair.json.key}_${pair.json.order}`]}
+                            className="w-full mt-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:text-gray-400 rounded-lg px-3 py-2 text-center transition-colors"
+                          >
+                            {imageGeneratingStates[`${pair.json.key}_${pair.json.order}`] ? (
+                              <div className="flex items-center justify-center gap-2">
+                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                Generating {pair.quiz3ImageOptions.missingImages.length} missing images...
+                              </div>
+                            ) : (
+                              `Generate Missing Images (${pair.quiz3ImageOptions.missingImages.length})`
+                            )}
+                          </button>
+                        )}
                       </div>
                       
                       {/* Action Buttons */}

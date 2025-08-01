@@ -135,11 +135,10 @@ IMPORTANT DIFFICULTY PROGRESSION:
 IMPORTANT QUIZ_3 GUIDELINES FOR ANIMALS:
 - Quiz_3 should ask educational questions about different animals, characteristics, behaviors, or facts
 - Make quiz_3 about learning something new, not just identifying the main subject
-- Use the available inputs list to create diverse, educational questions about animals
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
-- CRITICAL: Select exactly 4 items from the available inputs list for the options
-- CRITICAL: The correct answer position must correspond to an item that actually answers the question
-- EXAMPLE: If question is "Con nào sống dưới nước?" and available inputs include ["shark", "eagle", "elephant", "dolphin", "lion"], then:
+- CRITICAL: Select exactly 4 different animal names for the options
+- CRITICAL: The correct answer position must correspond to an animal that actually answers the question
+- EXAMPLE: If question is "Con nào sống dưới nước?" then:
   * Options should be: ["shark", "eagle", "elephant", "dolphin"] (4 items)
   * Correct answer should be position 1 (shark) or position 4 (dolphin) since they live in water
   * Voice should be: "Rất giỏi! Cá mập sống dưới nước" or "Rất giỏi! Cá heo sống dưới nước"
@@ -180,11 +179,10 @@ IMPORTANT DIFFICULTY PROGRESSION:
 IMPORTANT QUIZ_3 GUIDELINES FOR PLANTS:
 - Quiz_3 should ask educational questions about different plants, characteristics, growth patterns, or facts
 - Make quiz_3 about learning something new, not just identifying the main subject
-- Use the available inputs list to create diverse, educational questions about plants
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
-- CRITICAL: Select exactly 4 items from the available inputs list for the options
-- CRITICAL: The correct answer position must correspond to an item that actually answers the question
-- EXAMPLE: If question is "Cây nào cần nhiều nước?" and available inputs include ["oak", "cactus", "water_lily", "palm", "bamboo"], then:
+- CRITICAL: Select exactly 4 different plant names for the options
+- CRITICAL: The correct answer position must correspond to a plant that actually answers the question
+- EXAMPLE: If question is "Cây nào cần nhiều nước?" then:
   * Options should be: ["oak", "cactus", "water_lily", "palm"] (4 items)
   * Correct answer should be position 3 (water_lily) since it needs lots of water
   * Voice should be: "Rất giỏi! Sen nước cần nhiều nước để sống"
@@ -225,11 +223,10 @@ IMPORTANT DIFFICULTY PROGRESSION:
 IMPORTANT QUIZ_3 GUIDELINES FOR SCIENCE:
 - Quiz_3 should ask educational questions about different scientific concepts, experiments, or phenomena
 - Make quiz_3 about learning something new, not just identifying the main subject
-- Use the available inputs list to create diverse, educational questions about science
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
-- CRITICAL: Select exactly 4 items from the available inputs list for the options
-- CRITICAL: The correct answer position must correspond to an item that actually answers the question
-- EXAMPLE: If question is "Chất nào tan trong nước?" and available inputs include ["salt", "oil", "sugar", "sand", "vinegar"], then:
+- CRITICAL: Select exactly 4 different scientific terms for the options
+- CRITICAL: The correct answer position must correspond to a term that actually answers the question
+- EXAMPLE: If question is "Chất nào tan trong nước?" then:
   * Options should be: ["salt", "oil", "sugar", "sand"] (4 items)
   * Correct answer should be position 1 (salt) or position 3 (sugar) since they dissolve in water
   * Voice should be: "Rất giỏi! Muối tan trong nước" or "Rất giỏi! Đường tan trong nước"
@@ -270,11 +267,10 @@ IMPORTANT DIFFICULTY PROGRESSION:
 IMPORTANT QUIZ_3 GUIDELINES FOR HISTORY:
 - Quiz_3 should ask educational questions about different historical events, people, places, or facts
 - Make quiz_3 about learning something new, not just identifying the main subject
-- Use the available inputs list to create diverse, educational questions about history
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
-- CRITICAL: Select exactly 4 items from the available inputs list for the options
-- CRITICAL: The correct answer position must correspond to an item that actually answers the question
-- EXAMPLE: If question is "Ai là vị vua đầu tiên?" and available inputs include ["hung_king", "le_lai", "quang_trung", "gia_long", "tu_duc"], then:
+- CRITICAL: Select exactly 4 different historical terms for the options
+- CRITICAL: The correct answer position must correspond to a term that actually answers the question
+- EXAMPLE: If question is "Ai là vị vua đầu tiên?" then:
   * Options should be: ["hung_king", "le_lai", "quang_trung", "gia_long"] (4 items)
   * Correct answer should be position 1 (hung_king) since he was the first king
   * Voice should be: "Rất giỏi! Vua Hùng là vị vua đầu tiên của Việt Nam"
@@ -313,10 +309,9 @@ IMPORTANT DIFFICULTY PROGRESSION:
 IMPORTANT QUIZ_3 GUIDELINES:
 - Quiz_3 should ask educational questions about different concepts, characteristics, or facts
 - Make quiz_3 about learning something new, not just identifying the main subject
-- Use the available inputs list to create diverse, educational questions
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
-- CRITICAL: Select exactly 4 items from the available inputs list for the options
-- CRITICAL: The correct answer position must correspond to an item that actually answers the question`;
+- CRITICAL: Select exactly 4 different terms for the options
+- CRITICAL: The correct answer position must correspond to a term that actually answers the question`;
       }
     };
 
@@ -376,7 +371,7 @@ IMPORTANT QUIZ_3 GUIDELINES:
     const getTopicSpecificUserPrompt = (topic: string) => {
       switch (topic) {
         case 'animals':
-          return `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${availableInputs.length > 0 ? `\n\nAvailable inputs for quiz_3: ${availableInputs.join(', ')}` : ''}${uniquenessInstructions}
+          return `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${uniquenessInstructions}
 
 Video Format: SK3QLR (Short Kids 3 Question with Lesson and Reward) - 45 seconds total
 - Intro: 1 second
@@ -446,9 +441,9 @@ Requirements:
   * Other variations: "Đúng rồi! [correct answer]", "Hoàn hảo! [correct answer]", "Thông minh! [correct answer]", "Tài giỏi! [correct answer]", "Xuất sắc! [correct answer]"
   * Always include the correct answer in the voice response to reinforce learning
   * Vary the responses across different quizzes to keep it interesting
-- For quiz_3, select ONLY 4 items from the provided available inputs list
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
-- CRITICAL: The correct answer position must correspond to an item that actually answers the question
+- CRITICAL: Select exactly 4 different animal names for the options
+- CRITICAL: The correct answer position must correspond to an animal that actually answers the question
 - Quiz_3 should be diverse and educational - ask about different animals, characteristics, or facts
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic identification, simple facts, obvious choices
@@ -462,7 +457,7 @@ Requirements:
   * Hard: "Con nào có khả năng thay đổi màu sắc?", "Con nào có hệ thống định vị siêu âm?", "Con nào có thể tái sinh các bộ phận?"
   * Very Hard: "Con nào thuộc lớp bò sát có vảy?", "Con nào có hệ thống tuần hoàn kép?", "Con nào có khả năng quang hợp?"
 - Avoid repetitive identification questions like "Con nào là [subject]?"
-- If no available inputs are provided, use appropriate ENGLISH animal names that can be represented by images
+- Use appropriate ENGLISH animal names that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
 - REWARD PROGRESSION: The reward voice must follow this exact progression based on order number:
@@ -485,7 +480,7 @@ Order: ${order}
 CRITICAL: Return ONLY the JSON object. Do not include any other text, explanations, or formatting.`;
 
         case 'plants':
-          return `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${availableInputs.length > 0 ? `\n\nAvailable inputs for quiz_3: ${availableInputs.join(', ')}` : ''}${uniquenessInstructions}
+          return `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${uniquenessInstructions}
 
 Video Format: SK3QLR (Short Kids 3 Question with Lesson and Reward) - 45 seconds total
 - Intro: 1 second
@@ -555,9 +550,9 @@ Requirements:
   * Other variations: "Đúng rồi! [correct answer]", "Hoàn hảo! [correct answer]", "Thông minh! [correct answer]", "Tài giỏi! [correct answer]", "Xuất sắc! [correct answer]"
   * Always include the correct answer in the voice response to reinforce learning
   * Vary the responses across different quizzes to keep it interesting
-- For quiz_3, select ONLY 4 items from the provided available inputs list
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
-- CRITICAL: The correct answer position must correspond to an item that actually answers the question
+- CRITICAL: Select exactly 4 different plant names for the options
+- CRITICAL: The correct answer position must correspond to a plant that actually answers the question
 - Quiz_3 should be diverse and educational - ask about different plants, characteristics, or facts
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic identification, simple facts, obvious choices
@@ -571,7 +566,7 @@ Requirements:
   * Hard: "Cây nào có thể sống trong điều kiện khô hạn?", "Cây nào có hệ thống rễ cộng sinh?", "Cây nào có thể tự phát sáng?"
   * Very Hard: "Cây nào thuộc họ cây họ đậu?", "Cây nào có hệ thống vận chuyển nước hiệu quả nhất?", "Cây nào có thể sống hàng nghìn năm?"
 - Avoid repetitive identification questions like "Cây nào là [subject]?"
-- If no available inputs are provided, use appropriate ENGLISH plant names that can be represented by images
+- Use appropriate ENGLISH plant names that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
 - REWARD PROGRESSION: The reward voice must follow this exact progression based on order number:
@@ -594,7 +589,7 @@ Order: ${order}
 CRITICAL: Return ONLY the JSON object. Do not include any other text, explanations, or formatting.`;
 
         case 'science':
-          return `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${availableInputs.length > 0 ? `\n\nAvailable inputs for quiz_3: ${availableInputs.join(', ')}` : ''}${uniquenessInstructions}
+          return `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${uniquenessInstructions}
 
 Video Format: SK3QLR (Short Kids 3 Question with Lesson and Reward) - 45 seconds total
 - Intro: 1 second
@@ -664,9 +659,9 @@ Requirements:
   * Other variations: "Đúng rồi! [correct answer]", "Hoàn hảo! [correct answer]", "Thông minh! [correct answer]", "Tài giỏi! [correct answer]", "Xuất sắc! [correct answer]"
   * Always include the correct answer in the voice response to reinforce learning
   * Vary the responses across different quizzes to keep it interesting
-- For quiz_3, select ONLY 4 items from the provided available inputs list
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
-- CRITICAL: The correct answer position must correspond to an item that actually answers the question
+- CRITICAL: Select exactly 4 different scientific terms for the options
+- CRITICAL: The correct answer position must correspond to a term that actually answers the question
 - Quiz_3 should be diverse and educational - ask about different scientific concepts, experiments, or phenomena
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic concepts, simple experiments
@@ -680,7 +675,7 @@ Requirements:
   * Hard: "Chất nào có thể thay đổi trạng thái ở nhiệt độ phòng?", "Vật nào có từ tính mạnh nhất?", "Hiện tượng nào liên quan đến áp suất khí quyển?"
   * Very Hard: "Chất nào có cấu trúc tinh thể phức tạp nhất?", "Vật nào có khả năng siêu dẫn ở nhiệt độ cao?", "Hiện tượng nào liên quan đến cơ học lượng tử?"
 - Avoid repetitive identification questions like "Chất nào là [subject]?"
-- If no available inputs are provided, use appropriate ENGLISH scientific terms that can be represented by images
+- Use appropriate ENGLISH scientific terms that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
 - REWARD PROGRESSION: The reward voice must follow this exact progression based on order number:
@@ -703,7 +698,7 @@ Order: ${order}
 CRITICAL: Return ONLY the JSON object. Do not include any other text, explanations, or formatting.`;
 
         case 'history':
-          return `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${availableInputs.length > 0 ? `\n\nAvailable inputs for quiz_3: ${availableInputs.join(', ')}` : ''}${uniquenessInstructions}
+          return `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${uniquenessInstructions}
 
 Video Format: SK3QLR (Short Kids 3 Question with Lesson and Reward) - 45 seconds total
 - Intro: 1 second
@@ -773,9 +768,9 @@ Requirements:
   * Other variations: "Đúng rồi! [correct answer]", "Hoàn hảo! [correct answer]", "Thông minh! [correct answer]", "Tài giỏi! [correct answer]", "Xuất sắc! [correct answer]"
   * Always include the correct answer in the voice response to reinforce learning
   * Vary the responses across different quizzes to keep it interesting
-- For quiz_3, select ONLY 4 items from the provided available inputs list
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
-- CRITICAL: The correct answer position must correspond to an item that actually answers the question
+- CRITICAL: Select exactly 4 different historical terms for the options
+- CRITICAL: The correct answer position must correspond to a term that actually answers the question
 - Quiz_3 should be diverse and educational - ask about different historical events, people, places, or facts
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic facts, simple events
@@ -789,7 +784,7 @@ Requirements:
   * Hard: "Ai là người đầu tiên bay vòng quanh thế giới?", "Sự kiện nào dẫn đến cuộc cách mạng công nghiệp?", "Nơi nào là trung tâm thương mại cổ đại?"
   * Very Hard: "Ai là người phát hiện ra cấu trúc DNA?", "Sự kiện nào dẫn đến sự sụp đổ của đế chế La Mã?", "Nơi nào là trung tâm học thuật cổ đại quan trọng nhất?"
 - Avoid repetitive identification questions like "Ai là [subject]?"
-- If no available inputs are provided, use appropriate ENGLISH historical terms that can be represented by images
+- Use appropriate ENGLISH historical terms that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
 - REWARD PROGRESSION: The reward voice must follow this exact progression based on order number:
@@ -812,7 +807,7 @@ Order: ${order}
 CRITICAL: Return ONLY the JSON object. Do not include any other text, explanations, or formatting.`;
 
         default:
-          return `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${availableInputs.length > 0 ? `\n\nAvailable inputs for quiz_3: ${availableInputs.join(', ')}` : ''}${uniquenessInstructions}
+          return `Create educational content for a children's video about "${prompt}" in ${language} language, topic: ${topic}.${description ? `\n\nAdditional details: ${description}` : ''}${uniquenessInstructions}
 
 Video Format: SK3QLR (Short Kids 3 Question with Lesson and Reward) - 45 seconds total
 - Intro: 1 second
@@ -878,9 +873,9 @@ Requirements:
 - Make answer positions logical and varied
 - Keep voice scripts short and simple (3-5 seconds max)
 - ANSWER VOICES: Use varied, engaging responses that include the correct answer
-- For quiz_3, select ONLY 4 items from the provided available inputs list
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
-- CRITICAL: The correct answer position must correspond to an item that actually answers the question
+- CRITICAL: Select exactly 4 different terms for the options
+- CRITICAL: The correct answer position must correspond to a term that actually answers the question
 - Quiz_3 should be diverse and educational - ask about different concepts, characteristics, or facts
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic concepts, simple facts
@@ -889,7 +884,7 @@ Requirements:
   * Order 4 (Hard): Advanced knowledge, complex relationships
   * Order 5 (Very Hard): Expert level, detailed knowledge required
 - Avoid repetitive identification questions
-- If no available inputs are provided, use appropriate ENGLISH terms that can be represented by images
+- Use appropriate ENGLISH terms that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
 - REWARD PROGRESSION: The reward voice must follow this exact progression based on order number:
