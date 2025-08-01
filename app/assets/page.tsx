@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   PlusIcon, 
@@ -1929,11 +1929,12 @@ export default function AssetsPage() {
     };
 
     // Video Preview Component
-    const VideoPreview = ({ jsonData }: { jsonData: any }) => {
+    const VideoPreview = ({ jsonData, asset }: { jsonData: any; asset: Asset }) => {
       const [currentSection, setCurrentSection] = useState(0);
       const [isPlaying, setIsPlaying] = useState(false);
       const [currentTime, setCurrentTime] = useState(0);
       const [totalDuration, setTotalDuration] = useState(0);
+      const videoRef = useRef<HTMLVideoElement>(null);
 
       const sections = [
         { name: 'Intro', icon: '🎬', duration: 5 },
@@ -1987,6 +1988,13 @@ export default function AssetsPage() {
           accumulatedTime += sections[i].duration;
         }
       }, [currentTime]);
+
+      // Auto-play lesson and reward videos when section changes
+      useEffect(() => {
+        if ((currentSection === 4 || currentSection === 5) && videoRef.current) {
+          videoRef.current.play().catch((e: any) => console.log('Auto-play failed:', e));
+        }
+      }, [currentSection]);
 
 
 
@@ -2193,7 +2201,7 @@ export default function AssetsPage() {
                                    <img 
                                      src={`/api/assets/preview?path=${encodeURIComponent(imagePath)}&channel=${selectedChannel}&topic=${selectedTopic}`}
                                      alt={option}
-                                     className="w-full h-24 object-cover rounded"
+                                     className="w-full aspect-square object-cover rounded"
                                      onError={(e) => {
                                        const img = e.currentTarget as HTMLImageElement;
                                        console.log('Image failed to load:', img.src);
@@ -2229,9 +2237,12 @@ export default function AssetsPage() {
                        <div className="bg-gray-600 rounded-lg p-4">
                          <h5 className="text-lg font-medium text-white mb-2">Video Preview:</h5>
                          <video 
-                           src={`/api/assets/preview?path=${encodeURIComponent(`${config.workingDirectory}/${selectedChannel}/${selectedTopic}/video/${currentSection === 4 ? 'lesson' : 'reward'}.mp4`)}&channel=${selectedChannel}&topic=${selectedTopic}`}
-                           className="w-full h-32 object-cover rounded"
+                           ref={videoRef}
+                           src={`/api/assets/preview?path=${encodeURIComponent(`${config.workingDirectory}/${selectedChannel}/${selectedTopic}/${currentSection === 5 ? `reward/output/reward_${asset.order}/${asset.key}.mp4` : `video/${asset.key}.mp4`}`)}&channel=${selectedChannel}&topic=${selectedTopic}`}
+                           className={`w-full ${currentSection === 4 || currentSection === 5 ? 'aspect-square' : 'h-32'} object-cover rounded`}
                            controls
+                           autoPlay={currentSection === 4 || currentSection === 5}
+                           muted={currentSection === 4 || currentSection === 5}
                            onError={(e) => {
                              const video = e.currentTarget as HTMLVideoElement;
                              const fallback = video.nextElementSibling as HTMLElement;
@@ -2245,7 +2256,7 @@ export default function AssetsPage() {
                            <div className="text-center">
                              <div className="text-3xl mb-2">🎬</div>
                              <span className="text-sm text-gray-400">
-                               {currentSection === 4 ? 'Lesson video not found' : 'Reward video not found'}
+                               {currentSection === 4 ? 'Lesson video not found' : `Reward video not found (${asset.key}.mp4)`}
                              </span>
                            </div>
                          </div>
@@ -2347,7 +2358,7 @@ export default function AssetsPage() {
                 </pre>
               )
             ) : (
-              <VideoPreview jsonData={parsedJson} />
+              <VideoPreview jsonData={parsedJson} asset={asset} />
             )}
           </div>
         )}
