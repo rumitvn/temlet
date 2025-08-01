@@ -31,6 +31,9 @@ export const generateAssets = (renderItem: RenderItem, channel: string = "minima
   const imagePath = (name: string) =>
     config.getAssetFileUrl(config.buildAssetPath("image", channel, topic, `${name}.jpg`));
 
+  const quiz3ImagePath = (name: string) =>
+    config.getAssetFileUrl(config.buildAssetPath("image", channel, topic, `options/${name}.jpg`));
+
   const videoPath = (name: string) =>
     config.getAssetFileUrl(config.buildAssetPath("video", channel, topic, `${name}.mp4`));
 
@@ -171,22 +174,22 @@ export const generateAssets = (renderItem: RenderItem, channel: string = "minima
     {
       type: "image",
       layerName: "quiz_3_ans_1_image",
-      src: imagePath(quiz3.options?.[0] || "shark"),
+      src: quiz3ImagePath(quiz3.options?.[0] || "shark"),
     },
     {
       type: "image",
       layerName: "quiz_3_ans_2_image",
-      src: imagePath(quiz3.options?.[1] || "lion"),
+      src: quiz3ImagePath(quiz3.options?.[1] || "lion"),
     },
     {
       type: "image",
       layerName: "quiz_3_ans_3_image",
-      src: imagePath(quiz3.options?.[2] || "hippo"),
+      src: quiz3ImagePath(quiz3.options?.[2] || "hippo"),
     },
     {
       type: "image",
       layerName: "quiz_3_ans_4_image",
-      src: imagePath(quiz3.options?.[3] || "rabbit"),
+      src: quiz3ImagePath(quiz3.options?.[3] || "rabbit"),
     },
     {
       type: "audio",

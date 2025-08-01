@@ -28,34 +28,38 @@ interface GenerateTopicImageRequest {
 }
 
 // Helper function to generate topic-specific prompts
-function generateTopicPrompt(subject: string, topic: string): string {
+function generateTopicPrompt(subject: string, topic: string, size?: string): string {
   const baseSubject = subject.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
   
   // Map 'histories' to 'history' for prompt generation
   const normalizedTopic = topic === 'histories' ? 'history' : topic;
   
+  // Size requirements for better educational visibility
+  const sizeRequirement = size ? ` The image should be generated at ${size} resolution for optimal quality.` : '';
+  const zoomRequirement = " The image should show the complete subject from a medium distance - not too close up, so learners can see the full object clearly. Avoid extreme close-ups that would make it difficult to identify the subject.";
+  
   switch (normalizedTopic) {
     case 'animals':
-      return `A realistic, high-quality photograph of a ${baseSubject} in its natural habitat. The image should be clear, detailed, and suitable for educational content. The ${baseSubject} should be the main focus of the image, well-lit, and in a natural pose. Background should be appropriate to the animal's environment - forest, ocean, desert, etc. The image should be professional quality suitable for children's educational videos.`;
+      return `A realistic, high-quality photograph of a ${baseSubject} in its natural habitat.${sizeRequirement}${zoomRequirement} The image should be clear, detailed, and suitable for educational content. The ${baseSubject} should be the main focus of the image, well-lit, and in a natural pose showing the full body. Background should be appropriate to the animal's environment - forest, ocean, desert, etc. The image should be professional quality suitable for children's educational videos.`;
     
     case 'plants':
-      return `A beautiful, high-quality photograph of ${baseSubject} in its natural environment. The image should showcase the plant's unique characteristics, leaves, flowers, or structure clearly. The lighting should be natural and bright, highlighting the plant's natural colors and textures. The background should be appropriate - garden, forest, field, etc. The image should be professional quality suitable for children's educational videos.`;
+      return `A beautiful, high-quality photograph of ${baseSubject} in its natural environment.${sizeRequirement}${zoomRequirement} The image should showcase the plant's unique characteristics, leaves, flowers, or structure clearly. The lighting should be natural and bright, highlighting the plant's natural colors and textures. The background should be appropriate - garden, forest, field, etc. The image should be professional quality suitable for children's educational videos.`;
     
     case 'science':
-      return `A clear, educational illustration or photograph that demonstrates the concept of ${baseSubject}. The image should be scientifically accurate and visually engaging. It could show experiments, diagrams, natural phenomena, or scientific principles in action. The image should be bright, colorful, and easy to understand for educational purposes. Suitable for children's science education content.`;
+      return `A clear, educational illustration or photograph that demonstrates the concept of ${baseSubject}.${sizeRequirement}${zoomRequirement} The image should be scientifically accurate and visually engaging. It could show experiments, diagrams, natural phenomena, or scientific principles in action. The image should be bright, colorful, and easy to understand for educational purposes. Suitable for children's science education content.`;
     
     case 'history':
-      return `A historical representation or illustration of ${baseSubject}. This could be a historical figure, event, place, or artifact. The image should be historically accurate and visually engaging. It could be a portrait, scene, or object that represents the historical significance. The image should be clear, detailed, and suitable for educational content about history.`;
+      return `A historical representation or illustration of ${baseSubject}.${sizeRequirement}${zoomRequirement} This could be a historical figure, event, place, or artifact. The image should be historically accurate and visually engaging. It could be a portrait, scene, or object that represents the historical significance. The image should be clear, detailed, and suitable for educational content about history.`;
     
     default:
-      return `A high-quality, educational image of ${baseSubject}. The image should be clear, detailed, and suitable for educational content. Professional quality suitable for children's educational videos.`;
+      return `A high-quality, educational image of ${baseSubject}.${sizeRequirement}${zoomRequirement} The image should be clear, detailed, and suitable for educational content. Professional quality suitable for children's educational videos.`;
   }
 }
 
 // Helper function to generate image using OpenAI
 async function generateImageWithOpenAI(params: GenerateTopicImageRequest) {
   try {
-    const prompt = generateTopicPrompt(params.subject, params.topic);
+    const prompt = generateTopicPrompt(params.subject, params.topic, params.size);
     
     const response = await openai.images.generate({
       model: "dall-e-3",
@@ -84,7 +88,7 @@ async function generateImageWithOpenAI(params: GenerateTopicImageRequest) {
 // Helper function to generate image using Grok
 async function generateImageWithGrok(params: GenerateTopicImageRequest) {
   try {
-    const prompt = generateTopicPrompt(params.subject, params.topic);
+    const prompt = generateTopicPrompt(params.subject, params.topic, params.size);
     
     const response = await grok.images.generate({
       model: "grok-2-image",

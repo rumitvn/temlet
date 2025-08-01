@@ -2736,7 +2736,7 @@ export default function AssetsPage() {
               subject: missingImage,
               topic: topic,
               model: 'grok',
-              size: '1024x1024',
+              size: '512x512',
               quality: 'standard',
               style: 'vivid',
               channel: selectedChannel,
