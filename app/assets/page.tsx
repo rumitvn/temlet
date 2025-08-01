@@ -185,6 +185,7 @@ export default function AssetsPage() {
 
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewVideoMode, setPreviewVideoMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(12);
 
@@ -1721,8 +1722,9 @@ export default function AssetsPage() {
     }
   };
 
-  const handlePreviewAsset = (asset: Asset) => {
+  const handlePreviewAsset = (asset: Asset, videoMode = false) => {
     setPreviewAsset(asset);
+    setPreviewVideoMode(videoMode);
     setShowPreview(true);
   };
 
@@ -1742,6 +1744,7 @@ export default function AssetsPage() {
     });
     
     setShowPreview(false);
+    setPreviewVideoMode(false);
   };
 
   const getAssetPreviewContent = (asset: Asset) => {
@@ -1785,7 +1788,7 @@ export default function AssetsPage() {
         );
       case 'json':
         return (
-          <JSONPreview asset={asset} />
+          <JSONPreview asset={asset} initialViewMode={previewVideoMode ? 'video' : 'json'} />
         );
       default:
         return <div className="text-center text-gray-400">Preview not available</div>;
@@ -1793,12 +1796,14 @@ export default function AssetsPage() {
   };
 
   // JSON Preview Component
-  const JSONPreview = ({ asset }: { asset: Asset }) => {
+  const JSONPreview = ({ asset, initialViewMode = 'json' }: { asset: Asset; initialViewMode?: 'json' | 'video' }) => {
     const [jsonContent, setJsonContent] = useState<string>('Loading...');
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState<string>('');
     const [saving, setSaving] = useState(false);
+    const [viewMode, setViewMode] = useState<'json' | 'video'>(initialViewMode);
+    const [parsedJson, setParsedJson] = useState<any>(null);
 
     useEffect(() => {
       const loadJSON = async () => {
@@ -1808,9 +1813,11 @@ export default function AssetsPage() {
           const response = await fetch(`/api/assets/preview?path=${encodeURIComponent(asset.path)}&channel=${selectedChannel}&topic=${selectedTopic}&t=${timestamp}`);
           if (response.ok) {
             const content = await response.text();
-            const formattedContent = JSON.stringify(JSON.parse(content), null, 2);
+            const parsed = JSON.parse(content);
+            const formattedContent = JSON.stringify(parsed, null, 2);
             setJsonContent(formattedContent);
             setEditContent(formattedContent);
+            setParsedJson(parsed);
           } else {
             setJsonContent('Failed to load JSON content');
           }
@@ -1840,9 +1847,11 @@ export default function AssetsPage() {
         const response = await fetch(`/api/assets/preview?path=${encodeURIComponent(asset.path)}&channel=${selectedChannel}&topic=${selectedTopic}&t=${timestamp}`);
         if (response.ok) {
           const content = await response.text();
-          const formattedContent = JSON.stringify(JSON.parse(content), null, 2);
+          const parsed = JSON.parse(content);
+          const formattedContent = JSON.stringify(parsed, null, 2);
           setJsonContent(formattedContent);
           setEditContent(formattedContent);
+          setParsedJson(parsed);
         }
       } catch (error) {
         console.error('Error reloading JSON content:', error);
@@ -1919,8 +1928,350 @@ export default function AssetsPage() {
       }
     };
 
+    // Video Preview Component
+    const VideoPreview = ({ jsonData }: { jsonData: any }) => {
+      const [currentSection, setCurrentSection] = useState(0);
+      const [isPlaying, setIsPlaying] = useState(false);
+      const [currentTime, setCurrentTime] = useState(0);
+      const [totalDuration, setTotalDuration] = useState(0);
+
+      const sections = [
+        { name: 'Intro', icon: '🎬', duration: 5 },
+        { name: 'Quiz 1', icon: '❓', duration: 8 },
+        { name: 'Quiz 2', icon: '❓', duration: 8 },
+        { name: 'Quiz 3', icon: '❓', duration: 8 },
+        { name: 'Lesson', icon: '📚', duration: 6 },
+        { name: 'Reward', icon: '🏆', duration: 4 }
+      ];
+
+      useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (isPlaying) {
+          interval = setInterval(() => {
+            setCurrentTime(prev => {
+              const newTime = prev + 0.1;
+              if (newTime >= totalDuration) {
+                setIsPlaying(false);
+                return 0;
+              }
+              
+              // Update current section based on time
+              let accumulatedTime = 0;
+              for (let i = 0; i < sections.length; i++) {
+                if (newTime < accumulatedTime + sections[i].duration) {
+                  setCurrentSection(i);
+                  break;
+                }
+                accumulatedTime += sections[i].duration;
+              }
+              
+              return newTime;
+            });
+          }, 100);
+        }
+        return () => clearInterval(interval);
+      }, [isPlaying, totalDuration]);
+
+      useEffect(() => {
+        // Calculate total duration
+        const total = sections.reduce((sum, section) => sum + section.duration, 0);
+        setTotalDuration(total);
+        
+        // Initialize current section based on time
+        let accumulatedTime = 0;
+        for (let i = 0; i < sections.length; i++) {
+          if (currentTime < accumulatedTime + sections[i].duration) {
+            setCurrentSection(i);
+            break;
+          }
+          accumulatedTime += sections[i].duration;
+        }
+      }, [currentTime]);
+
+
+
+      const handlePlayPause = () => {
+        setIsPlaying(!isPlaying);
+      };
+
+      const handleSeek = (time: number) => {
+        setCurrentTime(time);
+        // Calculate which section we're in
+        let accumulatedTime = 0;
+        for (let i = 0; i < sections.length; i++) {
+          if (time < accumulatedTime + sections[i].duration) {
+            setCurrentSection(i);
+            break;
+          }
+          accumulatedTime += sections[i].duration;
+        }
+      };
+
+      const formatTime = (time: number) => {
+        const minutes = Math.floor(time / 60);
+        const seconds = Math.floor(time % 60);
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      };
+
+      const getCurrentSectionContent = () => {
+        if (!jsonData) return null;
+
+        switch (currentSection) {
+          case 0: // Intro
+            return {
+              title: 'Introduction',
+              text: jsonData.intro?.text || 'No intro text available',
+              voice: jsonData.intro?.voice || 'No voice available'
+            };
+          case 1: // Quiz 1
+            return {
+              title: 'Quiz 1',
+              question: jsonData.quiz_1?.question?.text || 'No question available',
+              options: jsonData.quiz_1?.options || [],
+              answer: jsonData.quiz_1?.answer?.position || 0,
+              voice: jsonData.quiz_1?.question?.voice || 'No voice available'
+            };
+          case 2: // Quiz 2
+            return {
+              title: 'Quiz 2',
+              question: jsonData.quiz_2?.question?.text || 'No question available',
+              options: jsonData.quiz_2?.options || [],
+              answer: jsonData.quiz_2?.answer?.position || 0,
+              voice: jsonData.quiz_2?.question?.voice || 'No voice available'
+            };
+          case 3: // Quiz 3
+            return {
+              title: 'Quiz 3',
+              question: jsonData.quiz_3?.question?.text || 'No question available',
+              options: jsonData.quiz_3?.options || [],
+              answer: jsonData.quiz_3?.answer?.position || 0,
+              voice: jsonData.quiz_3?.question?.voice || 'No voice available'
+            };
+          case 4: // Lesson
+            return {
+              title: 'Lesson',
+              text: 'Educational content about the topic',
+              voice: jsonData.lesson?.voice || 'No voice available'
+            };
+          case 5: // Reward
+            return {
+              title: 'Reward',
+              text: 'Congratulations! You completed the lesson!',
+              voice: jsonData.reward?.voice || 'No voice available'
+            };
+          default:
+            return null;
+        }
+      };
+
+      const content = getCurrentSectionContent();
+      
+      // Debug log to see if currentSection is updating
+      console.log('VideoPreview - currentSection:', currentSection, 'currentTime:', currentTime, 'content:', content);
+
+      return (
+        <div className="bg-gray-800 rounded-lg p-6 space-y-6 min-h-[600px]">
+          {/* Video Player Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="text-2xl">🎬</div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Video Preview</h3>
+                <p className="text-sm text-gray-400">{asset.name}</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handlePlayPause}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium transition-colors"
+              >
+                {isPlaying ? '⏸️ Pause' : '▶️ Play'}
+              </button>
+            </div>
+          </div>
+
+          {/* Timeline */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm text-gray-400">
+              <span>{formatTime(currentTime)}</span>
+              <span>{formatTime(totalDuration)}</span>
+            </div>
+            <div className="relative">
+              <input
+                type="range"
+                min="0"
+                max={totalDuration}
+                value={currentTime}
+                onChange={(e) => handleSeek(parseFloat(e.target.value))}
+                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                style={{
+                  background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(currentTime / totalDuration) * 100}%, #374151 ${(currentTime / totalDuration) * 100}%, #374151 100%)`
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Section Indicators */}
+          <div className="flex space-x-2">
+            {sections.map((section, index) => {
+              const sectionStart = sections.slice(0, index).reduce((sum, s) => sum + s.duration, 0);
+              const sectionEnd = sectionStart + section.duration;
+              const isActive = currentTime >= sectionStart && currentTime < sectionEnd;
+              const isCompleted = currentTime >= sectionEnd;
+
+              return (
+                <button
+                  key={section.name}
+                  onClick={() => handleSeek(sectionStart)}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                    isActive 
+                      ? 'bg-purple-600 text-white' 
+                      : isCompleted 
+                        ? 'bg-green-600 text-white' 
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-center space-x-1">
+                    <span>{section.icon}</span>
+                    <span>{section.name}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Current Section Content */}
+          {content && (
+            <div className="bg-gray-700 rounded-lg p-6 space-y-4 min-h-[400px]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="text-2xl">{sections[currentSection].icon}</div>
+                  <h4 className="text-xl font-semibold text-white">{content.title}</h4>
+                </div>
+                <div className="text-sm text-gray-400">
+                  Section {currentSection + 1} of {sections.length} • {formatTime(currentTime)} / {formatTime(totalDuration)}
+                </div>
+              </div>
+
+              {/* Content Display */}
+              <div className="space-y-4">
+                {currentSection >= 1 && currentSection <= 3 ? (
+                  // Quiz Section
+                  <div className="space-y-4">
+                    <div className="bg-gray-600 rounded-lg p-4">
+                      <h5 className="text-lg font-medium text-white mb-2">Question:</h5>
+                      <p className="text-gray-200">{content.question}</p>
+                    </div>
+                    
+                                         <div className="grid grid-cols-2 gap-3">
+                       {content.options.map((option: string, index: number) => (
+                         <div
+                           key={index}
+                           className={`p-3 rounded-lg text-left transition-all ${
+                             index === (content.answer - 1) // Convert 1-based to 0-based
+                               ? 'bg-green-600 text-white border-2 border-green-400'
+                               : 'bg-gray-600 text-gray-200'
+                           }`}
+                         >
+                           <div className="flex items-center space-x-2">
+                             <span className="text-sm font-medium">
+                               {String.fromCharCode(65 + index)}.
+                             </span>
+                             <span>{option}</span>
+                             {index === (content.answer - 1) && (
+                               <span className="ml-auto text-green-200">✓</span>
+                             )}
+                           </div>
+                           
+                           {/* Show image for Quiz 3 if available */}
+                           {currentSection === 3 && (
+                             <div className="mt-2">
+                               {(() => {
+                                 const imagePath = `${config.workingDirectory}/${selectedChannel}/${selectedTopic}/image/options/${option.toLowerCase()}.png`;
+                                 console.log('Quiz 3 Image Path:', imagePath);
+                                 return (
+                                   <img 
+                                     src={`/api/assets/preview?path=${encodeURIComponent(imagePath)}&channel=${selectedChannel}&topic=${selectedTopic}`}
+                                     alt={option}
+                                     className="w-full h-24 object-cover rounded"
+                                     onError={(e) => {
+                                       const img = e.currentTarget as HTMLImageElement;
+                                       console.log('Image failed to load:', img.src);
+                                       // Try jpg if png fails
+                                       if (img.src.includes('.png')) {
+                                         img.src = img.src.replace('.png', '.jpg');
+                                       } else if (img.src.includes('.jpg')) {
+                                         img.src = img.src.replace('.jpg', '.jpeg');
+                                       } else {
+                                         // Show placeholder if all formats fail
+                                         img.src = `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDIwMCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiBmaWxsPSIjMzc0MTUxIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiPkltYWdlIG5vdCBmb3VuZDwvdGV4dD4KPC9zdmc+`;
+                                       }
+                                     }}
+                                   />
+                                 );
+                               })()}
+                             </div>
+                           )}
+                         </div>
+                       ))}
+                     </div>
+                  </div>
+                                 ) : (
+                   // Non-Quiz Section
+                   <div className="space-y-4">
+                     <div className="bg-gray-600 rounded-lg p-4">
+                       <h5 className="text-lg font-medium text-white mb-2">Content:</h5>
+                       <p className="text-gray-200">{content.text}</p>
+                     </div>
+                     
+                     {/* Show video preview for Lesson and Reward sections */}
+                     {(currentSection === 4 || currentSection === 5) && (
+                       <div className="bg-gray-600 rounded-lg p-4">
+                         <h5 className="text-lg font-medium text-white mb-2">Video Preview:</h5>
+                         <video 
+                           src={`/api/assets/preview?path=${encodeURIComponent(`${config.workingDirectory}/${selectedChannel}/${selectedTopic}/video/${currentSection === 4 ? 'lesson' : 'reward'}.mp4`)}&channel=${selectedChannel}&topic=${selectedTopic}`}
+                           className="w-full h-32 object-cover rounded"
+                           controls
+                           onError={(e) => {
+                             const video = e.currentTarget as HTMLVideoElement;
+                             const fallback = video.nextElementSibling as HTMLElement;
+                             if (video && fallback) {
+                               video.style.display = 'none';
+                               fallback.style.display = 'flex';
+                             }
+                           }}
+                         />
+                         <div className="w-full h-32 bg-gray-700 rounded flex items-center justify-center" style={{ display: 'none' }}>
+                           <div className="text-center">
+                             <div className="text-3xl mb-2">🎬</div>
+                             <span className="text-sm text-gray-400">
+                               {currentSection === 4 ? 'Lesson video not found' : 'Reward video not found'}
+                             </span>
+                           </div>
+                         </div>
+                       </div>
+                     )}
+                   </div>
+                 )}
+
+                {/* Voice Preview */}
+                <div className="bg-blue-600 rounded-lg p-4">
+                  <h5 className="text-lg font-medium text-white mb-2">Voice Narration:</h5>
+                  <p className="text-white">{content.voice}</p>
+                  <div className="mt-2 flex items-center space-x-2">
+                    <span className="text-sm text-blue-200">🎵</span>
+                    <span className="text-sm text-blue-200">Voice file would play here</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
     return (
-      <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-auto">
+      <div className="bg-gray-900 rounded-lg p-4 max-h-[80vh] overflow-auto w-full max-w-4xl">
         {loading ? (
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
@@ -1928,15 +2279,42 @@ export default function AssetsPage() {
         ) : (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h4 className="text-lg font-semibold text-purple-400">JSON Content</h4>
-              {!isEditing ? (
+              <div className="flex items-center space-x-4">
+                <h4 className="text-lg font-semibold text-purple-400">JSON Content</h4>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setViewMode('json')}
+                    className={`px-3 py-1 rounded text-sm transition-colors ${
+                      viewMode === 'json' 
+                        ? 'bg-purple-600 text-white' 
+                        : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                    }`}
+                  >
+                    JSON
+                  </button>
+                  <button
+                    onClick={() => setViewMode('video')}
+                    className={`px-3 py-1 rounded text-sm transition-colors ${
+                      viewMode === 'video' 
+                        ? 'bg-purple-600 text-white' 
+                        : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                    }`}
+                  >
+                    🎬 Video Preview
+                  </button>
+                </div>
+              </div>
+              
+              {viewMode === 'json' && !isEditing && (
                 <button
                   onClick={handleEdit}
                   className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition-colors"
                 >
                   Edit
                 </button>
-              ) : (
+              )}
+              
+              {viewMode === 'json' && isEditing && (
                 <div className="flex gap-2">
                   <button
                     onClick={handleSave}
@@ -1955,17 +2333,21 @@ export default function AssetsPage() {
               )}
             </div>
             
-            {isEditing ? (
-              <textarea
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                className="w-full h-80 bg-gray-800 text-gray-300 text-sm font-mono p-4 rounded border border-gray-600 focus:border-purple-500 focus:outline-none resize-none"
-                placeholder="Edit JSON content here..."
-              />
+            {viewMode === 'json' ? (
+              isEditing ? (
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full h-80 bg-gray-800 text-gray-300 text-sm font-mono p-4 rounded border border-gray-600 focus:border-purple-500 focus:outline-none resize-none"
+                  placeholder="Edit JSON content here..."
+                />
+              ) : (
+                <pre className="text-sm text-gray-300 whitespace-pre-wrap">
+                  {jsonContent}
+                </pre>
+              )
             ) : (
-              <pre className="text-sm text-gray-300 whitespace-pre-wrap">
-                {jsonContent}
-              </pre>
+              <VideoPreview jsonData={parsedJson} />
             )}
           </div>
         )}
@@ -2325,6 +2707,35 @@ export default function AssetsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
+      <style jsx>{`
+        .slider::-webkit-slider-thumb {
+          appearance: none;
+          height: 20px;
+          width: 20px;
+          border-radius: 50%;
+          background: #8b5cf6;
+          cursor: pointer;
+          border: 2px solid #ffffff;
+        }
+        
+        .slider::-moz-range-thumb {
+          height: 20px;
+          width: 20px;
+          border-radius: 50%;
+          background: #8b5cf6;
+          cursor: pointer;
+          border: 2px solid #ffffff;
+        }
+        
+        .slider::-ms-thumb {
+          height: 20px;
+          width: 20px;
+          border-radius: 50%;
+          background: #8b5cf6;
+          cursor: pointer;
+          border: 2px solid #ffffff;
+        }
+      `}</style>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -2965,6 +3376,12 @@ export default function AssetsPage() {
                         >
                           View JSON
                         </button>
+                        <button
+                          onClick={() => handlePreviewAsset(pair.json, true)}
+                          className="flex-1 text-base text-purple-300 bg-purple-800 rounded-lg px-4 py-2 text-center hover:bg-purple-700 transition-colors"
+                        >
+                          🎬 Preview Video
+                        </button>
                         {!pair.hasAllVoices && (
                           <button
                             onClick={() => handleGenerateVoice(pair.json)}
@@ -3502,7 +3919,7 @@ export default function AssetsPage() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+              className="bg-gray-800 rounded-lg p-6 w-full max-w-6xl max-h-[95vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-4">
