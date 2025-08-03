@@ -1,0 +1,1046 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  PlusIcon, 
+  MagnifyingGlassIcon, 
+  FunnelIcon,
+  ChevronUpIcon,
+  ChevronDownIcon
+} from "@heroicons/react/24/outline";
+import { 
+  ClockIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  DocumentTextIcon,
+  ArrowUpTrayIcon,
+  ShieldCheckIcon,
+  PhotoIcon,
+  VideoCameraIcon,
+  GlobeAltIcon,
+  ExclamationTriangleIcon,
+  PlayIcon,
+  PauseIcon
+} from "@heroicons/react/24/solid";
+import CreateCrawlerDialog from "../components/CreateCrawlerDialog";
+
+// Custom debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+// Default filter values
+const defaultTypes = ["Image", "Video"];
+const defaultTopics = [
+  "Animals",
+  "Plants",
+  "Histories",
+  "Science",
+  "Technology",
+  "Nature",
+  "Space",
+  "Ocean",
+  "Weather",
+  "Geography"
+];
+const defaultChannels = [
+  "MiniMate",
+  "RumitX Studio",
+  "RumitX Shorts",
+  "RumitX Nature",
+  "RumitX Science",
+  "RumitX History"
+];
+const defaultSites = [
+  "Pexels",
+  "Pixabay",
+  "Unsplash",
+  "Pexels Videos",
+  "Pixabay Videos"
+];
+
+// Try to import from filters file, fallback to defaults if it fails
+let types = defaultTypes;
+let topics = defaultTopics;
+let channels = defaultChannels;
+let sites = defaultSites;
+
+try {
+  const filters = require("@/app/data/filters");
+  types = filters.types || defaultTypes;
+  topics = filters.topics || defaultTopics;
+  channels = filters.channels || defaultChannels;
+  sites = filters.sites || defaultSites;
+} catch (error) {
+  console.warn("Failed to load filters from file, using defaults:", error);
+}
+
+const statusColors = {
+  pending: "bg-blue-500/20 text-blue-400",
+  crawling: "bg-orange-500/20 text-orange-400",
+  downloading: "bg-yellow-500/20 text-yellow-400",
+  completed: "bg-green-500/20 text-green-400",
+  failed: "bg-red-500/20 text-red-400",
+  paused: "bg-gray-500/20 text-gray-400"
+};
+
+const statusGroups = {
+  active: {
+    title: "Active",
+    icon: PlayIcon,
+    statuses: ['pending', 'crawling', 'downloading'] as CrawlerStatus[]
+  },
+  completed: {
+    title: "Completed",
+    icon: CheckCircleIcon,
+    statuses: ['completed'] as CrawlerStatus[]
+  },
+  issues: {
+    title: "Issues",
+    icon: ExclamationTriangleIcon,
+    statuses: ['failed', 'paused'] as CrawlerStatus[]
+  }
+};
+
+type CrawlerStatus = 'pending' | 'crawling' | 'downloading' | 'completed' | 'failed' | 'paused';
+
+interface CrawlerJob {
+  id: string;
+  name: string;
+  keyword: string;
+  site: string;
+  type: 'image' | 'video';
+  channel: string;
+  topic: string;
+  status: CrawlerStatus;
+  progress: number;
+  totalItems: number;
+  downloadedItems: number;
+  failedItems: number;
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  error?: string;
+  outputPath: string;
+  settings: {
+    maxItems: number;
+    quality: 'low' | 'medium' | 'high';
+    format: string;
+  };
+}
+
+interface CrawlerStats {
+  totalJobs: number;
+  activeJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+  totalDownloaded: number;
+  totalFailed: number;
+  averageSpeed: number;
+}
+
+const getStatusIcon = (status: CrawlerStatus) => {
+  switch (status) {
+    case 'pending':
+      return ClockIcon;
+    case 'crawling':
+      return GlobeAltIcon;
+    case 'downloading':
+      return ArrowUpTrayIcon;
+    case 'completed':
+      return CheckCircleIcon;
+    case 'failed':
+      return XCircleIcon;
+    case 'paused':
+      return PauseIcon;
+    default:
+      return ClockIcon;
+  }
+};
+
+export default function CrawlersPage() {
+  const [jobs, setJobs] = useState<CrawlerJob[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 200);
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+  const [selectedSite, setSelectedSite] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [statusCounts, setStatusCounts] = useState<Partial<Record<CrawlerStatus, number>>>({});
+  const [loadingCounts, setLoadingCounts] = useState(true);
+  const [stats, setStats] = useState<CrawlerStats>({
+    totalJobs: 0,
+    activeJobs: 0,
+    completedJobs: 0,
+    failedJobs: 0,
+    totalDownloaded: 0,
+    totalFailed: 0,
+    averageSpeed: 0
+  });
+
+  const fetchStatusCounts = useCallback(async () => {
+    try {
+      setLoadingCounts(true);
+      const response = await fetch('/api/crawlers/status-counts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch status counts');
+      }
+      const data = await response.json();
+      setStatusCounts(data);
+    } catch (error) {
+      console.error('Error fetching status counts:', error);
+    } finally {
+      setLoadingCounts(false);
+    }
+  }, []);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const response = await fetch('/api/crawlers/stats');
+      if (!response.ok) {
+        throw new Error('Failed to fetch stats');
+      }
+      const data = await response.json();
+      setStats(data);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  }, []);
+
+  const fetchJobs = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        sortBy,
+        sortOrder,
+        limit: itemsPerPage.toString()
+      });
+
+      if (debouncedSearchQuery) {
+        params.append("q", debouncedSearchQuery);
+      }
+      if (selectedType) params.append("type", selectedType);
+      if (selectedTopic) params.append("topic", selectedTopic);
+      if (selectedChannel) params.append("channel", selectedChannel);
+      if (selectedSite) params.append("site", selectedSite);
+      if (selectedStatus) params.append("status", selectedStatus);
+
+      const response = await fetch(`/api/crawlers?${params}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch crawler jobs');
+      }
+      const data = await response.json();
+      setJobs(data.jobs || []);
+      setTotalPages(data.totalPages || 1);
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      setError('Failed to load crawler jobs');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, sortBy, sortOrder, itemsPerPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, selectedSite, selectedStatus]);
+
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
+
+  useEffect(() => {
+    fetchStatusCounts();
+    fetchStats();
+  }, [fetchStatusCounts, fetchStats]);
+
+  const getActiveFiltersCount = () => {
+    let count = 0;
+    if (selectedType) count++;
+    if (selectedTopic) count++;
+    if (selectedChannel) count++;
+    if (selectedSite) count++;
+    return count;
+  };
+
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(field);
+      setSortOrder("desc");
+    }
+  };
+
+  const clearFilters = () => {
+    setSelectedType(null);
+    setSelectedTopic(null);
+    setSelectedChannel(null);
+    setSelectedSite(null);
+    setSelectedStatus(null);
+  };
+
+  const formatDate = (dateString: string | number | Date | null | undefined) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleString();
+  };
+
+  const handleStatusClick = (status: string) => {
+    setSelectedStatus(selectedStatus === status ? null : status);
+  };
+
+  const handleItemSelect = (itemId: string, event: React.MouseEvent) => {
+    if (event.ctrlKey || event.metaKey) {
+      setSelectedItems(prev => 
+        prev.includes(itemId) 
+          ? prev.filter(id => id !== itemId)
+          : [...prev, itemId]
+      );
+    } else {
+      setSelectedItems([itemId]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    setSelectedItems(jobs.map(job => job.id));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedItems([]);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedItems.length} crawler job(s)?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/crawlers/batch', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedItems })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete jobs');
+      }
+
+      setJobs(prev => prev.filter(job => !selectedItems.includes(job.id)));
+      setSelectedItems([]);
+      fetchStatusCounts();
+      fetchStats();
+    } catch (error) {
+      console.error('Error deleting jobs:', error);
+      alert('Failed to delete jobs');
+    }
+  };
+
+  const handleActionClick = async (action: string) => {
+    if (selectedItems.length === 0) return;
+
+    try {
+      const response = await fetch('/api/crawlers/batch-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          ids: selectedItems, 
+          action 
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to ${action} jobs`);
+      }
+
+      // Refresh the jobs list
+      fetchJobs();
+      fetchStatusCounts();
+      fetchStats();
+      setSelectedItems([]);
+    } catch (error) {
+      console.error(`Error ${action}ing jobs:`, error);
+      alert(`Failed to ${action} jobs`);
+    }
+  };
+
+  const handleCreateCrawler = async (data: any) => {
+    try {
+      const response = await fetch('/api/crawlers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create crawler job');
+      }
+
+      const newJob = await response.json();
+      setJobs(prev => [newJob, ...prev]);
+      setIsCreateDialogOpen(false);
+      fetchStatusCounts();
+      fetchStats();
+    } catch (error) {
+      console.error('Error creating crawler job:', error);
+      alert('Failed to create crawler job');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
+      {/* Header - Sticky */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-between items-center mb-8 h-24 sticky top-0 z-40 bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-95 backdrop-blur"
+        style={{ backdropFilter: 'blur(8px)' }}
+      >
+        <div>
+          <motion.h1
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 bg-clip-text text-transparent"
+          >
+            Web Crawlers
+          </motion.h1>
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="flex items-center gap-2 mt-1"
+          >
+            <span className="text-gray-400">Download images and videos from websites</span>
+          </motion.div>
+        </div>
+
+        {/* Navigation Buttons */}
+        <div className="flex gap-4">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+            onClick={() => window.location.href = '/'}
+          >
+            <DocumentTextIcon className="w-5 h-5" />
+            <span>Renders</span>
+          </motion.button>
+          
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+            onClick={() => window.location.href = '/assets'}
+          >
+            <DocumentTextIcon className="w-5 h-5" />
+            <span>Assets</span>
+          </motion.button>
+          
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
+            <PlusIcon className="w-5 h-5" />
+            <span>Create Crawler</span>
+          </motion.button>
+        </div>
+      </motion.div>
+
+      {/* Stats Overview */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gray-800/50 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <GlobeAltIcon className="w-6 h-6 text-blue-400" />
+              <h3 className="text-lg font-medium text-gray-200">Total Jobs</h3>
+            </div>
+            <p className="text-3xl font-bold text-blue-400">{stats.totalJobs}</p>
+          </div>
+          
+          <div className="bg-gray-800/50 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <PlayIcon className="w-6 h-6 text-orange-400" />
+              <h3 className="text-lg font-medium text-gray-200">Active Jobs</h3>
+            </div>
+            <p className="text-3xl font-bold text-orange-400">{stats.activeJobs}</p>
+          </div>
+          
+          <div className="bg-gray-800/50 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircleIcon className="w-6 h-6 text-green-400" />
+              <h3 className="text-lg font-medium text-gray-200">Completed</h3>
+            </div>
+            <p className="text-3xl font-bold text-green-400">{stats.completedJobs}</p>
+          </div>
+          
+          <div className="bg-gray-800/50 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <ArrowUpTrayIcon className="w-6 h-6 text-purple-400" />
+              <h3 className="text-lg font-medium text-gray-200">Downloaded</h3>
+            </div>
+            <p className="text-3xl font-bold text-purple-400">{stats.totalDownloaded}</p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Status Counts Bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6"
+      >
+        <div className="flex flex-col lg:flex-row gap-4">
+          {Object.entries(statusGroups).map(([groupKey, group]) => (
+            <div key={groupKey} className="flex-1 bg-gray-800/50 rounded-xl p-3 mb-4 lg:mb-0">
+              <div className="flex items-center gap-2 mb-2">
+                <group.icon className="w-6 h-6 text-purple-400" />
+                <h3 className="text-2xl font-bold text-gray-200 flex items-center">
+                  {group.title}
+                  {loadingCounts && (
+                    <svg className="animate-spin ml-2 h-4 w-4 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                    </svg>
+                  )}
+                </h3>
+                {selectedStatus && (
+                  <button
+                    onClick={() => setSelectedStatus(null)}
+                    className="ml-4 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded text-gray-200"
+                  >
+                    Clear Status Filter
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {group.statuses.map((status) => {
+                  const Icon = getStatusIcon(status);
+                  const count = statusCounts[status] || 0;
+                  return (
+                    <motion.button
+                      key={status}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleStatusClick(status)}
+                      className={`flex items-center justify-between p-2 rounded-lg text-lg font-medium transition-all ${
+                        statusColors[status]
+                      } ${selectedStatus === status ? 'ring-2 ring-white' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Icon className="w-5 h-5" />
+                        <span>{status.replace(/_/g, ' ')}</span>
+                      </div>
+                      <span className="text-2xl font-extrabold">{count}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* Action Bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-end gap-2 mb-6"
+      >
+        {selectedItems.length > 0 && (
+          <>
+            <button
+              onClick={handleDeleteSelected}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+            >
+              Delete ({selectedItems.length})
+            </button>
+            <button
+              onClick={() => handleActionClick('pause')}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-yellow-600 text-white hover:bg-yellow-700 transition-colors"
+            >
+              Pause ({selectedItems.length})
+            </button>
+            <button
+              onClick={() => handleActionClick('resume')}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
+            >
+              Resume ({selectedItems.length})
+            </button>
+          </>
+        )}
+      </motion.div>
+
+      {/* Search and Filter Bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col gap-4 mb-6"
+      >
+        <div className="flex gap-4">
+          <div className="flex-1 relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search crawler jobs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
+            />
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              showFilters ? "bg-purple-600" : "bg-gray-800 hover:bg-gray-700"
+            }`}
+          >
+            <FunnelIcon className="w-5 h-5" />
+            <span>Filters</span>
+            {getActiveFiltersCount() > 0 && (
+              <span className="bg-purple-500 text-white px-2 py-0.5 rounded-full text-sm">
+                {getActiveFiltersCount()}
+              </span>
+            )}
+          </motion.button>
+        </div>
+
+        {/* Sorting buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleSort("createdAt")}
+            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+              sortBy === "createdAt"
+                ? "bg-purple-600 text-white"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+            }`}
+          >
+            Date
+            {sortBy === "createdAt" && (
+              <span className="ml-1">
+                {sortOrder === "asc" ? "↑" : "↓"}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => handleSort("name")}
+            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+              sortBy === "name"
+                ? "bg-purple-600 text-white"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+            }`}
+          >
+            Name
+            {sortBy === "name" && (
+              <span className="ml-1">
+                {sortOrder === "asc" ? "↑" : "↓"}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => handleSort("type")}
+            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+              sortBy === "type"
+                ? "bg-purple-600 text-white"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+            }`}
+          >
+            Type
+            {sortBy === "type" && (
+              <span className="ml-1">
+                {sortOrder === "asc" ? "↑" : "↓"}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => handleSort("status")}
+            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+              sortBy === "status"
+                ? "bg-purple-600 text-white"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+            }`}
+          >
+            Status
+            {sortBy === "status" && (
+              <span className="ml-1">
+                {sortOrder === "asc" ? "↑" : "↓"}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="bg-gray-800 rounded-lg p-4 space-y-4"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium">Filters</h3>
+                <button
+                  onClick={clearFilters}
+                  className="text-gray-400 hover:text-gray-300"
+                >
+                  Clear All
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Type Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Type
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {types.map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setSelectedType(selectedType === type ? null : type)}
+                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                          selectedType === type
+                            ? "bg-purple-600 text-white"
+                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Topic Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Topic
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {topics.map((topic) => (
+                      <button
+                        key={topic}
+                        onClick={() => setSelectedTopic(selectedTopic === topic ? null : topic)}
+                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                          selectedTopic === topic
+                            ? "bg-purple-600 text-white"
+                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        }`}
+                      >
+                        {topic}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Channel Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Channel
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {channels.map((channel) => (
+                      <button
+                        key={channel}
+                        onClick={() => setSelectedChannel(selectedChannel === channel ? null : channel)}
+                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                          selectedChannel === channel
+                            ? "bg-purple-600 text-white"
+                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        }`}
+                      >
+                        {channel}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Site Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Site
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {sites.map((site) => (
+                      <button
+                        key={site}
+                        onClick={() => setSelectedSite(selectedSite === site ? null : site)}
+                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                          selectedSite === site
+                            ? "bg-purple-600 text-white"
+                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        }`}
+                      >
+                        {site}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      {/* Jobs Table */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gray-800/50 rounded-xl overflow-hidden"
+      >
+        <div className="p-4 border-b border-gray-700">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Crawler Jobs</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSelectAll}
+                className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+              >
+                Select All
+              </button>
+              <button
+                onClick={handleDeselectAll}
+                className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+              >
+                Deselect All
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400 mx-auto"></div>
+            <p className="mt-2 text-gray-400">Loading crawler jobs...</p>
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center">
+            <p className="text-red-400">{error}</p>
+          </div>
+        ) : jobs.length === 0 ? (
+          <div className="p-8 text-center">
+            <GlobeAltIcon className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-400">No crawler jobs found</p>
+            <button
+              onClick={() => setIsCreateDialogOpen(true)}
+              className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+            >
+              Create Your First Crawler
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-700/50">
+                <tr>
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedItems.length === jobs.length && jobs.length > 0}
+                      onChange={(e) => e.target.checked ? handleSelectAll() : handleDeselectAll()}
+                      className="rounded border-gray-600 bg-gray-700"
+                    />
+                  </th>
+                  <th className="px-4 py-3 text-left">Name</th>
+                  <th className="px-4 py-3 text-left">Keyword</th>
+                  <th className="px-4 py-3 text-left">Site</th>
+                  <th className="px-4 py-3 text-left">Type</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-left">Progress</th>
+                  <th className="px-4 py-3 text-left">Channel</th>
+                  <th className="px-4 py-3 text-left">Topic</th>
+                  <th className="px-4 py-3 text-left">Created</th>
+                  <th className="px-4 py-3 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map((job) => {
+                  const StatusIcon = getStatusIcon(job.status);
+                  const isSelected = selectedItems.includes(job.id);
+                  
+                  return (
+                    <motion.tr
+                      key={job.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className={`border-b border-gray-700 hover:bg-gray-700/30 transition-colors ${
+                        isSelected ? 'bg-purple-600/20' : ''
+                      }`}
+                      onClick={(e) => handleItemSelect(job.id, e)}
+                    >
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded border-gray-600 bg-gray-700"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {job.type === 'image' ? (
+                            <PhotoIcon className="w-5 h-5 text-blue-400" />
+                          ) : (
+                            <VideoCameraIcon className="w-5 h-5 text-red-400" />
+                          )}
+                          <span className="font-medium">{job.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-300">{job.keyword}</td>
+                      <td className="px-4 py-3 text-gray-300">{job.site}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          job.type === 'image' 
+                            ? 'bg-blue-500/20 text-blue-400' 
+                            : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {job.type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <StatusIcon className="w-4 h-4" />
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            statusColors[job.status]
+                          }`}>
+                            {job.status}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 bg-gray-700 rounded-full h-2">
+                            <div 
+                              className="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${job.progress}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-gray-400">
+                            {job.downloadedItems}/{job.totalItems}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-300">{job.channel}</td>
+                      <td className="px-4 py-3 text-gray-300">{job.topic}</td>
+                      <td className="px-4 py-3 text-gray-300">{formatDate(job.createdAt)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          {job.status === 'pending' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleActionClick('start');
+                              }}
+                              className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 rounded transition-colors"
+                            >
+                              Start
+                            </button>
+                          )}
+                          {(job.status === 'crawling' || job.status === 'downloading') && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleActionClick('pause');
+                              }}
+                              className="px-2 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 rounded transition-colors"
+                            >
+                              Pause
+                            </button>
+                          )}
+                          {job.status === 'paused' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleActionClick('resume');
+                              }}
+                              className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 rounded transition-colors"
+                            >
+                              Resume
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSelected();
+                            }}
+                            className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 rounded transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex justify-center items-center gap-2 mt-6"
+        >
+          <button
+            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-800 disabled:text-gray-600 rounded-lg transition-colors"
+          >
+            Previous
+          </button>
+          
+          <span className="px-3 py-2 text-gray-300">
+            Page {currentPage} of {totalPages}
+          </span>
+          
+          <button
+            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-800 disabled:text-gray-600 rounded-lg transition-colors"
+          >
+            Next
+          </button>
+        </motion.div>
+      )}
+
+      {/* Create Crawler Dialog */}
+      <CreateCrawlerDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onSubmit={handleCreateCrawler}
+      />
+    </div>
+  );
+} 
