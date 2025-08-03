@@ -167,6 +167,19 @@ interface SK3QLRContent {
   };
 }
 
+interface OverviewStatus {
+  totalGroups: number;
+  completeGroups: number;
+  incompleteGroups: number;
+  missingJson: number;
+  missingImage: number;
+  missingVideos: number;
+  missingVoices: number;
+  missingRewards: number;
+  missingQuiz3Images: number;
+  completionRate: number;
+}
+
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetGroups, setAssetGroups] = useState<AssetGroup[]>([]);
@@ -192,6 +205,106 @@ export default function AssetsPage() {
   // Sorting state
   const [sortBy, setSortBy] = useState<'name' | 'createDate'>('createDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Overview status filter state
+  const [statusFilter, setStatusFilter] = useState<'all' | 'complete' | 'missing-json' | 'missing-image' | 'missing-videos' | 'missing-voices' | 'missing-rewards' | 'missing-quiz3-images' | 'incomplete'>('all');
+
+  // Calculate overview status
+  const calculateOverviewStatus = useMemo((): OverviewStatus => {
+    const totalGroups = assetGroups.length;
+    let completeGroups = 0;
+    let incompleteGroups = 0;
+    let missingJson = 0;
+    let missingImage = 0;
+    let missingVideos = 0;
+    let missingVoices = 0;
+    let missingRewards = 0;
+    let missingQuiz3Images = 0;
+
+    assetGroups.forEach(group => {
+      const status = group.renderStatus;
+      
+      // Debug logging for Alligator group
+      if (group.name === 'Alligator') {
+        // Manual calculation of completion status
+        const manualIsComplete = status.hasJson && 
+                                status.hasImage && 
+                                status.hasVideos && 
+                                status.availableVoices >= status.requiredVoices &&
+                                status.availableRewards >= status.requiredRewards &&
+                                status.availableQuiz3Images >= status.requiredQuiz3Images;
+        
+        console.log('🐊 Alligator Group Status:', {
+          name: group.name,
+          isComplete: status.isComplete,
+          manualIsComplete: manualIsComplete,
+          hasJson: status.hasJson,
+          hasImage: status.hasImage,
+          hasVideos: status.hasVideos,
+          hasVoices: status.hasVoices,
+          availableVoices: status.availableVoices,
+          requiredVoices: status.requiredVoices,
+          availableRewards: status.availableRewards,
+          requiredRewards: status.requiredRewards,
+          hasQuiz3Images: status.hasQuiz3Images,
+          availableQuiz3Images: status.availableQuiz3Images,
+          requiredQuiz3Images: status.requiredQuiz3Images,
+          voiceComplete: status.availableVoices >= status.requiredVoices,
+          rewardComplete: status.availableRewards >= status.requiredRewards,
+          quiz3Complete: status.availableQuiz3Images >= status.requiredQuiz3Images
+        });
+      }
+      
+      // Calculate completion status manually to ensure consistency
+      const isActuallyComplete = status.hasJson && 
+                                status.hasImage && 
+                                status.hasVideos && 
+                                status.availableVoices >= status.requiredVoices &&
+                                status.availableRewards >= status.requiredRewards &&
+                                status.availableQuiz3Images >= status.requiredQuiz3Images;
+      
+      if (isActuallyComplete) {
+        completeGroups++;
+      } else {
+        incompleteGroups++;
+      }
+
+      if (!status.hasJson) missingJson++;
+      if (!status.hasImage) missingImage++;
+      if (!status.hasVideos) missingVideos++;
+      if (status.availableVoices < status.requiredVoices) missingVoices++;
+      if (status.availableRewards < status.requiredRewards) missingRewards++;
+      if (status.availableQuiz3Images < status.requiredQuiz3Images) missingQuiz3Images++;
+    });
+
+    const completionRate = totalGroups > 0 ? Math.round((completeGroups / totalGroups) * 100) : 0;
+
+    console.log('📊 Overview Status Results:', {
+      totalGroups,
+      completeGroups,
+      incompleteGroups,
+      missingJson,
+      missingImage,
+      missingVideos,
+      missingVoices,
+      missingRewards,
+      missingQuiz3Images,
+      completionRate
+    });
+
+    return {
+      totalGroups,
+      completeGroups,
+      incompleteGroups,
+      missingJson,
+      missingImage,
+      missingVideos,
+      missingVoices,
+      missingRewards,
+      missingQuiz3Images,
+      completionRate
+    };
+  }, [assetGroups]);
 
   // Filter options
   const channelOptions = [
@@ -1015,106 +1128,97 @@ export default function AssetsPage() {
 
   // Client-side filtered asset groups for immediate search feedback
   const filteredAssetGroups = useMemo(() => {
-    // If there's a search query, use the server-side search results (assetGroups)
-    // instead of client-side filtering to ensure proper JSON content
+    let filtered = assetGroups;
+
+    // Apply status filter first
+    if (statusFilter !== 'all') {
+      console.log('🔍 Applying status filter:', statusFilter);
+      filtered = filtered.filter(group => {
+        const status = group.renderStatus;
+        
+        switch (statusFilter) {
+          case 'complete':
+            return status.hasJson && 
+                   status.hasImage && 
+                   status.hasVideos && 
+                   status.availableVoices >= status.requiredVoices &&
+                   status.availableRewards >= status.requiredRewards &&
+                   status.availableQuiz3Images >= status.requiredQuiz3Images;
+          case 'missing-json':
+            return !status.hasJson;
+          case 'missing-image':
+            return !status.hasImage;
+          case 'missing-videos':
+            return !status.hasVideos;
+          case 'missing-voices':
+            return status.availableVoices < status.requiredVoices;
+          case 'missing-rewards':
+            return status.availableRewards < status.requiredRewards;
+          case 'missing-quiz3-images':
+            return status.availableQuiz3Images < status.requiredQuiz3Images;
+          case 'incomplete':
+            return !status.isComplete;
+          default:
+            return true;
+        }
+      });
+      console.log('📊 Status filter applied, filtered groups:', filtered.length);
+    }
+
+    // Apply search filter if there's a search query
     if (searchQuery.trim()) {
-      console.log('🔍 Using server-side search results for query:', searchQuery);
-      let filtered = assetGroups.filter(group => 
+      console.log('🔍 Applying search filter for query:', searchQuery);
+      filtered = filtered.filter(group => 
         group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         group.assets.jsons.some(json => json.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         group.assets.videos.some(video => video.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         group.assets.voices.some(voice => voice.name.toLowerCase().includes(searchQuery.toLowerCase()))
       );
-
-      // Sort the filtered groups
-      console.log(`Sorting server-side results by: ${sortBy}, Order: ${sortOrder}, Groups: ${filtered.length}`);
-      filtered.sort((a, b) => {
-        if (sortBy === 'createDate') {
-          // Get the earliest JSON file creation date for each group
-          const getEarliestJsonDate = (group: AssetGroup): Date => {
-            if (group.assets.jsons.length === 0) {
-              // If no JSON files, use a very old date to push to the end
-              return new Date(0);
-            }
-            
-            // Find the JSON with the earliest lastModified date
-            const earliestJson = group.assets.jsons.reduce((earliest, current) => {
-              const earliestDate = earliest.lastModified ? new Date(earliest.lastModified) : new Date(0);
-              const currentDate = current.lastModified ? new Date(current.lastModified) : new Date(0);
-              return earliestDate < currentDate ? earliest : current;
-            });
-            
-            return earliestJson.lastModified ? new Date(earliestJson.lastModified) : new Date(0);
-          };
-
-          const dateA = getEarliestJsonDate(a);
-          const dateB = getEarliestJsonDate(b);
-          
-          if (sortOrder === 'asc') {
-            return dateA.getTime() - dateB.getTime();
-          } else {
-            return dateB.getTime() - dateA.getTime();
-          }
-        } else {
-          // Sort by name
-          console.log(`Comparing names: "${a.name}" vs "${b.name}"`);
-          if (sortOrder === 'asc') {
-            return a.name.localeCompare(b.name);
-          } else {
-            return b.name.localeCompare(a.name);
-          }
-        }
-      });
-
-      return filtered;
-    } else {
-      // No search query, use all asset groups with client-side filtering for sorting only
-      console.log('📋 No search query, using all asset groups');
-      let filtered = assetGroups;
-
-      // Sort the filtered groups
-      console.log(`Sorting all groups by: ${sortBy}, Order: ${sortOrder}, Groups: ${filtered.length}`);
-      filtered.sort((a, b) => {
-        if (sortBy === 'createDate') {
-          // Get the earliest JSON file creation date for each group
-          const getEarliestJsonDate = (group: AssetGroup): Date => {
-            if (group.assets.jsons.length === 0) {
-              // If no JSON files, use a very old date to push to the end
-              return new Date(0);
-            }
-            
-            // Find the JSON with the earliest lastModified date
-            const earliestJson = group.assets.jsons.reduce((earliest, current) => {
-              const earliestDate = earliest.lastModified ? new Date(earliest.lastModified) : new Date(0);
-              const currentDate = current.lastModified ? new Date(current.lastModified) : new Date(0);
-              return earliestDate < currentDate ? earliest : current;
-            });
-            
-            return earliestJson.lastModified ? new Date(earliestJson.lastModified) : new Date(0);
-          };
-
-          const dateA = getEarliestJsonDate(a);
-          const dateB = getEarliestJsonDate(b);
-          
-          if (sortOrder === 'asc') {
-            return dateA.getTime() - dateB.getTime();
-          } else {
-            return dateB.getTime() - dateA.getTime();
-          }
-        } else {
-          // Sort by name
-          console.log(`Comparing names: "${a.name}" vs "${b.name}"`);
-          if (sortOrder === 'asc') {
-            return a.name.localeCompare(b.name);
-          } else {
-            return b.name.localeCompare(a.name);
-          }
-        }
-      });
-
-      return filtered;
+      console.log('📊 Search filter applied, filtered groups:', filtered.length);
     }
-  }, [assetGroups, searchQuery, sortBy, sortOrder]);
+
+    // Sort the filtered groups
+    console.log(`Sorting filtered groups by: ${sortBy}, Order: ${sortOrder}, Groups: ${filtered.length}`);
+    filtered.sort((a, b) => {
+      if (sortBy === 'createDate') {
+        // Get the earliest JSON file creation date for each group
+        const getEarliestJsonDate = (group: AssetGroup): Date => {
+          if (group.assets.jsons.length === 0) {
+            // If no JSON files, use a very old date to push to the end
+            return new Date(0);
+          }
+          
+          // Find the JSON with the earliest lastModified date
+          const earliestJson = group.assets.jsons.reduce((earliest, current) => {
+            const earliestDate = earliest.lastModified ? new Date(earliest.lastModified) : new Date(0);
+            const currentDate = current.lastModified ? new Date(current.lastModified) : new Date(0);
+            return earliestDate < currentDate ? earliest : current;
+          });
+          
+          return earliestJson.lastModified ? new Date(earliestJson.lastModified) : new Date(0);
+        };
+
+        const dateA = getEarliestJsonDate(a);
+        const dateB = getEarliestJsonDate(b);
+        
+        if (sortOrder === 'asc') {
+          return dateA.getTime() - dateB.getTime();
+        } else {
+          return dateB.getTime() - dateA.getTime();
+        }
+      } else {
+        // Sort by name
+        console.log(`Comparing names: "${a.name}" vs "${b.name}"`);
+        if (sortOrder === 'asc') {
+          return a.name.localeCompare(b.name);
+        } else {
+          return b.name.localeCompare(a.name);
+        }
+      }
+    });
+
+    return filtered;
+  }, [assetGroups, searchQuery, sortBy, sortOrder, statusFilter]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredAssetGroups.length / itemsPerPage);
@@ -2916,7 +3020,186 @@ export default function AssetsPage() {
         </div>
       </motion.div>
 
+      {/* Overview Status Bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6 p-4 bg-gray-800 rounded-lg border border-gray-700"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-purple-400">📊 Overview Status</h2>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-400">Overall Completion:</span>
+            <span className={`text-lg font-bold ${calculateOverviewStatus.completionRate >= 75 ? 'text-green-400' : calculateOverviewStatus.completionRate >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+              {calculateOverviewStatus.completionRate}%
+            </span>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3">
+          {/* Total Groups */}
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
+              statusFilter === 'all' 
+                ? 'bg-purple-600 border-purple-500 text-white' 
+                : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            <div className="text-center">
+              <div className="text-2xl mb-1">📁</div>
+              <div className="text-sm font-medium">Total Groups</div>
+              <div className="text-lg font-bold">{calculateOverviewStatus.totalGroups}</div>
+            </div>
+          </button>
 
+          {/* Complete Groups */}
+          <button
+            onClick={() => setStatusFilter(statusFilter === 'complete' ? 'all' : 'complete')}
+            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
+              statusFilter === 'complete' 
+                ? 'bg-green-600 border-4 border-green-300 text-white shadow-lg' 
+                : calculateOverviewStatus.completeGroups > 0
+                ? 'bg-green-900 border border-green-600 text-green-300 hover:bg-green-800'
+                : 'bg-gray-700 border border-gray-600 text-gray-500'
+            }`}
+          >
+            <div className="text-center">
+              <div className="text-2xl mb-1">✅</div>
+              <div className="text-sm font-medium">Complete</div>
+              <div className="text-lg font-bold">{calculateOverviewStatus.completeGroups}</div>
+            </div>
+          </button>
+
+          {/* Missing JSON */}
+          <button
+            onClick={() => setStatusFilter(statusFilter === 'missing-json' ? 'all' : 'missing-json')}
+            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
+              statusFilter === 'missing-json' 
+                ? 'bg-red-600 border-4 border-red-300 text-white shadow-lg' 
+                : calculateOverviewStatus.missingJson > 0
+                ? 'bg-red-900 border border-red-600 text-red-300 hover:bg-red-800'
+                : 'bg-gray-700 border border-gray-600 text-gray-500'
+            }`}
+          >
+            <div className="text-center">
+              <div className="text-2xl mb-1">📄</div>
+              <div className="text-sm font-medium">Missing JSON</div>
+              <div className="text-lg font-bold">{calculateOverviewStatus.missingJson}</div>
+            </div>
+          </button>
+
+          {/* Missing Image */}
+          <button
+            onClick={() => setStatusFilter(statusFilter === 'missing-image' ? 'all' : 'missing-image')}
+            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
+              statusFilter === 'missing-image' 
+                ? 'bg-red-600 border-4 border-red-300 text-white shadow-lg' 
+                : calculateOverviewStatus.missingImage > 0
+                ? 'bg-red-900 border border-red-600 text-red-300 hover:bg-red-800'
+                : 'bg-gray-700 border border-gray-600 text-gray-500'
+            }`}
+          >
+            <div className="text-center">
+              <div className="text-2xl mb-1">🖼️</div>
+              <div className="text-sm font-medium">Missing Image</div>
+              <div className="text-lg font-bold">{calculateOverviewStatus.missingImage}</div>
+            </div>
+          </button>
+
+          {/* Missing Videos */}
+          <button
+            onClick={() => setStatusFilter(statusFilter === 'missing-videos' ? 'all' : 'missing-videos')}
+            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
+              statusFilter === 'missing-videos' 
+                ? 'bg-red-600 border-4 border-red-300 text-white shadow-lg' 
+                : calculateOverviewStatus.missingVideos > 0
+                ? 'bg-red-900 border border-red-600 text-red-300 hover:bg-red-800'
+                : 'bg-gray-700 border border-gray-600 text-gray-500'
+            }`}
+          >
+            <div className="text-center">
+              <div className="text-2xl mb-1">🎥</div>
+              <div className="text-sm font-medium">Missing Videos</div>
+              <div className="text-lg font-bold">{calculateOverviewStatus.missingVideos}</div>
+            </div>
+          </button>
+
+          {/* Missing Voices */}
+          <button
+            onClick={() => setStatusFilter(statusFilter === 'missing-voices' ? 'all' : 'missing-voices')}
+            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
+              statusFilter === 'missing-voices' 
+                ? 'bg-orange-600 border-4 border-orange-300 text-white shadow-lg' 
+                : calculateOverviewStatus.missingVoices > 0
+                ? 'bg-orange-900 border border-orange-600 text-orange-300 hover:bg-orange-800'
+                : 'bg-gray-700 border border-gray-600 text-gray-500'
+            }`}
+          >
+            <div className="text-center">
+              <div className="text-2xl mb-1">🎵</div>
+              <div className="text-sm font-medium">Missing Voices</div>
+              <div className="text-lg font-bold">{calculateOverviewStatus.missingVoices}</div>
+            </div>
+          </button>
+
+          {/* Missing Rewards */}
+          <button
+            onClick={() => setStatusFilter(statusFilter === 'missing-rewards' ? 'all' : 'missing-rewards')}
+            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
+              statusFilter === 'missing-rewards' 
+                ? 'bg-yellow-600 border-4 border-yellow-300 text-white shadow-lg' 
+                : calculateOverviewStatus.missingRewards > 0
+                ? 'bg-yellow-900 border border-yellow-600 text-yellow-300 hover:bg-yellow-800'
+                : 'bg-gray-700 border border-gray-600 text-gray-500'
+            }`}
+          >
+            <div className="text-center">
+              <div className="text-2xl mb-1">🏆</div>
+              <div className="text-sm font-medium">Missing Rewards</div>
+              <div className="text-lg font-bold">{calculateOverviewStatus.missingRewards}</div>
+            </div>
+          </button>
+
+          {/* Missing Quiz 3 Images */}
+          <button
+            onClick={() => setStatusFilter(statusFilter === 'missing-quiz3-images' ? 'all' : 'missing-quiz3-images')}
+            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
+              statusFilter === 'missing-quiz3-images' 
+                ? 'bg-blue-600 border-4 border-blue-300 text-white shadow-lg' 
+                : calculateOverviewStatus.missingQuiz3Images > 0
+                ? 'bg-blue-900 border border-blue-600 text-blue-300 hover:bg-blue-800'
+                : 'bg-gray-700 border border-gray-600 text-gray-500'
+            }`}
+          >
+            <div className="text-center">
+              <div className="text-2xl mb-1">🖼️</div>
+              <div className="text-sm font-medium">Missing Quiz 3 Images</div>
+              <div className="text-lg font-bold">{calculateOverviewStatus.missingQuiz3Images}</div>
+            </div>
+          </button>
+
+          {/* Incomplete Groups */}
+          <button
+            onClick={() => setStatusFilter(statusFilter === 'incomplete' ? 'all' : 'incomplete')}
+            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
+              statusFilter === 'incomplete' 
+                ? 'bg-red-600 border-4 border-red-300 text-white shadow-lg' 
+                : calculateOverviewStatus.incompleteGroups > 0
+                ? 'bg-red-900 border border-red-600 text-red-300 hover:bg-red-800'
+                : 'bg-gray-700 border border-gray-600 text-gray-500'
+            }`}
+          >
+            <div className="text-center">
+              <div className="text-2xl mb-1">⚠️</div>
+              <div className="text-sm font-medium">Incomplete</div>
+              <div className="text-lg font-bold">{calculateOverviewStatus.incompleteGroups}</div>
+            </div>
+          </button>
+        </div>
+
+
+      </motion.div>
 
       {/* Search and Filters */}
       <motion.div
@@ -3031,14 +3314,29 @@ export default function AssetsPage() {
 
       {/* Assets Display */}
       <motion.div layout className="space-y-6">
-          {searching && (
-            <div className="text-center py-4">
-              <div className="inline-flex items-center gap-2 text-gray-400">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
-                <span>Searching...</span>
-              </div>
+        {/* Results Summary */}
+        <div className="flex items-center justify-between text-sm text-gray-400">
+          <div>
+            Showing {paginatedAssetGroups.length} of {filteredAssetGroups.length} groups
+            {statusFilter !== 'all' && (
+              <span className="ml-2 text-purple-400">
+                (filtered by {statusFilter.replace('-', ' ')})
+              </span>
+            )}
+          </div>
+          <div>
+            Page {currentPage} of {Math.ceil(filteredAssetGroups.length / itemsPerPage)}
+          </div>
+        </div>
+
+        {searching && (
+          <div className="text-center py-4">
+            <div className="inline-flex items-center gap-2 text-gray-400">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
+              <span>Searching...</span>
             </div>
-          )}
+          </div>
+        )}
           {paginatedAssetGroups.map((group) => {
             const renderStatus = getRenderStatusDisplay(group.renderStatus);
             const originalRenderStatus = group.renderStatus;
