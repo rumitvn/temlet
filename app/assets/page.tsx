@@ -180,6 +180,35 @@ interface OverviewStatus {
   completionRate: number;
 }
 
+// Interface for missing resource types
+interface MissingResource {
+  type: 'image' | 'quiz3-image' | 'video' | 'reward';
+  label: string;
+  icon: string;
+  color: string;
+  count: number;
+  description: string;
+  // For quiz3-image and reward, we need specific items
+  items?: MissingItem[];
+}
+
+// Interface for specific missing items
+interface MissingItem {
+  name: string;
+  key: string;
+  jsonOrder?: number; // For rewards
+  description: string;
+}
+
+// Interface for group upload item
+interface GroupUploadItem {
+  key: string;
+  name: string;
+  missingResources: MissingResource[];
+  priority: number; // Higher number = higher priority
+  jsonOrders: number[];
+}
+
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetGroups, setAssetGroups] = useState<AssetGroup[]>([]);
@@ -192,8 +221,9 @@ export default function AssetsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [showImageGenerationDialog, setShowImageGenerationDialog] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingStates, setUploadingStates] = useState<{ [key: string]: boolean }>({});
   const [aiGenerating, setAiGenerating] = useState(false);
 
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
@@ -208,6 +238,135 @@ export default function AssetsPage() {
 
   // Overview status filter state
   const [statusFilter, setStatusFilter] = useState<'all' | 'complete' | 'missing-json' | 'missing-image' | 'missing-videos' | 'missing-voices' | 'missing-rewards' | 'missing-quiz3-images' | 'incomplete'>('all');
+
+  // Calculate missing resources for upload dialog
+  const calculateMissingResources = useMemo((): GroupUploadItem[] => {
+    const groups: GroupUploadItem[] = [];
+    
+    assetGroups.forEach(group => {
+      const status = group.renderStatus;
+      const missingResources: MissingResource[] = [];
+      
+      // Check for missing main image
+      if (!status.hasImage) {
+        missingResources.push({
+          type: 'image',
+          label: 'Image',
+          icon: '🖼️',
+          color: 'bg-red-600',
+          count: 1,
+          description: `Upload main image for ${group.name}`
+        });
+      }
+      
+      // Check for missing videos
+      if (!status.hasVideos) {
+        missingResources.push({
+          type: 'video',
+          label: 'Videos',
+          icon: '🎥',
+          color: 'bg-red-600',
+          count: 1,
+          description: `Upload video for ${group.name}`
+        });
+      }
+      
+      // Check for missing quiz 3 images
+      if (status.requiredQuiz3Images > status.availableQuiz3Images) {
+        const missingCount = status.requiredQuiz3Images - status.availableQuiz3Images;
+        
+        // Get specific missing quiz 3 images
+        const missingQuiz3Items: MissingItem[] = [];
+        group.assets.jsonAssetPairs.forEach(pair => {
+          pair.quiz3ImageOptions.missingImages.forEach(missingImage => {
+            missingQuiz3Items.push({
+              name: missingImage,
+              key: missingImage,
+              description: `Upload "${missingImage}" image for quiz 3 options`
+            });
+          });
+        });
+        
+        // Only show quiz 3 images upload if there are actual missing items
+        if (missingQuiz3Items.length > 0) {
+          missingResources.push({
+            type: 'quiz3-image',
+            label: 'Quiz 3 Images',
+            icon: '🖼️',
+            color: 'bg-blue-600',
+            count: missingCount,
+            description: `Upload ${missingCount} quiz 3 option images`,
+            items: missingQuiz3Items
+          });
+        }
+      }
+      
+      // Check for missing rewards
+      if (status.requiredRewards > status.availableRewards) {
+        const missingCount = status.requiredRewards - status.availableRewards;
+        
+        // Get specific missing rewards
+        const missingRewardItems: MissingItem[] = [];
+        group.assets.jsons.forEach(jsonAsset => {
+          if (jsonAsset.order) {
+            const hasReward = group.assets.rewards.some(reward => reward.order === jsonAsset.order);
+            if (!hasReward) {
+              missingRewardItems.push({
+                name: `Reward ${jsonAsset.order}`,
+                key: `reward_${jsonAsset.order}`,
+                jsonOrder: jsonAsset.order,
+                description: `Upload reward video for JSON order ${jsonAsset.order}`
+              });
+            }
+          }
+        });
+        
+        missingResources.push({
+          type: 'reward',
+          label: 'Rewards',
+          icon: '🏆',
+          color: 'bg-yellow-600',
+          count: missingCount,
+          description: `Upload ${missingCount} reward videos`,
+          items: missingRewardItems
+        });
+      }
+      
+      // Only add groups that have missing resources
+      if (missingResources.length > 0) {
+        // Calculate priority based on missing resource types and counts
+        let priority = 0;
+        missingResources.forEach(resource => {
+          switch (resource.type) {
+            case 'image':
+              priority += 100; // Highest priority
+              break;
+            case 'video':
+              priority += 80;
+              break;
+            case 'quiz3-image':
+              priority += 60;
+              break;
+            case 'reward':
+              priority += 40;
+              break;
+          }
+          priority += resource.count; // Add count to priority
+        });
+        
+        groups.push({
+          key: group.key,
+          name: group.name,
+          missingResources,
+          priority,
+          jsonOrders: status.jsonOrders
+        });
+      }
+    });
+    
+    // Sort by priority (highest first)
+    return groups.sort((a, b) => b.priority - a.priority);
+  }, [assetGroups]);
 
   // Calculate overview status
   const calculateOverviewStatus = useMemo((): OverviewStatus => {
@@ -927,7 +1086,7 @@ export default function AssetsPage() {
         const jsonCount = groups[key].renderStatus.jsonOrders.length;
         groups[key].renderStatus.requiredVoices = jsonCount * 9; // 9 voices per JSON
         groups[key].renderStatus.requiredRewards = jsonCount; // 1 reward per JSON
-        groups[key].renderStatus.requiredQuiz3Images = jsonCount * 4; // 4 images per JSON for quiz 3 options
+        // Note: requiredQuiz3Images will be calculated later after loading JSON content
         
         return groups;
       }, {});
@@ -1072,6 +1231,13 @@ export default function AssetsPage() {
           }
         });
         
+        // Calculate required quiz 3 images based on actual options in JSON files
+        let totalRequiredQuiz3Images = 0;
+        groupAsAssetGroup.assets.jsonAssetPairs.forEach(pair => {
+          totalRequiredQuiz3Images += pair.quiz3ImageOptions.options.length;
+        });
+        
+        groupAsAssetGroup.renderStatus.requiredQuiz3Images = totalRequiredQuiz3Images;
         groupAsAssetGroup.renderStatus.availableQuiz3Images = totalAvailableQuiz3Images;
         groupAsAssetGroup.renderStatus.hasQuiz3Images = hasQuiz3Images;
       });
@@ -1381,6 +1547,202 @@ export default function AssetsPage() {
 
   const handleUploadAssets = async (files: FileList) => {
     alert('Upload functionality requires category selection. Please implement category selection first.');
+  };
+
+  // Helper function to get upload key for state management
+  const getUploadKey = (groupKey: string, resourceType: MissingResource['type'], jsonOrder?: number, imageName?: string) => {
+    return `${groupKey}-${resourceType}${jsonOrder ? `-${jsonOrder}` : ''}${imageName ? `-${imageName}` : ''}`;
+  };
+
+  // Upload specific asset types
+  const handleUploadSpecificAsset = async (
+    groupKey: string, 
+    resourceType: MissingResource['type'], 
+    files: FileList,
+    jsonOrder?: number,
+    imageName?: string
+  ) => {
+    // Create unique key for this upload
+    const uploadKey = getUploadKey(groupKey, resourceType, jsonOrder, imageName);
+    
+    // Set loading state for this specific upload
+    setUploadingStates(prev => ({ ...prev, [uploadKey]: true }));
+    
+    try {
+      const formData = new FormData();
+      
+      // Add files to form data
+      Array.from(files).forEach((file, index) => {
+        formData.append(`files`, file);
+      });
+      
+      // Add metadata
+      formData.append('groupKey', groupKey);
+      formData.append('resourceType', resourceType);
+      formData.append('channel', selectedChannel);
+      formData.append('topic', selectedTopic);
+      if (jsonOrder) {
+        formData.append('jsonOrder', jsonOrder.toString());
+      }
+      if (imageName) {
+        formData.append('imageName', imageName);
+      }
+      
+      const response = await fetch('/api/assets/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+      
+      const result = await response.json();
+      
+      // Show success message
+      setToast({
+        type: 'success',
+        message: `Successfully uploaded ${files.length} file(s) for ${groupKey}`
+      });
+      
+      // Update local state instead of refetching everything
+      updateGroupAfterUpload(groupKey, resourceType, files, jsonOrder, imageName);
+      
+    } catch (error) {
+      console.error('Upload error:', error);
+      setToast({
+        type: 'error',
+        message: 'Upload failed. Please try again.'
+      });
+    } finally {
+      // Clear loading state for this specific upload
+      setUploadingStates(prev => ({ ...prev, [uploadKey]: false }));
+    }
+  };
+
+  // Update group data after successful upload
+  const updateGroupAfterUpload = (
+    groupKey: string, 
+    resourceType: MissingResource['type'], 
+    files: FileList,
+    jsonOrder?: number,
+    imageName?: string
+  ) => {
+    setAssetGroups(prevGroups => {
+      return prevGroups.map(group => {
+        if (group.key !== groupKey) return group;
+        
+        const updatedGroup = { ...group };
+        const fileArray = Array.from(files);
+        
+        // Helper function to get file extension
+        const getFileExtension = (filename: string) => {
+          return filename.substring(filename.lastIndexOf('.'));
+        };
+        
+        // Helper function to join paths (browser-safe)
+        const joinPaths = (...parts: string[]) => {
+          return parts.join('/').replace(/\/+/g, '/');
+        };
+        
+        switch (resourceType) {
+          case 'image':
+            // Update image asset
+            const imageFile = fileArray[0];
+            if (imageFile) {
+              const imageAsset: Asset = {
+                id: `image_${groupKey}_${Date.now()}`,
+                name: imageFile.name,
+                type: 'image',
+                category: 'image',
+                path: joinPaths(config.getAssetPaths(selectedChannel, selectedTopic).image, `${groupKey}${getFileExtension(imageFile.name)}`),
+                size: imageFile.size,
+                lastModified: new Date(),
+                status: 'available',
+                key: groupKey
+              };
+              updatedGroup.assets.image = imageAsset;
+              updatedGroup.renderStatus.hasImage = true;
+            }
+            break;
+            
+          case 'video':
+            // Update video assets
+            const videoAssets: Asset[] = fileArray.map((file, index) => ({
+              id: `video_${groupKey}_${index}_${Date.now()}`,
+              name: file.name,
+              type: 'video',
+              category: 'video',
+              path: joinPaths(config.getAssetPaths(selectedChannel, selectedTopic).video, `${groupKey}${getFileExtension(file.name)}`),
+              size: file.size,
+              lastModified: new Date(),
+              status: 'available',
+              key: groupKey
+            }));
+            updatedGroup.assets.videos = [...updatedGroup.assets.videos, ...videoAssets];
+            updatedGroup.renderStatus.hasVideos = true;
+            break;
+            
+          case 'quiz3-image':
+            // Update quiz 3 image assets
+            const quiz3ImageAssets: Asset[] = fileArray.map((file, index) => ({
+              id: `quiz3_image_${groupKey}_${index}_${Date.now()}`,
+              name: file.name,
+              type: 'image',
+              category: 'image',
+              path: joinPaths(config.getAssetPaths(selectedChannel, selectedTopic).image, 'options', file.name),
+              size: file.size,
+              lastModified: new Date(),
+              status: 'available',
+              key: file.name.replace(getFileExtension(file.name), '') // Use filename without extension as key
+            }));
+            // Add to existing images or create new array
+            const existingImages = assets.filter(a => a.type === 'image' && a.category === 'image');
+            setAssets(prev => [...prev, ...quiz3ImageAssets]);
+            
+            // Update quiz 3 images count
+            const newQuiz3Count = updatedGroup.renderStatus.availableQuiz3Images + fileArray.length;
+            updatedGroup.renderStatus.availableQuiz3Images = newQuiz3Count;
+            updatedGroup.renderStatus.hasQuiz3Images = newQuiz3Count >= updatedGroup.renderStatus.requiredQuiz3Images;
+            break;
+            
+          case 'reward':
+            // Update reward assets
+            if (jsonOrder) {
+              const rewardFile = fileArray[0];
+              if (rewardFile) {
+                const rewardAsset: Asset = {
+                  id: `reward_${groupKey}_${jsonOrder}_${Date.now()}`,
+                  name: rewardFile.name,
+                  type: 'video',
+                  category: 'reward',
+                  path: joinPaths(config.getAssetPaths(selectedChannel, selectedTopic).reward, 'output', `reward_${jsonOrder}`, `${groupKey}${getFileExtension(rewardFile.name)}`),
+                  size: rewardFile.size,
+                  lastModified: new Date(),
+                  status: 'available',
+                  key: groupKey,
+                  order: jsonOrder
+                };
+                updatedGroup.assets.rewards = [...updatedGroup.assets.rewards, rewardAsset];
+                updatedGroup.renderStatus.availableRewards = updatedGroup.assets.rewards.length;
+              }
+            }
+            break;
+        }
+        
+        // Recalculate completion status
+        const status = updatedGroup.renderStatus;
+        updatedGroup.renderStatus.isComplete = 
+          status.hasJson && 
+          status.hasImage && 
+          status.hasVideos && 
+          status.availableVoices >= status.requiredVoices &&
+          status.availableRewards >= status.requiredRewards &&
+          status.availableQuiz3Images >= status.requiredQuiz3Images;
+        
+        return updatedGroup;
+      });
+    });
   };
 
   // Check for duplicate subjects
@@ -3012,7 +3374,7 @@ export default function AssetsPage() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
-            onClick={() => setShowCreateDialog(true)}
+            onClick={() => setShowUploadDialog(true)}
           >
             <PlusIcon className="w-5 h-5" />
             <span>Upload Assets</span>
@@ -4471,6 +4833,220 @@ export default function AssetsPage() {
                 <button
                   onClick={() => setShowSuccessDialog(false)}
                   className="w-full bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Upload Assets Dialog */}
+      <AnimatePresence>
+        {showUploadDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gray-800 rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">📤 Upload Missing Assets</h2>
+                <button
+                  onClick={() => setShowUploadDialog(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <XCircleIcon className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto">
+                {calculateMissingResources.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">🎉</div>
+                    <h3 className="text-xl font-bold text-green-400 mb-2">All Assets Complete!</h3>
+                    <p className="text-gray-300">No missing assets found. All groups are ready for rendering.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {calculateMissingResources.map((group) => (
+                      <div key={group.key} className="bg-gray-700 rounded-lg p-4 border border-gray-600">
+                        {/* Group Header */}
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-white capitalize">
+                            {group.name}
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-400">Priority:</span>
+                            <span className="px-2 py-1 bg-purple-600 text-white text-xs rounded">
+                              {group.priority}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Missing Resources */}
+                        <div className="space-y-4">
+                          {group.missingResources.map((resource, index) => (
+                            <div
+                              key={`${group.key}-${resource.type}-${index}`}
+                              className="bg-gray-600 rounded-lg p-4 border border-gray-500"
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-2xl">{resource.icon}</span>
+                                  <span className="font-medium text-white">{resource.label}</span>
+                                </div>
+                                <span className={`px-2 py-1 text-xs rounded text-white ${resource.color}`}>
+                                  {resource.count}
+                                </span>
+                              </div>
+                              
+                              <p className="text-sm text-gray-300 mb-3">
+                                {resource.description}
+                              </p>
+
+                              {/* Show individual items for quiz3-image and reward */}
+                              {resource.items && resource.items.length > 0 ? (
+                                <div className="space-y-2">
+                                  {resource.items.map((item, itemIndex) => (
+                                    <div
+                                      key={`${group.key}-${resource.type}-${item.key}-${itemIndex}`}
+                                      className="bg-gray-700 rounded-lg p-3 border border-gray-600"
+                                    >
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-medium text-white">
+                                          {item.name}
+                                        </span>
+                                        <button
+                                          onClick={() => {
+                                            const input = document.createElement('input');
+                                            input.type = 'file';
+                                            input.multiple = false;
+                                            
+                                            // Set file type restrictions
+                                            if (resource.type === 'quiz3-image') {
+                                              input.accept = 'image/*';
+                                            } else if (resource.type === 'reward') {
+                                              input.accept = 'video/*';
+                                            }
+                                            
+                                            input.onchange = (e) => {
+                                              const files = (e.target as HTMLInputElement).files;
+                                              if (files && files.length > 0) {
+                                                if (resource.type === 'reward' && item.jsonOrder) {
+                                                  handleUploadSpecificAsset(group.key, resource.type, files, item.jsonOrder);
+                                                } else if (resource.type === 'quiz3-image') {
+                                                  // For quiz3-image, we need to handle the specific image name
+                                                  handleUploadSpecificAsset(group.key, resource.type, files, undefined, item.name);
+                                                }
+                                              }
+                                            };
+                                            
+                                            input.click();
+                                          }}
+                                          disabled={uploadingStates[getUploadKey(group.key, resource.type, item.jsonOrder)]}
+                                          className={`px-3 py-1 rounded text-xs transition-colors flex items-center gap-1 ${
+                                            uploadingStates[getUploadKey(group.key, resource.type, item.jsonOrder)]
+                                              ? 'bg-gray-500 cursor-not-allowed text-gray-300' 
+                                              : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                          }`}
+                                        >
+                                          {uploadingStates[getUploadKey(group.key, resource.type, item.jsonOrder)] ? (
+                                            <>
+                                              <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                                              <span>Uploading...</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <span>📤</span>
+                                              <span>Upload</span>
+                                            </>
+                                          )}
+                                        </button>
+                                      </div>
+                                      <p className="text-xs text-gray-400">
+                                        {item.description}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                /* Default upload button for other resource types */
+                                <button
+                                  onClick={() => {
+                                    const input = document.createElement('input');
+                                    input.type = 'file';
+                                    input.multiple = resource.type === 'quiz3-image';
+                                    
+                                    // Set file type restrictions
+                                    if (resource.type === 'image' || resource.type === 'quiz3-image') {
+                                      input.accept = 'image/*';
+                                    } else if (resource.type === 'video') {
+                                      input.accept = 'video/*';
+                                    } else if (resource.type === 'reward') {
+                                      input.accept = 'video/*';
+                                    }
+                                    
+                                    input.onchange = (e) => {
+                                      const files = (e.target as HTMLInputElement).files;
+                                      if (files && files.length > 0) {
+                                        if (resource.type === 'reward') {
+                                          // For rewards, ask for JSON order
+                                          const order = prompt(`Enter JSON order number for reward (available orders: ${group.jsonOrders.join(', ')})`);
+                                          if (order && !isNaN(parseInt(order))) {
+                                            handleUploadSpecificAsset(group.key, resource.type, files, parseInt(order));
+                                          }
+                                        } else {
+                                          handleUploadSpecificAsset(group.key, resource.type, files);
+                                        }
+                                      }
+                                    };
+                                    
+                                    input.click();
+                                  }}
+                                  disabled={uploadingStates[getUploadKey(group.key, resource.type)]}
+                                  className={`w-full px-3 py-2 rounded transition-colors flex items-center justify-center gap-2 ${
+                                    uploadingStates[getUploadKey(group.key, resource.type)]
+                                      ? 'bg-gray-500 cursor-not-allowed' 
+                                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                  }`}
+                                >
+                                  {uploadingStates[getUploadKey(group.key, resource.type)] ? (
+                                    <>
+                                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                      <span>Uploading...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>📤</span>
+                                      <span>Upload</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-600">
+                <button
+                  onClick={() => setShowUploadDialog(false)}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded transition-colors"
                 >
                   Close
                 </button>
