@@ -226,6 +226,12 @@ export default function AssetsPage() {
   const [uploadingStates, setUploadingStates] = useState<{ [key: string]: boolean }>({});
   const [aiGenerating, setAiGenerating] = useState(false);
 
+  // Upload dialog search and filter state
+  const [uploadSearchQuery, setUploadSearchQuery] = useState("");
+  const [uploadResourceFilter, setUploadResourceFilter] = useState<'all' | 'image' | 'video' | 'quiz3-image' | 'reward'>('all');
+  const [uploadSortBy, setUploadSortBy] = useState<'priority' | 'name' | 'count'>('priority');
+  const [uploadSortOrder, setUploadSortOrder] = useState<'asc' | 'desc'>('desc');
+
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [previewVideoMode, setPreviewVideoMode] = useState(false);
@@ -367,6 +373,71 @@ export default function AssetsPage() {
     // Sort by priority (highest first)
     return groups.sort((a, b) => b.priority - a.priority);
   }, [assetGroups]);
+
+  // Filtered and sorted missing resources for upload dialog
+  const filteredMissingResources = useMemo(() => {
+    let filtered = calculateMissingResources;
+
+    // Apply search filter
+    if (uploadSearchQuery.trim()) {
+      const query = uploadSearchQuery.toLowerCase();
+      filtered = filtered.filter(group => 
+        group.name.toLowerCase().includes(query) ||
+        group.missingResources.some(resource => 
+          resource.label.toLowerCase().includes(query) ||
+          resource.description.toLowerCase().includes(query) ||
+          (resource.items && resource.items.some(item => 
+            item.name.toLowerCase().includes(query) ||
+            item.description.toLowerCase().includes(query)
+          ))
+        )
+      );
+    }
+
+    // Apply resource type filter
+    if (uploadResourceFilter !== 'all') {
+      filtered = filtered.map(group => ({
+        ...group,
+        missingResources: group.missingResources.filter(resource => resource.type === uploadResourceFilter)
+      })).filter(group => group.missingResources.length > 0);
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue: number | string;
+      let bValue: number | string;
+
+      switch (uploadSortBy) {
+        case 'priority':
+          aValue = a.priority;
+          bValue = b.priority;
+          break;
+        case 'name':
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case 'count':
+          aValue = a.missingResources.reduce((sum, resource) => sum + resource.count, 0);
+          bValue = b.missingResources.reduce((sum, resource) => sum + resource.count, 0);
+          break;
+        default:
+          aValue = a.priority;
+          bValue = b.priority;
+      }
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return uploadSortOrder === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      } else {
+        return uploadSortOrder === 'asc' 
+          ? (aValue as number) - (bValue as number)
+          : (bValue as number) - (aValue as number);
+      }
+    });
+
+    return filtered;
+  }, [calculateMissingResources, uploadSearchQuery, uploadResourceFilter, uploadSortBy, uploadSortOrder]);
 
   // Calculate overview status
   const calculateOverviewStatus = useMemo((): OverviewStatus => {
@@ -4859,7 +4930,12 @@ export default function AssetsPage() {
             >
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">📤 Upload Missing Assets</h2>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">📤 Upload Missing Assets</h2>
+                  <p className="text-sm text-gray-400 mt-1">
+                    {calculateMissingResources.length} groups with missing assets • {calculateMissingResources.reduce((sum, group) => sum + group.missingResources.reduce((s, r) => s + r.count, 0), 0)} total items to upload
+                  </p>
+                </div>
                 <button
                   onClick={() => setShowUploadDialog(false)}
                   className="text-gray-400 hover:text-white transition-colors"
@@ -4868,62 +4944,200 @@ export default function AssetsPage() {
                 </button>
               </div>
 
+              {/* Quick Stats */}
+              <div className="mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { type: 'image', icon: '🖼️', label: 'Images', color: 'bg-red-600' },
+                    { type: 'video', icon: '🎥', label: 'Videos', color: 'bg-red-600' },
+                    { type: 'quiz3-image', icon: '🖼️', label: 'Quiz 3 Images', color: 'bg-blue-600' },
+                    { type: 'reward', icon: '🏆', label: 'Rewards', color: 'bg-yellow-600' }
+                  ].map(({ type, icon, label, color }) => {
+                    const count = calculateMissingResources.reduce((sum, group) => 
+                      sum + group.missingResources.filter(r => r.type === type).reduce((s, r) => s + r.count, 0), 0
+                    );
+                    return (
+                      <div key={type} className={`${color} rounded-lg p-3 text-white`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{icon}</span>
+                          <div>
+                            <div className="text-sm font-medium">{label}</div>
+                            <div className="text-lg font-bold">{count}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Search and Filter Controls */}
+              <div className="mb-6 space-y-4">
+                {/* Search Bar */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search groups, resources, or items..."
+                    value={uploadSearchQuery}
+                    onChange={(e) => setUploadSearchQuery(e.target.value)}
+                    className="w-full px-4 py-2 pl-10 pr-10 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  {uploadSearchQuery && (
+                    <button
+                      onClick={() => setUploadSearchQuery("")}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition-colors"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter and Sort Controls */}
+                <div className="flex flex-wrap gap-4 items-center">
+                  {/* Resource Type Filter */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-300">Filter:</label>
+                    <select
+                      value={uploadResourceFilter}
+                      onChange={(e) => setUploadResourceFilter(e.target.value as any)}
+                      className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">All Resources</option>
+                      <option value="image">🖼️ Images</option>
+                      <option value="video">🎥 Videos</option>
+                      <option value="quiz3-image">🖼️ Quiz 3 Images</option>
+                      <option value="reward">🏆 Rewards</option>
+                    </select>
+                  </div>
+
+                  {/* Sort By */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-300">Sort by:</label>
+                    <select
+                      value={uploadSortBy}
+                      onChange={(e) => setUploadSortBy(e.target.value as any)}
+                      className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="priority">Priority</option>
+                      <option value="name">Name</option>
+                      <option value="count">Count</option>
+                    </select>
+                  </div>
+
+                  {/* Sort Order */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-300">Order:</label>
+                    <button
+                      onClick={() => setUploadSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                      className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {uploadSortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
+                    </button>
+                  </div>
+
+                  {/* Reset Filters */}
+                  {(uploadSearchQuery || uploadResourceFilter !== 'all') && (
+                    <button
+                      onClick={() => {
+                        setUploadSearchQuery("");
+                        setUploadResourceFilter('all');
+                      }}
+                      className="px-3 py-1 bg-gray-600 border border-gray-500 rounded text-sm text-white hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+
+                  {/* Results Count */}
+                  <div className="ml-auto text-sm text-gray-400">
+                    {filteredMissingResources.length} of {calculateMissingResources.length} groups
+                  </div>
+                </div>
+              </div>
+
               {/* Content */}
               <div className="flex-1 overflow-y-auto">
-                {calculateMissingResources.length === 0 ? (
+                {filteredMissingResources.length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="text-6xl mb-4">🎉</div>
-                    <h3 className="text-xl font-bold text-green-400 mb-2">All Assets Complete!</h3>
-                    <p className="text-gray-300">No missing assets found. All groups are ready for rendering.</p>
+                    {calculateMissingResources.length === 0 ? (
+                      <>
+                        <div className="text-6xl mb-4">🎉</div>
+                        <h3 className="text-xl font-bold text-green-400 mb-2">All Assets Complete!</h3>
+                        <p className="text-gray-300">No missing assets found. All groups are ready for rendering.</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-6xl mb-4">🔍</div>
+                        <h3 className="text-xl font-bold text-gray-400 mb-2">No Results Found</h3>
+                        <p className="text-gray-300">Try adjusting your search or filter criteria.</p>
+                      </>
+                    )}
                   </div>
                 ) : (
-                  <div className="space-y-6">
-                    {calculateMissingResources.map((group) => (
-                      <div key={group.key} className="bg-gray-700 rounded-lg p-4 border border-gray-600">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {filteredMissingResources.map((group) => (
+                      <div key={group.key} className="bg-gray-700 rounded-lg p-4 border border-gray-600 hover:border-gray-500 transition-colors">
                         {/* Group Header */}
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center justify-between mb-3">
                           <h3 className="text-lg font-semibold text-white capitalize">
                             {group.name}
                           </h3>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-400">Priority:</span>
-                            <span className="px-2 py-1 bg-purple-600 text-white text-xs rounded">
+                            <span className="text-xs text-gray-400">Priority:</span>
+                            <span className="px-2 py-1 bg-purple-600 text-white text-xs rounded font-medium">
                               {group.priority}
                             </span>
                           </div>
                         </div>
 
+                        {/* Missing Resources Count */}
+                        <div className="mb-3">
+                          <div className="flex items-center gap-2 text-sm text-gray-300">
+                            <span>📦</span>
+                            <span>{group.missingResources.length} resource{group.missingResources.length !== 1 ? 's' : ''} missing</span>
+                            <span className="text-gray-500">•</span>
+                            <span>{group.missingResources.reduce((sum, resource) => sum + resource.count, 0)} total items</span>
+                          </div>
+                        </div>
+
                         {/* Missing Resources */}
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           {group.missingResources.map((resource, index) => (
                             <div
                               key={`${group.key}-${resource.type}-${index}`}
-                              className="bg-gray-600 rounded-lg p-4 border border-gray-500"
+                              className="bg-gray-600 rounded-lg p-3 border border-gray-500 hover:border-gray-400 transition-colors"
                             >
-                              <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-2xl">{resource.icon}</span>
-                                  <span className="font-medium text-white">{resource.label}</span>
+                                  <span className="text-xl">{resource.icon}</span>
+                                  <span className="font-medium text-white text-sm">{resource.label}</span>
                                 </div>
-                                <span className={`px-2 py-1 text-xs rounded text-white ${resource.color}`}>
+                                <span className={`px-2 py-1 text-xs rounded text-white font-medium ${resource.color}`}>
                                   {resource.count}
                                 </span>
                               </div>
                               
-                              <p className="text-sm text-gray-300 mb-3">
+                              <p className="text-xs text-gray-300 mb-3 leading-relaxed">
                                 {resource.description}
                               </p>
 
                               {/* Show individual items for quiz3-image and reward */}
                               {resource.items && resource.items.length > 0 ? (
-                                <div className="space-y-2">
+                                <div className="space-y-2 max-h-32 overflow-y-auto">
                                   {resource.items.map((item, itemIndex) => (
                                     <div
                                       key={`${group.key}-${resource.type}-${item.key}-${itemIndex}`}
-                                      className="bg-gray-700 rounded-lg p-3 border border-gray-600"
+                                      className="bg-gray-700 rounded p-2 border border-gray-600 hover:border-gray-500 transition-colors"
                                     >
-                                      <div className="flex items-center justify-between mb-2">
-                                        <span className="text-sm font-medium text-white">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs font-medium text-white truncate">
                                           {item.name}
                                         </span>
                                         <button
@@ -4954,7 +5168,7 @@ export default function AssetsPage() {
                                             input.click();
                                           }}
                                           disabled={uploadingStates[getUploadKey(group.key, resource.type, item.jsonOrder)]}
-                                          className={`px-3 py-1 rounded text-xs transition-colors flex items-center gap-1 ${
+                                          className={`px-2 py-1 rounded text-xs transition-colors flex items-center gap-1 ${
                                             uploadingStates[getUploadKey(group.key, resource.type, item.jsonOrder)]
                                               ? 'bg-gray-500 cursor-not-allowed text-gray-300' 
                                               : 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -4973,7 +5187,7 @@ export default function AssetsPage() {
                                           )}
                                         </button>
                                       </div>
-                                      <p className="text-xs text-gray-400">
+                                      <p className="text-xs text-gray-400 leading-tight">
                                         {item.description}
                                       </p>
                                     </div>
@@ -5014,7 +5228,7 @@ export default function AssetsPage() {
                                     input.click();
                                   }}
                                   disabled={uploadingStates[getUploadKey(group.key, resource.type)]}
-                                  className={`w-full px-3 py-2 rounded transition-colors flex items-center justify-center gap-2 ${
+                                  className={`w-full px-3 py-2 rounded transition-colors flex items-center justify-center gap-2 text-sm ${
                                     uploadingStates[getUploadKey(group.key, resource.type)]
                                       ? 'bg-gray-500 cursor-not-allowed' 
                                       : 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -5028,7 +5242,7 @@ export default function AssetsPage() {
                                   ) : (
                                     <>
                                       <span>📤</span>
-                                      <span>Upload</span>
+                                      <span>Upload {resource.label}</span>
                                     </>
                                   )}
                                 </button>
