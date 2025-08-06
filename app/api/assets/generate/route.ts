@@ -152,9 +152,13 @@ IMPORTANT QUIZ_3 GUIDELINES FOR ANIMALS:
 - CRITICAL: The correct answer position must correspond to an animal that actually answers the question
 - CRITICAL: NEVER include the main subject animal in quiz_3 options (e.g., if subject is "blue_whale", do NOT include "blue_whale" in quiz_3 options)
 - CRITICAL: Quiz_3 should ask about characteristics that the main subject animal has or doesn't have
+- CRITICAL: ANSWER POSITION VARIETY - Vary the correct answer positions across different quizzes to keep users engaged:
+  * Use positions 1, 2, 3, or 4 randomly and evenly distributed
+  * Do NOT always use position 1 - this makes the quiz predictable and boring
+  * Examples of varied positions: position 1 (25%), position 2 (25%), position 3 (25%), position 4 (25%)
 - EXAMPLE: If main subject is "blue_whale" and question is "Con nào có vây?" then:
   * Options should be: ["shark", "eagle", "elephant", "dolphin"] (4 items)
-  * Correct answer should be position 1 (shark) or position 4 (dolphin) since they have fins like whales
+  * Correct answer could be position 1 (shark), position 4 (dolphin), or any position that makes sense
   * Voice should be: "Rất giỏi! Cá mập có vây giống như cá voi" or "Rất giỏi! Cá heo có vây giống như cá voi"
 - Adapt questions based on difficulty level:
   * Easy: basic characteristics (fins, size, habitat type)
@@ -198,9 +202,13 @@ IMPORTANT QUIZ_3 GUIDELINES FOR PLANTS:
 - CRITICAL: The correct answer position must correspond to a plant that actually answers the question
 - CRITICAL: NEVER include the main subject plant in quiz_3 options (e.g., if subject is "oak", do NOT include "oak" in quiz_3 options)
 - CRITICAL: Quiz_3 should ask about characteristics that the main subject plant has or doesn't have
+- CRITICAL: ANSWER POSITION VARIETY - Vary the correct answer positions across different quizzes to keep users engaged:
+  * Use positions 1, 2, 3, or 4 randomly and evenly distributed
+  * Do NOT always use position 1 - this makes the quiz predictable and boring
+  * Examples of varied positions: position 1 (25%), position 2 (25%), position 3 (25%), position 4 (25%)
 - EXAMPLE: If main subject is "oak" and question is "Cây nào có lá rộng?" then:
   * Options should be: ["maple", "pine", "palm", "willow"] (4 items)
-  * Correct answer should be position 1 (maple) or position 4 (willow) since they have broad leaves like oak
+  * Correct answer could be position 1 (maple), position 4 (willow), or any position that makes sense
   * Voice should be: "Rất giỏi! Cây phong có lá rộng giống như cây sồi" or "Rất giỏi! Cây liễu có lá rộng giống như cây sồi"
 - Adapt questions based on difficulty level:
   * Easy: basic characteristics (leaf type, size, growth pattern)
@@ -244,9 +252,13 @@ IMPORTANT QUIZ_3 GUIDELINES FOR SCIENCE:
 - CRITICAL: The correct answer position must correspond to a term that actually answers the question
 - CRITICAL: NEVER include the main subject concept in quiz_3 options (e.g., if subject is "electricity", do NOT include "electricity" in quiz_3 options)
 - CRITICAL: Quiz_3 should ask about properties that the main subject concept has or doesn't have
+- CRITICAL: ANSWER POSITION VARIETY - Vary the correct answer positions across different quizzes to keep users engaged:
+  * Use positions 1, 2, 3, or 4 randomly and evenly distributed
+  * Do NOT always use position 1 - this makes the quiz predictable and boring
+  * Examples of varied positions: position 1 (25%), position 2 (25%), position 3 (25%), position 4 (25%)
 - EXAMPLE: If main subject is "electricity" and question is "Chất nào dẫn điện?" then:
   * Options should be: ["copper", "plastic", "wood", "aluminum"] (4 items)
-  * Correct answer should be position 1 (copper) or position 4 (aluminum) since they conduct electricity like the main subject
+  * Correct answer could be position 1 (copper), position 4 (aluminum), or any position that makes sense
   * Voice should be: "Rất giỏi! Đồng dẫn điện giống như điện" or "Rất giỏi! Nhôm dẫn điện giống như điện"
 - Adapt questions based on difficulty level:
   * Easy: basic properties (conductivity, solubility, state of matter)
@@ -290,9 +302,13 @@ IMPORTANT QUIZ_3 GUIDELINES FOR HISTORY:
 - CRITICAL: The correct answer position must correspond to a term that actually answers the question
 - CRITICAL: NEVER include the main subject historical figure/event in quiz_3 options (e.g., if subject is "hung_king", do NOT include "hung_king" in quiz_3 options)
 - CRITICAL: Quiz_3 should ask about characteristics that the main subject historical figure/event has or doesn't have
+- CRITICAL: ANSWER POSITION VARIETY - Vary the correct answer positions across different quizzes to keep users engaged:
+  * Use positions 1, 2, 3, or 4 randomly and evenly distributed
+  * Do NOT always use position 1 - this makes the quiz predictable and boring
+  * Examples of varied positions: position 1 (25%), position 2 (25%), position 3 (25%), position 4 (25%)
 - EXAMPLE: If main subject is "hung_king" and question is "Ai là vị vua có công lập nước?" then:
   * Options should be: ["le_lai", "quang_trung", "gia_long", "minh_mang"] (4 items)
-  * Correct answer should be position 1 (le_lai) or position 2 (quang_trung) since they were founding kings like Hung King
+  * Correct answer could be position 1 (le_lai), position 2 (quang_trung), or any position that makes sense
   * Voice should be: "Rất giỏi! Lê Lợi có công lập nước giống như Vua Hùng" or "Rất giỏi! Quang Trung có công lập nước giống như Vua Hùng"
 - Adapt questions based on difficulty level:
   * Easy: basic characteristics (role, time period, achievements)
@@ -333,7 +349,11 @@ IMPORTANT QUIZ_3 GUIDELINES:
 - CRITICAL: Select exactly 4 different terms for the options
 - CRITICAL: The correct answer position must correspond to a term that actually answers the question
 - CRITICAL: NEVER include the main subject in quiz_3 options (e.g., if subject is "example", do NOT include "example" in quiz_3 options)
-- CRITICAL: Quiz_3 should ask about characteristics that the main subject has or doesn't have`;
+- CRITICAL: Quiz_3 should ask about characteristics that the main subject has or doesn't have
+- CRITICAL: ANSWER POSITION VARIETY - Vary the correct answer positions across different quizzes to keep users engaged:
+  * Use positions 1, 2, 3, or 4 randomly and evenly distributed
+  * Do NOT always use position 1 - this makes the quiz predictable and boring
+  * Examples of varied positions: position 1 (25%), position 2 (25%), position 3 (25%), position 4 (25%)`;
       }
     };
 
@@ -440,8 +460,8 @@ Generate content in this exact JSON format:
     },
     "options": ["shark", "eagle", "elephant", "dolphin"], // CRITICAL: Must be ENGLISH image names, NEVER include main subject
     "answer": {
-      "position": 1,
-      "voice": "Rất giỏi! Cá mập sống dưới nước"
+      "position": 3,
+      "voice": "Rất giỏi! Cá heo sống dưới nước"
     }
   },
   "lesson": {
@@ -468,6 +488,10 @@ Requirements:
 - CRITICAL: The correct answer position must correspond to an animal that actually answers the question
 - CRITICAL: NEVER include the main subject animal in quiz_3 options (e.g., if subject is "blue_whale", do NOT include "blue_whale" in quiz_3 options)
 - CRITICAL: Quiz_3 should ask about characteristics that the main subject animal has or doesn't have
+- CRITICAL: ANSWER POSITION VARIETY - Vary the correct answer positions across different quizzes to keep users engaged:
+  * Use positions 1, 2, 3, or 4 randomly and evenly distributed
+  * Do NOT always use position 1 - this makes the quiz predictable and boring
+  * Examples of varied positions: position 1 (25%), position 2 (25%), position 3 (25%), position 4 (25%)
 - Quiz_3 should be diverse and educational - ask about characteristics RELATED to the main subject animal
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic identification, simple facts, obvious choices
@@ -558,8 +582,8 @@ Generate content in this exact JSON format:
     },
     "options": ["oak", "cactus", "water_lily", "palm"], // CRITICAL: Must be ENGLISH image names
     "answer": {
-      "position": 3,
-      "voice": "Rất giỏi! Sen nước cần nhiều nước để sống"
+      "position": 2,
+      "voice": "Rất giỏi! Xương rồng cần ít nước để sống"
     }
   },
   "lesson": {
@@ -586,6 +610,10 @@ Requirements:
 - CRITICAL: The correct answer position must correspond to a plant that actually answers the question
 - CRITICAL: NEVER include the main subject plant in quiz_3 options (e.g., if subject is "oak", do NOT include "oak" in quiz_3 options)
 - CRITICAL: Quiz_3 should ask about characteristics that the main subject plant has or doesn't have
+- CRITICAL: ANSWER POSITION VARIETY - Vary the correct answer positions across different quizzes to keep users engaged:
+  * Use positions 1, 2, 3, or 4 randomly and evenly distributed
+  * Do NOT always use position 1 - this makes the quiz predictable and boring
+  * Examples of varied positions: position 1 (25%), position 2 (25%), position 3 (25%), position 4 (25%)
 - Quiz_3 should be diverse and educational - ask about characteristics RELATED to the main subject plant
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic identification, simple facts, obvious choices
@@ -676,8 +704,8 @@ Generate content in this exact JSON format:
     },
     "options": ["salt", "oil", "sugar", "sand"], // CRITICAL: Must be ENGLISH image names
     "answer": {
-      "position": 1,
-      "voice": "Rất giỏi! Muối tan trong nước"
+      "position": 4,
+      "voice": "Rất giỏi! Đường tan trong nước"
     }
   },
   "lesson": {
@@ -704,6 +732,10 @@ Requirements:
 - CRITICAL: The correct answer position must correspond to a term that actually answers the question
 - CRITICAL: NEVER include the main subject concept in quiz_3 options (e.g., if subject is "electricity", do NOT include "electricity" in quiz_3 options)
 - CRITICAL: Quiz_3 should ask about properties that the main subject concept has or doesn't have
+- CRITICAL: ANSWER POSITION VARIETY - Vary the correct answer positions across different quizzes to keep users engaged:
+  * Use positions 1, 2, 3, or 4 randomly and evenly distributed
+  * Do NOT always use position 1 - this makes the quiz predictable and boring
+  * Examples of varied positions: position 1 (25%), position 2 (25%), position 3 (25%), position 4 (25%)
 - Quiz_3 should be diverse and educational - ask about properties RELATED to the main subject concept
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic concepts, simple experiments
@@ -794,8 +826,8 @@ Generate content in this exact JSON format:
     },
     "options": ["hung_king", "le_lai", "quang_trung", "gia_long"], // CRITICAL: Must be ENGLISH image names
     "answer": {
-      "position": 1,
-      "voice": "Rất giỏi! Vua Hùng là vị vua đầu tiên của Việt Nam"
+      "position": 2,
+      "voice": "Rất giỏi! Lê Lợi là vị vua có công lập nước"
     }
   },
   "lesson": {
@@ -822,6 +854,10 @@ Requirements:
 - CRITICAL: The correct answer position must correspond to a term that actually answers the question
 - CRITICAL: NEVER include the main subject historical figure/event in quiz_3 options (e.g., if subject is "hung_king", do NOT include "hung_king" in quiz_3 options)
 - CRITICAL: Quiz_3 should ask about characteristics that the main subject historical figure/event has or doesn't have
+- CRITICAL: ANSWER POSITION VARIETY - Vary the correct answer positions across different quizzes to keep users engaged:
+  * Use positions 1, 2, 3, or 4 randomly and evenly distributed
+  * Do NOT always use position 1 - this makes the quiz predictable and boring
+  * Examples of varied positions: position 1 (25%), position 2 (25%), position 3 (25%), position 4 (25%)
 - Quiz_3 should be diverse and educational - ask about characteristics RELATED to the main subject historical figure/event
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic facts, simple events
@@ -936,6 +972,10 @@ Requirements:
 - CRITICAL: The correct answer position must correspond to a term that actually answers the question
 - CRITICAL: NEVER include the main subject in quiz_3 options (e.g., if subject is "example", do NOT include "example" in quiz_3 options)
 - CRITICAL: Quiz_3 should ask about characteristics that the main subject has or doesn't have
+- CRITICAL: ANSWER POSITION VARIETY - Vary the correct answer positions across different quizzes to keep users engaged:
+  * Use positions 1, 2, 3, or 4 randomly and evenly distributed
+  * Do NOT always use position 1 - this makes the quiz predictable and boring
+  * Examples of varied positions: position 1 (25%), position 2 (25%), position 3 (25%), position 4 (25%)
 - Quiz_3 should be diverse and educational - ask about characteristics RELATED to the main subject
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic concepts, simple facts
