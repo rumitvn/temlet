@@ -115,11 +115,36 @@ function extractKeyAndOrder(filename: string, type: string, filePath?: string): 
     if (match) {
       return { key: 'voice_' + match[1] };
     }
-  } else {
-    // Extract from format like "bear.jpg", "bear.mp4", "blue_tang.jpg"
-    const match = filename.match(/^(.+?)\.(jpg|mp4|png|gif)$/);
+  } else if (type === 'video' && filePath && filePath.includes('reward')) {
+    // For reward videos, extract key from the filename and order from the path
+    // Path format: reward/output/reward_1/hamster.mp4
+    const pathMatch = filePath.match(/reward[\/\\]output[\/\\]reward_(\d+)[\/\\]([^\/\\]+)\.mp4$/);
+    if (pathMatch) {
+      const order = parseInt(pathMatch[1]);
+      const key = pathMatch[2]; // The filename without extension is the key
+      return { key, order };
+    }
+    
+    // Fallback for reward videos without proper path structure
+    const filenameMatch = filename.match(/^(.+?)\.mp4$/);
+    if (filenameMatch) {
+      const key = filenameMatch[1];
+      return { key };
+    }
+  } else if (type === 'image' || type === 'video') {
+    // Extract from format like "alligator_1.jpg", "alligator_2.mp4", "bear_1.png"
+    // This matches the new structure where images and videos include order numbers
+    const match = filename.match(/^(.+?)_(\d+)\.(jpg|mp4|png|gif)$/);
     if (match) {
-      return { key: match[1] };
+      const key = match[1];
+      const order = parseInt(match[2]);
+      return { key, order };
+    }
+    
+    // Fallback for files without order numbers
+    const fallbackMatch = filename.match(/^(.+?)\.(jpg|mp4|png|gif)$/);
+    if (fallbackMatch) {
+      return { key: fallbackMatch[1] };
     }
   }
   return { key: filename.split('.')[0] };

@@ -8,7 +8,8 @@ import {
   FunnelIcon
 } from "@heroicons/react/24/outline";
 import { 
-  PhotoIcon
+  PhotoIcon,
+  PencilIcon
 } from "@heroicons/react/24/solid";
 import { 
   CheckCircleIcon,
@@ -17,6 +18,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { config } from "../../lib/config";
 import ImageGenerationDialog from "../components/ImageGenerationDialog";
+import ImageEditor from "../components/ImageEditor";
 
 interface Asset {
   id: string;
@@ -89,34 +91,40 @@ interface JSONAssetPair {
   };
 }
 
-interface AssetGroup {
-  key: string;
-  name: string;
-  assets: {
-    image?: Asset;
-    videos: Asset[];
-    voices: Asset[];
-    jsons: Asset[];
-    rewards: Asset[];
-    jsonAssetPairs: JSONAssetPair[]; // Updated field for organized JSON-Asset pairs
-  };
-  renderStatus: {
-    hasJson: boolean;
-    hasImage: boolean;
-    hasVideos: boolean;
-    hasVoices: boolean;
-    isComplete: boolean;
-    requiredVoices: number; // 9 voices per JSON
-    availableVoices: number;
-    requiredRewards: number; // 1 reward per JSON
-    availableRewards: number;
-    jsonOrders: number[]; // Which JSON orders exist (1, 2, 3, etc.)
-    // Quiz 3 image options status
-    hasQuiz3Images: boolean;
-    requiredQuiz3Images: number; // 4 images per JSON
-    availableQuiz3Images: number;
-  };
-}
+  interface AssetGroup {
+    key: string;
+    name: string;
+    assets: {
+      images: Asset[]; // Changed from single image to array to handle multiple orders
+      videos: Asset[];
+      voices: Asset[];
+      jsons: Asset[];
+      rewards: Asset[];
+      jsonAssetPairs: JSONAssetPair[]; // Updated field for organized JSON-Asset pairs
+    };
+    renderStatus: {
+      hasJson: boolean;
+      hasImage: boolean;
+      hasVideos: boolean;
+      hasVoices: boolean;
+      isComplete: boolean;
+      requiredVoices: number; // 9 voices per JSON
+      availableVoices: number;
+      requiredRewards: number; // 1 reward per JSON
+      availableRewards: number;
+      requiredImages: number; // 1 image per JSON (with order numbers)
+      availableImages: number;
+      requiredVideos: number; // 1 video per JSON (with order numbers)
+      availableVideos: number;
+      jsonOrders: number[]; // Which JSON orders exist (1, 2, 3, etc.)
+      imageOrders: number[]; // Which image orders exist (1, 2, 3, etc.)
+      videoOrders: number[]; // Which video orders exist (1, 2, 3, etc.)
+      // Quiz 3 image options status
+      hasQuiz3Images: boolean;
+      requiredQuiz3Images: number; // 4 images per JSON
+      availableQuiz3Images: number;
+    };
+  }
 
 interface SK3QLRContent {
   id: string; // Add unique ID to prevent duplicate keys
@@ -225,6 +233,10 @@ export default function AssetsPage() {
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [uploadingStates, setUploadingStates] = useState<{ [key: string]: boolean }>({});
   const [aiGenerating, setAiGenerating] = useState(false);
+
+  // Image editor state
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [editingImage, setEditingImage] = useState<{ asset: Asset; type: 'main' | 'quiz3' } | null>(null);
 
   // Upload dialog search and filter state
   const [uploadSearchQuery, setUploadSearchQuery] = useState("");
@@ -639,12 +651,38 @@ export default function AssetsPage() {
       if (match) {
         return { key: 'voice_' + match[1] };
       }
-    } else {
-      // Extract from format like "bear.jpg", "bear.mp4", "blue_tang.jpg"
-      const match = filename.match(/^(.+?)\.(jpg|mp4|png|gif)$/);
-      if (match) {
-        return { key: match[1] };
+    } else if (type === 'video' && path && path.includes('reward')) {
+      // For reward videos, extract key from the filename and order from the path
+      // Path format: reward/output/reward_1/hamster.mp4
+      const pathMatch = path.match(/reward[\/\\]output[\/\\]reward_(\d+)[\/\\]([^\/\\]+)\.mp4$/);
+      if (pathMatch) {
+        const order = parseInt(pathMatch[1]);
+        const key = pathMatch[2]; // The filename without extension is the key
+        console.log(`Extracted from reward video path ${path}: key="${key}", order=${order}`); // Debug log
+        return { key, order };
       }
+      
+      // Fallback for reward videos without proper path structure
+      const filenameMatch = filename.match(/^(.+?)\.mp4$/);
+      if (filenameMatch) {
+        const key = filenameMatch[1];
+        console.log(`Extracted from reward video filename ${filename}: key="${key}"`); // Debug log
+        return { key };
+      }
+    } else if (type === 'image' || type === 'video') {
+      // Extract from format like "alligator_1.jpg", "alligator_2.mp4", "bear_1.png"
+      // This matches the new structure where images and videos include order numbers
+      const match = filename.match(/^(.+?)_(\d+)\.(jpg|mp4|png|gif)$/);
+      if (match) {
+        const key = match[1];
+        const order = parseInt(match[2]);
+        console.log(`Extracted from ${type} ${filename}: key="${key}", order=${order}`); // Debug log
+        return { key, order };
+      }
+      
+      // Files without order numbers should be ignored for images and videos
+      console.log(`Ignoring ${type} file without order number: ${filename}`);
+      return { key: 'ignored', order: undefined };
     }
     return { key: filename.split('.')[0] };
   };
@@ -654,6 +692,7 @@ export default function AssetsPage() {
   // Helper function to organize JSON files with their corresponding voices and rewards
   const organizeJSONAssetPairs = (jsons: Asset[], voices: Asset[], rewards: Asset[], allImages: Asset[], jsonOptionsMap: Map<string, string[]> = new Map()): JSONAssetPair[] => {
     console.log('🔧 organizeJSONAssetPairs called with:', jsons.length, 'JSONs');
+    console.log('🎁 Rewards array:', rewards.map(r => ({ name: r.name, path: r.path, key: r.key, order: r.order })));
     return jsons.map(json => {
       const jsonOrder = json.order;
       const jsonKey = json.key;
@@ -686,15 +725,35 @@ export default function AssetsPage() {
       });
 
       // Find reward that belongs to this JSON file
+      console.log(`🔍 Looking for reward for JSON ${json.name} (key: ${jsonKey}, order: ${jsonOrder})`);
       const matchingReward = rewards.find(reward => {
-        // Check by path structure: reward/output/reward_order/key.mp4
+        console.log(`  Checking reward: ${reward.name} (path: ${reward.path}, key: ${reward.key}, order: ${reward.order})`);
+        
+        // Check by path structure: reward/output/reward_order/name.mp4
         if (reward.path) {
           const pathMatch = reward.path.match(/reward[\/\\]output[\/\\]reward_(\d+)[\/\\]([^\/\\]+)\.mp4$/);
-          if (pathMatch && parseInt(pathMatch[1]) === jsonOrder && pathMatch[2] === jsonKey) {
-            return true;
+          if (pathMatch) {
+            console.log(`    Path match: order=${pathMatch[1]}, filename=${pathMatch[2]}`);
+            if (parseInt(pathMatch[1]) === jsonOrder) {
+              console.log(`    ✅ Reward ${reward.name} matched by path: ${reward.path} (order ${pathMatch[1]})`);
+              return true;
+            }
           }
         }
         
+        // Check by filename pattern: key.mp4 (for reward videos)
+        if (reward.name && reward.name.toLowerCase() === `${jsonKey}.mp4`) {
+          console.log(`    ✅ Reward ${reward.name} matched by filename: ${reward.name}`);
+          return true;
+        }
+        
+        // Check by key and order if reward has order
+        if (reward.key === jsonKey && reward.order === jsonOrder) {
+          console.log(`    ✅ Reward ${reward.name} matched by key/order: ${reward.key}_${reward.order}`);
+          return true;
+        }
+        
+        console.log(`    ❌ No match for reward: ${reward.name}`);
         return false;
       });
 
@@ -990,6 +1049,7 @@ export default function AssetsPage() {
       console.log('Voice files:', processedAssets.filter((a: Asset) => a.type === 'voice').map((a: Asset) => a.name));
       console.log('Image files:', processedAssets.filter((a: Asset) => a.type === 'image').map((a: Asset) => a.name));
       console.log('Video files:', processedAssets.filter((a: Asset) => a.type === 'video').map((a: Asset) => a.name));
+      console.log('Video files with categories:', processedAssets.filter((a: Asset) => a.type === 'video').map((a: Asset) => ({ name: a.name, category: a.category, path: a.path })));
       
       setAssets(processedAssets);
       
@@ -1091,6 +1151,7 @@ export default function AssetsPage() {
             key: key,
             name: key.charAt(0).toUpperCase() + key.slice(1),
             assets: {
+              images: [], // Initialize images array
               videos: [],
               voices: [],
               jsons: [],
@@ -1107,7 +1168,13 @@ export default function AssetsPage() {
               availableVoices: 0,
               requiredRewards: 0,
               availableRewards: 0,
+              requiredImages: 0,
+              availableImages: 0,
+              requiredVideos: 0,
+              availableVideos: 0,
               jsonOrders: [],
+              imageOrders: [],
+              videoOrders: [],
               // Quiz 3 image options status
               hasQuiz3Images: false,
               requiredQuiz3Images: 0,
@@ -1119,14 +1186,26 @@ export default function AssetsPage() {
         // Categorize assets
         if (asset.type === 'image') {
           // Only use images from the image directory, ignore images from reward directories
-          if (asset.category === 'image') {
-            groups[key].assets.image = asset;
+          if (asset.category === 'image' && asset.key !== 'ignored') {
+            // With new structure, images have order numbers (e.g., alligator_1.jpg)
+            // Add image to the images array
+            groups[key].assets.images.push(asset);
+            
+            // Track image orders
+            if (asset.order && !groups[key].renderStatus.imageOrders.includes(asset.order)) {
+              groups[key].renderStatus.imageOrders.push(asset.order);
+            }
           }
         } else if (asset.type === 'video') {
+          console.log(`🎬 Processing video asset: ${asset.name} (category: ${asset.category}, path: ${asset.path})`);
           if (asset.category === 'reward') {
+            console.log(`🎁 Adding reward video: ${asset.name} (path: ${asset.path}) to group ${key}`);
             groups[key].assets.rewards.push(asset);
-          } else {
+          } else if (asset.key !== 'ignored') {
+            console.log(`📹 Adding regular video: ${asset.name} to group ${key}`);
             groups[key].assets.videos.push(asset);
+          } else {
+            console.log(`❌ Ignoring video: ${asset.name} (category: ${asset.category}, key: ${asset.key})`);
           }
         } else if (asset.type === 'voice') {
           groups[key].assets.voices.push(asset);
@@ -1135,10 +1214,16 @@ export default function AssetsPage() {
         }
         
         // Update basic render status (JSON orders, basic asset presence)
-        if (asset.type === 'image' && asset.category === 'image') {
+        if (asset.type === 'image' && asset.category === 'image' && asset.key !== 'ignored') {
           groups[key].renderStatus.hasImage = true;
-        } else if (asset.type === 'video' && asset.category === 'video') {
+          groups[key].renderStatus.availableImages++;
+        } else if (asset.type === 'video' && asset.category === 'video' && asset.key !== 'ignored') {
           groups[key].renderStatus.hasVideos = true;
+          groups[key].renderStatus.availableVideos++;
+          // Track video orders
+          if (asset.order && !groups[key].renderStatus.videoOrders.includes(asset.order)) {
+            groups[key].renderStatus.videoOrders.push(asset.order);
+          }
         } else if (asset.type === 'json') {
           groups[key].renderStatus.hasJson = true;
           // Extract order from JSON filename (e.g., "alligator_1.json" -> 1)
@@ -1157,6 +1242,25 @@ export default function AssetsPage() {
         const jsonCount = groups[key].renderStatus.jsonOrders.length;
         groups[key].renderStatus.requiredVoices = jsonCount * 9; // 9 voices per JSON
         groups[key].renderStatus.requiredRewards = jsonCount; // 1 reward per JSON
+        groups[key].renderStatus.requiredImages = jsonCount; // 1 image per JSON (with order numbers)
+        groups[key].renderStatus.requiredVideos = jsonCount; // 1 video per JSON (with order numbers)
+        
+        // Check if we have matching images and videos for each JSON order
+        const missingImageOrders = groups[key].renderStatus.jsonOrders.filter(order => 
+          !groups[key].renderStatus.imageOrders.includes(order)
+        );
+        const missingVideoOrders = groups[key].renderStatus.jsonOrders.filter(order => 
+          !groups[key].renderStatus.videoOrders.includes(order)
+        );
+        
+        // Update available counts to only count matching orders
+        groups[key].renderStatus.availableImages = groups[key].renderStatus.imageOrders.filter(order => 
+          groups[key].renderStatus.jsonOrders.includes(order)
+        ).length;
+        groups[key].renderStatus.availableVideos = groups[key].renderStatus.videoOrders.filter(order => 
+          groups[key].renderStatus.jsonOrders.includes(order)
+        ).length;
+        
         // Note: requiredQuiz3Images will be calculated later after loading JSON content
         
         return groups;
@@ -1277,16 +1381,22 @@ export default function AssetsPage() {
       
       // Organize JSON-Asset pairs for each group
       Object.values(groupedAssets).forEach((group) => {
-        (group as AssetGroup).assets.jsonAssetPairs = organizeJSONAssetPairs(
-          (group as AssetGroup).assets.jsons, 
+        const groupAsAssetGroup = group as AssetGroup;
+        console.log(`🔧 Organizing pairs for group ${groupAsAssetGroup.key}:`);
+        console.log(`  JSONs: ${groupAsAssetGroup.assets.jsons.length}`);
+        console.log(`  Voices: ${groupAsAssetGroup.assets.voices.length}`);
+        console.log(`  Rewards: ${groupAsAssetGroup.assets.rewards.length}`);
+        console.log(`  Rewards details:`, groupAsAssetGroup.assets.rewards.map(r => ({ name: r.name, path: r.path, category: r.category })));
+        
+        groupAsAssetGroup.assets.jsonAssetPairs = organizeJSONAssetPairs(
+          groupAsAssetGroup.assets.jsons, 
           allVoicesForChecking, // Always use complete voice list for checking
-          (group as AssetGroup).assets.rewards,
+          groupAsAssetGroup.assets.rewards,
           allImagesForChecking, // Always use complete image list for quiz 3 checking
           jsonOptionsMap
         );
         
         // Calculate quiz 3 image options status
-        const groupAsAssetGroup = group as AssetGroup;
         let totalAvailableQuiz3Images = 0;
         let hasQuiz3Images = false;
         
@@ -1489,18 +1599,18 @@ export default function AssetsPage() {
   const getRenderStatusDisplay = (renderStatus: AssetGroup['renderStatus']) => {
     const statuses = [];
     if (renderStatus.hasJson) statuses.push(`📄 JSON (${renderStatus.jsonOrders.length})`);
-    if (renderStatus.hasImage) statuses.push('🖼️ Image');
-    if (renderStatus.hasVideos) statuses.push('🎥 Videos');
+    if (renderStatus.availableImages > 0) statuses.push(`🖼️ Images (${renderStatus.availableImages}/${renderStatus.requiredImages})`);
+    if (renderStatus.availableVideos > 0) statuses.push(`🎥 Videos (${renderStatus.availableVideos}/${renderStatus.requiredVideos})`);
     if (renderStatus.hasVoices) statuses.push(`🎵 Voices (${renderStatus.availableVoices}/${renderStatus.requiredVoices})`);
     if (renderStatus.availableRewards > 0) statuses.push(`🏆 Rewards (${renderStatus.availableRewards}/${renderStatus.requiredRewards})`);
     if (renderStatus.hasQuiz3Images) statuses.push(`🖼️ Quiz 3 Images (${renderStatus.availableQuiz3Images}/${renderStatus.requiredQuiz3Images})`);
     
     // Calculate completion rate based on all requirements
-    const totalRequirements = 5; // JSON, Image, Videos, Voices+Rewards, Quiz 3 Images
+    const totalRequirements = 5; // JSON, Images, Videos, Voices+Rewards, Quiz 3 Images
     const metRequirements = [
       renderStatus.hasJson,
-      renderStatus.hasImage,
-      renderStatus.hasVideos,
+      renderStatus.availableImages >= renderStatus.requiredImages,
+      renderStatus.availableVideos >= renderStatus.requiredVideos,
       renderStatus.availableVoices >= renderStatus.requiredVoices && renderStatus.availableRewards >= renderStatus.requiredRewards,
       renderStatus.availableQuiz3Images >= renderStatus.requiredQuiz3Images
     ].filter(Boolean).length;
@@ -1509,6 +1619,14 @@ export default function AssetsPage() {
     let statusColor = 'text-red-400';
     if (completionRate >= 75) statusColor = 'text-green-400';
     else if (completionRate >= 50) statusColor = 'text-yellow-400';
+    
+    // Check for missing orders
+    const missingImageOrders = renderStatus.jsonOrders.filter(order => 
+      !renderStatus.imageOrders.includes(order)
+    );
+    const missingVideoOrders = renderStatus.jsonOrders.filter(order => 
+      !renderStatus.videoOrders.includes(order)
+    );
     
     return {
       statuses,
@@ -1521,10 +1639,14 @@ export default function AssetsPage() {
       missingVoices: Math.max(0, renderStatus.requiredVoices - renderStatus.availableVoices),
       missingRewards: Math.max(0, renderStatus.requiredRewards - renderStatus.availableRewards),
       // Add image and video status
-      hasImage: renderStatus.hasImage,
-      hasVideos: renderStatus.hasVideos,
-      imageStatus: renderStatus.hasImage ? 'Available' : 'Missing',
-      videoStatus: renderStatus.hasVideos ? 'Available' : 'Missing',
+      hasImage: renderStatus.availableImages > 0,
+      hasVideos: renderStatus.availableVideos > 0,
+      imageStatus: renderStatus.availableImages >= renderStatus.requiredImages ? 'Available' : 'Missing',
+      videoStatus: renderStatus.availableVideos >= renderStatus.requiredVideos ? 'Available' : 'Missing',
+      imageProgress: `${renderStatus.availableImages}/${renderStatus.requiredImages}`,
+      videoProgress: `${renderStatus.availableVideos}/${renderStatus.requiredVideos}`,
+      missingImageOrders,
+      missingVideoOrders,
       // Add quiz 3 image options status
       quiz3ImageProgress: `${renderStatus.availableQuiz3Images}/${renderStatus.requiredQuiz3Images}`,
       missingQuiz3Images: Math.max(0, renderStatus.requiredQuiz3Images - renderStatus.availableQuiz3Images)
@@ -1732,7 +1854,7 @@ export default function AssetsPage() {
                 status: 'available',
                 key: groupKey
               };
-              updatedGroup.assets.image = imageAsset;
+              updatedGroup.assets.images.push(imageAsset);
               updatedGroup.renderStatus.hasImage = true;
             }
             break;
@@ -3243,6 +3365,111 @@ export default function AssetsPage() {
     }
   };
 
+  const handleGenerateMainImage = async (jsonAsset: Asset) => {
+    const assetKey = `${jsonAsset.key}_${jsonAsset.order}`;
+    
+    // Set loading state for this specific JSON asset
+    setImageGeneratingStates(prev => ({ ...prev, [assetKey]: true }));
+    
+    try {
+      // Determine the topic based on the current selected topic
+      const topic = selectedTopic || 'animals';
+      
+      // Generate the image using the topic-specific API
+      const response = await fetch('/api/assets/generate-topic-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subject: jsonAsset.key,
+          topic: topic,
+          model: 'grok',
+          size: '1024x1024',
+          quality: 'standard',
+          style: 'vivid',
+          channel: selectedChannel,
+          topicParam: selectedTopic,
+          order: jsonAsset.order // Pass the order to generate the correct filename
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate image');
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.savedAsset) {
+        console.log('🎨 Generated image data:', data.savedAsset);
+        console.log('📄 JSON asset:', jsonAsset);
+        
+        // Update only the specific asset group instead of refreshing all assets
+        setAssetGroups(prevGroups => {
+          return prevGroups.map(group => {
+            if (group.key === jsonAsset.key) {
+              console.log('🔧 Updating group:', group.key);
+              console.log('📸 Current images:', group.assets.images.length);
+              
+              // Create the new image asset with proper structure
+              const newImageAsset = {
+                ...data.savedAsset,
+                key: jsonAsset.key,
+                order: jsonAsset.order
+              };
+              
+              console.log('🆕 New image asset:', newImageAsset);
+              
+              // Add the new image to the group's images array
+              const updatedGroup = {
+                ...group,
+                assets: {
+                  ...group.assets,
+                  images: [...group.assets.images, newImageAsset]
+                },
+                renderStatus: {
+                  ...group.renderStatus,
+                  hasImage: true,
+                  availableImages: group.renderStatus.availableImages + 1,
+                  imageOrders: [...group.renderStatus.imageOrders, jsonAsset.order!]
+                }
+              };
+              
+              console.log('✅ Updated group render status:', updatedGroup.renderStatus);
+              
+              return updatedGroup;
+            }
+            return group;
+          });
+        });
+        
+        // Show success message
+        setToast({
+          message: `Image for "${jsonAsset.key}_${jsonAsset.order}" generated and saved successfully!`,
+          type: 'success'
+        });
+        
+        // Auto-dismiss toast after 3 seconds
+        setTimeout(() => setToast(null), 3000);
+      } else {
+        throw new Error('Image generation failed');
+      }
+    } catch (error) {
+      console.error('Error generating main image:', error);
+      setToast({
+        message: error instanceof Error ? error.message : 'Failed to generate image. Please try again.',
+        type: 'error'
+      });
+      
+      // Auto-dismiss toast after 5 seconds
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      // Clear loading state
+      setImageGeneratingStates(prev => ({ ...prev, [assetKey]: false }));
+    }
+  };
+
   const handleGenerateMissingQuiz3Images = async (pair: JSONAssetPair) => {
     if (pair.quiz3ImageOptions.missingImages.length === 0) {
       setToast({
@@ -3364,6 +3591,70 @@ export default function AssetsPage() {
       // Clear loading state
       setImageGeneratingStates(prev => ({ ...prev, [pairKey]: false }));
     }
+  };
+
+  // Image editor functions
+  const handleEditImage = (asset: Asset, type: 'main' | 'quiz3') => {
+    setEditingImage({ asset, type });
+    setShowImageEditor(true);
+  };
+
+  const handleImageEditorSave = async (editedImageBlob: Blob, fileName: string) => {
+    if (!editingImage) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('image', editedImageBlob, fileName);
+      formData.append('channel', selectedChannel);
+      formData.append('topic', selectedTopic);
+      formData.append('type', editingImage.type);
+      
+      if (editingImage.type === 'main') {
+        formData.append('key', editingImage.asset.key || '');
+        formData.append('order', editingImage.asset.order?.toString() || '');
+      } else {
+        // For quiz 3 images, we need to specify the image name
+        const imageName = fileName.replace(/\.[^/.]+$/, ''); // Remove extension
+        formData.append('imageName', imageName);
+      }
+
+      const response = await fetch('/api/assets/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save edited image');
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setToast({
+          message: 'Image edited and saved successfully!',
+          type: 'success'
+        });
+        
+        // Refresh assets to show the updated image
+        await fetchAssets();
+      } else {
+        throw new Error(data.error || 'Failed to save image');
+      }
+    } catch (error) {
+      console.error('Error saving edited image:', error);
+      setToast({
+        message: error instanceof Error ? error.message : 'Failed to save edited image',
+        type: 'error'
+      });
+    } finally {
+      setShowImageEditor(false);
+      setEditingImage(null);
+    }
+  };
+
+  const handleImageEditorClose = () => {
+    setShowImageEditor(false);
+    setEditingImage(null);
   };
 
   if (loading) {
@@ -3785,8 +4076,6 @@ export default function AssetsPage() {
                   <div className="flex items-center gap-4">
                     <h3 className="text-2xl font-bold text-purple-400">{group.name}</h3>
                     <div className="flex gap-2 text-sm text-gray-400">
-                      <span>🖼️ {group.assets.image ? '1' : '0'} Image</span>
-                      <span>🎥 {group.assets.videos.length} Videos</span>
                       <span>📄 {group.assets.jsonAssetPairs.length} JSON-Asset Pairs</span>
                       <span>🏆 {group.assets.rewards.length} Rewards</span>
                       <span className="text-blue-400">
@@ -3831,24 +4120,24 @@ export default function AssetsPage() {
                   {/* Image Requirements */}
                   <div className="mb-3 p-2 bg-gray-800 rounded">
                     <div className="text-xs font-medium text-blue-400 mb-1">
-                      🖼️ Image: {renderStatus.imageStatus}
+                      🖼️ Images: {renderStatus.imageProgress}
                     </div>
                     <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
                       <div 
                         className={`h-2 rounded-full ${
-                          originalRenderStatus.hasImage 
+                          originalRenderStatus.availableImages >= originalRenderStatus.requiredImages 
                             ? 'bg-green-500' 
                             : 'bg-red-500'
                         }`}
                         style={{ 
-                          width: `${originalRenderStatus.hasImage ? 100 : 0}%` 
+                          width: `${Math.min(100, (originalRenderStatus.availableImages / originalRenderStatus.requiredImages) * 100)}%` 
                         }}
                       ></div>
                     </div>
                     <div className="text-xs text-gray-300">
-                      Required: 1 image per subject
-                      {!originalRenderStatus.hasImage && (
-                        <span className="text-red-400 ml-2">Missing: Image file</span>
+                      Required: {originalRenderStatus.requiredImages} images (1 per JSON with matching order)
+                      {renderStatus.missingImageOrders.length > 0 && (
+                        <span className="text-red-400 ml-2">Missing orders: {renderStatus.missingImageOrders.join(', ')}</span>
                       )}
                     </div>
                   </div>
@@ -3856,24 +4145,24 @@ export default function AssetsPage() {
                   {/* Video Requirements */}
                   <div className="mb-3 p-2 bg-gray-800 rounded">
                     <div className="text-xs font-medium text-cyan-400 mb-1">
-                      🎥 Videos: {renderStatus.videoStatus}
+                      🎥 Videos: {renderStatus.videoProgress}
                     </div>
                     <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
                       <div 
                         className={`h-2 rounded-full ${
-                          originalRenderStatus.hasVideos 
+                          originalRenderStatus.availableVideos >= originalRenderStatus.requiredVideos 
                             ? 'bg-green-500' 
                             : 'bg-red-500'
                         }`}
                         style={{ 
-                          width: `${originalRenderStatus.hasVideos ? 100 : 0}%` 
+                          width: `${Math.min(100, (originalRenderStatus.availableVideos / originalRenderStatus.requiredVideos) * 100)}%` 
                         }}
                       ></div>
                     </div>
                     <div className="text-xs text-gray-300">
-                      Required: At least 1 video per subject
-                      {!originalRenderStatus.hasVideos && (
-                        <span className="text-red-400 ml-2">Missing: Video files</span>
+                      Required: {originalRenderStatus.requiredVideos} videos (1 per JSON with matching order)
+                      {renderStatus.missingVideoOrders.length > 0 && (
+                        <span className="text-red-400 ml-2">Missing orders: {renderStatus.missingVideoOrders.join(', ')}</span>
                       )}
                     </div>
                   </div>
@@ -3964,107 +4253,7 @@ export default function AssetsPage() {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Image */}
-                  {group.assets.image && (
-                    <div 
-                      className="bg-gray-700 rounded-lg p-6 cursor-pointer hover:bg-gray-600 transition-colors border border-gray-600 hover:border-purple-500"
-                      onClick={() => handlePreviewAsset(group.assets.image!)}
-                    >
-                      <div className="flex items-center gap-4 mb-4">
-                        <span className="text-4xl">🖼️</span>
-                        <div className="flex-1">
-                          <span className="text-lg font-semibold text-purple-400">Image</span>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-900 text-green-300 border border-green-600">
-                              ✅ Available
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-base text-gray-200 truncate mb-3 font-medium">{group.assets.image.name}</p>
-                      <p className="text-base text-gray-400 mb-4">{formatFileSize(group.assets.image.size || 0)}</p>
-                      <div className="text-base text-gray-300 bg-gray-800 rounded-lg px-4 py-2 text-center hover:bg-gray-700 transition-colors">Click to preview</div>
-                    </div>
-                  )}
-                  
-                  {/* Missing Image Placeholder */}
-                  {!group.assets.image && (
-                    <div className="bg-gray-700 rounded-lg p-6 border border-gray-600 border-dashed">
-                      <div className="flex items-center gap-4 mb-4">
-                        <span className="text-4xl">🖼️</span>
-                        <div className="flex-1">
-                          <span className="text-lg font-semibold text-gray-400">Image</span>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-900 text-red-300 border border-red-600">
-                              ❌ Missing
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-base text-gray-400 mb-3 font-medium">No image file found</p>
-                      <p className="text-base text-gray-500 mb-4">Required for video rendering</p>
-                      <button 
-                        onClick={() => handleGenerateTopicImage(group)}
-                        disabled={imageGeneratingStates[group.key]}
-                        className="w-full text-base text-purple-300 bg-purple-900/50 rounded-lg px-4 py-2 text-center hover:bg-purple-900/70 disabled:bg-gray-600 disabled:text-gray-400 transition-colors border border-purple-600"
-                      >
-                        {imageGeneratingStates[group.key] ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-300"></div>
-                            Generating...
-                          </div>
-                        ) : (
-                          '🎨 Generate Image'
-                        )}
-                      </button>
-                    </div>
-                  )}
-                  
-                  {/* Videos */}
-                  {group.assets.videos.map((video, index) => (
-                    <div 
-                      key={`${video.id}-${index}`} 
-                      className="bg-gray-700 rounded-lg p-6 cursor-pointer hover:bg-gray-600 transition-colors border border-gray-600 hover:border-purple-500"
-                      onClick={() => handlePreviewAsset(video)}
-                    >
-                      <div className="flex items-center gap-4 mb-4">
-                        <span className="text-4xl">🎥</span>
-                        <div className="flex-1">
-                          <span className="text-lg font-semibold text-blue-400">Video {index + 1}</span>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-900 text-green-300 border border-green-600">
-                              ✅ Available
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-base text-gray-200 truncate mb-3 font-medium">{video.name}</p>
-                      <p className="text-base text-gray-400 mb-4">{formatFileSize(video.size || 0)}</p>
-                      <div className="text-base text-gray-300 bg-gray-800 rounded-lg px-4 py-2 text-center hover:bg-gray-700 transition-colors">Click to play</div>
-                    </div>
-                  ))}
-                  
-                  {/* Missing Videos Placeholder */}
-                  {group.assets.videos.length === 0 && (
-                    <div className="bg-gray-700 rounded-lg p-6 border border-gray-600 border-dashed">
-                      <div className="flex items-center gap-4 mb-4">
-                        <span className="text-4xl">🎥</span>
-                        <div className="flex-1">
-                          <span className="text-lg font-semibold text-gray-400">Videos</span>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-900 text-red-300 border border-red-600">
-                              ❌ Missing
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-base text-gray-400 mb-3 font-medium">No video files found</p>
-                      <p className="text-base text-gray-500 mb-4">Required for video rendering</p>
-                      <button className="w-full text-base text-blue-300 bg-blue-900/50 rounded-lg px-4 py-2 text-center hover:bg-blue-900/70 transition-colors border border-blue-600">
-                        🎬 Generate Videos
-                      </button>
-                    </div>
-                  )}
+
                   
                   {/* JSONs with Voice and Reward Status */}
                   {group.assets.jsonAssetPairs.map((pair, index) => (
@@ -4215,21 +4404,40 @@ export default function AssetsPage() {
                         
                         {/* Individual option status */}
                         <div className="grid grid-cols-2 gap-1 text-xs">
-                          {pair.quiz3ImageOptions.options.map((option, idx) => (
-                            <div 
-                              key={idx}
-                              className={`flex items-center gap-1 ${
-                                pair.quiz3ImageOptions.availableImages.includes(option) 
-                                  ? 'text-green-400' 
-                                  : 'text-red-400'
-                              }`}
-                            >
-                              <span>
-                                {pair.quiz3ImageOptions.availableImages.includes(option) ? '✅' : '❌'}
-                              </span>
-                              <span className="truncate">{option}</span>
-                            </div>
-                          ))}
+                          {pair.quiz3ImageOptions.options.map((option, idx) => {
+                            const isAvailable = pair.quiz3ImageOptions.availableImages.includes(option);
+                            const matchingImage = group.assets.images.find(img => 
+                              img.type === 'image' && 
+                              img.path.includes('options') && 
+                              img.name.replace(/\.(jpg|jpeg|png|gif|bmp)$/i, '').toLowerCase() === option.toLowerCase()
+                            );
+                            
+                            return (
+                              <div 
+                                key={idx}
+                                className={`flex items-center justify-between ${
+                                  isAvailable 
+                                    ? 'text-green-400' 
+                                    : 'text-red-400'
+                                }`}
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span>
+                                    {isAvailable ? '✅' : '❌'}
+                                  </span>
+                                  <span className="truncate">{option}</span>
+                                </div>
+                                {isAvailable && matchingImage && (
+                                  <button
+                                    onClick={() => handleEditImage(matchingImage, 'quiz3')}
+                                    className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/30 hover:bg-blue-900/50 rounded px-1 py-0.5 transition-colors"
+                                  >
+                                    <PencilIcon className="w-2 h-2" />
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                         
                         {/* Generate missing images button */}
@@ -4249,6 +4457,77 @@ export default function AssetsPage() {
                             )}
                           </button>
                         )}
+                      </div>
+                      
+                      {/* Image Status */}
+                      <div className="mb-4 p-3 bg-gray-800 rounded-lg">
+                        <div className="text-sm font-medium text-gray-300 mb-2">Main Image:</div>
+                        {(() => {
+                          const matchingImage = group.assets.images.find(img => img.order === pair.json.order);
+                          return matchingImage ? (
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg text-green-400">✅</span>
+                                <span className="text-sm text-gray-300">
+                                  Image available ({matchingImage.name})
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => handleEditImage(matchingImage, 'main')}
+                                className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/30 hover:bg-blue-900/50 rounded px-2 py-1 transition-colors"
+                              >
+                                <PencilIcon className="w-3 h-3" />
+                                Edit
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg text-red-400">❌</span>
+                                <span className="text-sm text-gray-300">
+                                  No image found for order {pair.json.order}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => handleGenerateMainImage(pair.json)}
+                                disabled={imageGeneratingStates[`${pair.json.key}_${pair.json.order}`]}
+                                className="text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:text-gray-400 rounded px-3 py-1 transition-colors"
+                              >
+                                {imageGeneratingStates[`${pair.json.key}_${pair.json.order}`] ? (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                    Generating...
+                                  </div>
+                                ) : (
+                                  'Generate Image'
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      
+                      {/* Video Status */}
+                      <div className="mb-4 p-3 bg-gray-800 rounded-lg">
+                        <div className="text-sm font-medium text-gray-300 mb-2">Main Video:</div>
+                        {(() => {
+                          const matchingVideo = group.assets.videos.find(vid => vid.order === pair.json.order);
+                          return matchingVideo ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg text-green-400">✅</span>
+                              <span className="text-sm text-gray-300">
+                                Video available ({matchingVideo.name})
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg text-red-400">❌</span>
+                              <span className="text-sm text-gray-300">
+                                No video found for order {pair.json.order}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
                       
                       {/* Action Buttons */}
@@ -5279,6 +5558,18 @@ export default function AssetsPage() {
         channel={selectedChannel}
         topic={selectedTopic}
       />
+
+      {/* Image Editor */}
+      {editingImage && (
+        <ImageEditor
+          isOpen={showImageEditor}
+          onClose={handleImageEditorClose}
+          imageUrl={`/api/assets/preview?path=${encodeURIComponent(editingImage.asset.path)}&channel=${selectedChannel}&topic=${selectedTopic}`}
+          imageName={editingImage.asset.name}
+          onSave={handleImageEditorSave}
+          defaultSize={512}
+        />
+      )}
 
       {/* Toast Notification */}
       <AnimatePresence>

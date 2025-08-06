@@ -29,13 +29,13 @@ export const generateAssets = (renderItem: RenderItem, channel: string = "minima
     config.getAssetFileUrl(config.buildAssetPath("voice", channel, topic, `${keyOrder}/${layer}.mp3`));
 
   const imagePath = (name: string) =>
-    config.getAssetFileUrl(config.buildAssetPath("image", channel, topic, `${name}.jpg`));
+    config.getAssetFileUrl(config.buildAssetPath("image", channel, topic, `${name}_${order}.jpg`));
 
   const quiz3ImagePath = (name: string) =>
     config.getAssetFileUrl(config.buildAssetPath("image", channel, topic, `options/${name}.jpg`));
 
   const videoPath = (name: string) =>
-    config.getAssetFileUrl(config.buildAssetPath("video", channel, topic, `${name}.mp4`));
+    config.getAssetFileUrl(config.buildAssetPath("video", channel, topic, `${name}_${order}.mp4`));
 
   // Extract quiz data
   const intro = content.intro || {};

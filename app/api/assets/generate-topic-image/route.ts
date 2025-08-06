@@ -25,6 +25,7 @@ interface GenerateTopicImageRequest {
   channel?: string;
   topicParam?: string;
   isQuiz3Option?: boolean;
+  order?: number; // Add order parameter for proper filename generation
 }
 
 // Helper function to generate topic-specific prompts
@@ -168,7 +169,9 @@ export async function POST(req: NextRequest) {
         }
         
         const imageBuffer = await imageResponse.arrayBuffer();
-        const filename = `${body.subject.toLowerCase().replace(/[^a-z0-9]/g, '_')}.jpg`;
+        // Generate filename with order if provided, otherwise just the subject
+        const baseName = body.subject.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const filename = body.order ? `${baseName}_${body.order}.jpg` : `${baseName}.jpg`;
         const filePath = path.join(targetImagePath, filename);
         
         // Save the image
