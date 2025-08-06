@@ -125,6 +125,18 @@ IMPORTANT VOICE GUIDELINES:
   * Other variations: "Đúng rồi! [correct answer]", "Hoàn hảo! [correct answer]", "Thông minh! [correct answer]", "Tài giỏi! [correct answer]", "Xuất sắc! [correct answer]"
 - Always include the correct answer in the voice response to reinforce learning
 
+IMPORTANT QUIZ_1 GUIDELINES FOR ENGAGEMENT:
+- Quiz_1 should be CURIOUS and INTERESTING to hook viewers immediately
+- Use surprising facts, unexpected questions, or "wow" moments
+- Make viewers think "I want to know more about this!"
+- Examples of engaging quiz_1 questions:
+  * Animals: "Con cá voi xanh có thể ăn bao nhiêu tôm mỗi ngày?", "Con sư tử có thể ngủ bao nhiêu giờ mỗi ngày?"
+  * Plants: "Cây cối có thể 'nghe' được âm thanh không?", "Cây nào có thể sống hàng nghìn năm?"
+  * Science: "Điện có thể chạy nhanh như ánh sáng không?", "Tại sao bầu trời có màu xanh?"
+  * History: "Vua Hùng có thể sống bao nhiêu năm?", "Ai là người đầu tiên phát minh ra lửa?"
+- Avoid boring identification questions like "Con cá voi sống ở đâu?"
+- Make quiz_1 create curiosity and excitement about the topic
+
 IMPORTANT DIFFICULTY PROGRESSION:
 - Order 1 (Easy): Basic identification, simple facts, obvious choices
 - Order 2 (Medium): Slightly more complex, requires basic knowledge
@@ -471,6 +483,11 @@ Requirements:
 - Avoid repetitive identification questions like "Con nào là [subject]?"
 - CRITICAL: Quiz_3 must NEVER include the main subject animal in the options
 - CRITICAL: Quiz_3 should teach about characteristics RELATED to the main subject animal
+- QUIZ_1 ENGAGEMENT REQUIREMENTS:
+  * Use surprising facts, unexpected questions, or "wow" moments to hook viewers immediately
+  * Examples: "Con cá voi xanh có thể ăn bao nhiêu tôm mỗi ngày?", "Con sư tử có thể ngủ bao nhiêu giờ mỗi ngày?"
+  * Avoid boring identification questions like "Con cá voi sống ở đâu?"
+  * Make quiz_1 create curiosity and excitement about the topic
 - Use appropriate ENGLISH animal names that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
@@ -584,6 +601,11 @@ Requirements:
 - Avoid repetitive identification questions like "Cây nào là [subject]?"
 - CRITICAL: Quiz_3 must NEVER include the main subject plant in the options
 - CRITICAL: Quiz_3 should teach about characteristics RELATED to the main subject plant
+- QUIZ_1 ENGAGEMENT REQUIREMENTS:
+  * Use surprising facts, unexpected questions, or "wow" moments to hook viewers immediately
+  * Examples: "Cây cối có thể 'nghe' được âm thanh không?", "Cây nào có thể sống hàng nghìn năm?"
+  * Avoid boring identification questions like "Cây cối sống ở đâu?"
+  * Make quiz_1 create curiosity and excitement about the topic
 - Use appropriate ENGLISH plant names that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
@@ -697,6 +719,11 @@ Requirements:
 - Avoid repetitive identification questions like "Chất nào là [subject]?"
 - CRITICAL: Quiz_3 must NEVER include the main subject concept in the options
 - CRITICAL: Quiz_3 should teach about properties RELATED to the main subject concept
+- QUIZ_1 ENGAGEMENT REQUIREMENTS:
+  * Use surprising facts, unexpected questions, or "wow" moments to hook viewers immediately
+  * Examples: "Điện có thể chạy nhanh như ánh sáng không?", "Tại sao bầu trời có màu xanh?"
+  * Avoid boring identification questions like "Điện là gì?"
+  * Make quiz_1 create curiosity and excitement about the topic
 - Use appropriate ENGLISH scientific terms that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
@@ -810,6 +837,11 @@ Requirements:
 - Avoid repetitive identification questions like "Ai là [subject]?"
 - CRITICAL: Quiz_3 must NEVER include the main subject historical figure/event in the options
 - CRITICAL: Quiz_3 should teach about characteristics RELATED to the main subject historical figure/event
+- QUIZ_1 ENGAGEMENT REQUIREMENTS:
+  * Use surprising facts, unexpected questions, or "wow" moments to hook viewers immediately
+  * Examples: "Vua Hùng có thể sống bao nhiêu năm?", "Ai là người đầu tiên phát minh ra lửa?"
+  * Avoid boring identification questions like "Vua Hùng là ai?"
+  * Make quiz_1 create curiosity and excitement about the topic
 - Use appropriate ENGLISH historical terms that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
@@ -914,6 +946,11 @@ Requirements:
 - Avoid repetitive identification questions
 - CRITICAL: Quiz_3 must NEVER include the main subject in the options
 - CRITICAL: Quiz_3 should teach about characteristics RELATED to the main subject
+- QUIZ_1 ENGAGEMENT REQUIREMENTS:
+  * Use surprising facts, unexpected questions, or "wow" moments to hook viewers immediately
+  * Examples: "Subject có thể làm gì đặc biệt?", "Tại sao subject lại quan trọng?"
+  * Avoid boring identification questions like "Subject là gì?"
+  * Make quiz_1 create curiosity and excitement about the topic
 - Use appropriate ENGLISH terms that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
