@@ -133,19 +133,21 @@ IMPORTANT DIFFICULTY PROGRESSION:
 - Order 5 (Very Hard): Expert level, detailed knowledge required
 
 IMPORTANT QUIZ_3 GUIDELINES FOR ANIMALS:
-- Quiz_3 should ask educational questions about different animals, characteristics, behaviors, or facts
-- Make quiz_3 about learning something new, not just identifying the main subject
+- Quiz_3 should ask educational questions about characteristics, behaviors, or facts RELATED to the main subject animal
+- Make quiz_3 about learning something new about the main subject's characteristics, not just identifying the main subject
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
 - CRITICAL: Select exactly 4 different animal names for the options
 - CRITICAL: The correct answer position must correspond to an animal that actually answers the question
-- EXAMPLE: If question is "Con nào sống dưới nước?" then:
+- CRITICAL: NEVER include the main subject animal in quiz_3 options (e.g., if subject is "blue_whale", do NOT include "blue_whale" in quiz_3 options)
+- CRITICAL: Quiz_3 should ask about characteristics that the main subject animal has or doesn't have
+- EXAMPLE: If main subject is "blue_whale" and question is "Con nào có vây?" then:
   * Options should be: ["shark", "eagle", "elephant", "dolphin"] (4 items)
-  * Correct answer should be position 1 (shark) or position 4 (dolphin) since they live in water
-  * Voice should be: "Rất giỏi! Cá mập sống dưới nước" or "Rất giỏi! Cá heo sống dưới nước"
+  * Correct answer should be position 1 (shark) or position 4 (dolphin) since they have fins like whales
+  * Voice should be: "Rất giỏi! Cá mập có vây giống như cá voi" or "Rất giỏi! Cá heo có vây giống như cá voi"
 - Adapt questions based on difficulty level:
-  * Easy: basic habitats, obvious characteristics
-  * Medium: diet, behavior patterns
-  * Hard: adaptations, ecosystem roles
+  * Easy: basic characteristics (fins, size, habitat type)
+  * Medium: behavior patterns (migration, feeding, social)
+  * Hard: adaptations (breathing, temperature regulation, communication)
   * Very Hard: scientific classification, complex behaviors`;
 
         case 'plants':
@@ -177,19 +179,21 @@ IMPORTANT DIFFICULTY PROGRESSION:
 - Order 5 (Very Hard): Expert level, detailed knowledge required
 
 IMPORTANT QUIZ_3 GUIDELINES FOR PLANTS:
-- Quiz_3 should ask educational questions about different plants, characteristics, growth patterns, or facts
-- Make quiz_3 about learning something new, not just identifying the main subject
+- Quiz_3 should ask educational questions about characteristics, growth patterns, or facts RELATED to the main subject plant
+- Make quiz_3 about learning something new about the main subject's characteristics, not just identifying the main subject
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
 - CRITICAL: Select exactly 4 different plant names for the options
 - CRITICAL: The correct answer position must correspond to a plant that actually answers the question
-- EXAMPLE: If question is "Cây nào cần nhiều nước?" then:
-  * Options should be: ["oak", "cactus", "water_lily", "palm"] (4 items)
-  * Correct answer should be position 3 (water_lily) since it needs lots of water
-  * Voice should be: "Rất giỏi! Sen nước cần nhiều nước để sống"
+- CRITICAL: NEVER include the main subject plant in quiz_3 options (e.g., if subject is "oak", do NOT include "oak" in quiz_3 options)
+- CRITICAL: Quiz_3 should ask about characteristics that the main subject plant has or doesn't have
+- EXAMPLE: If main subject is "oak" and question is "Cây nào có lá rộng?" then:
+  * Options should be: ["maple", "pine", "palm", "willow"] (4 items)
+  * Correct answer should be position 1 (maple) or position 4 (willow) since they have broad leaves like oak
+  * Voice should be: "Rất giỏi! Cây phong có lá rộng giống như cây sồi" or "Rất giỏi! Cây liễu có lá rộng giống như cây sồi"
 - Adapt questions based on difficulty level:
-  * Easy: basic parts, simple identification
-  * Medium: growth patterns, basic uses
-  * Hard: photosynthesis, complex adaptations
+  * Easy: basic characteristics (leaf type, size, growth pattern)
+  * Medium: growth patterns, basic uses, habitat preferences
+  * Hard: photosynthesis, complex adaptations, ecological roles
   * Very Hard: scientific classification, ecological relationships`;
 
         case 'science':
@@ -221,20 +225,22 @@ IMPORTANT DIFFICULTY PROGRESSION:
 - Order 5 (Very Hard): Expert level, detailed knowledge required
 
 IMPORTANT QUIZ_3 GUIDELINES FOR SCIENCE:
-- Quiz_3 should ask educational questions about different scientific concepts, experiments, or phenomena
-- Make quiz_3 about learning something new, not just identifying the main subject
+- Quiz_3 should ask educational questions about scientific concepts, experiments, or phenomena RELATED to the main subject
+- Make quiz_3 about learning something new about the main subject's properties, not just identifying the main subject
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
 - CRITICAL: Select exactly 4 different scientific terms for the options
 - CRITICAL: The correct answer position must correspond to a term that actually answers the question
-- EXAMPLE: If question is "Chất nào tan trong nước?" then:
-  * Options should be: ["salt", "oil", "sugar", "sand"] (4 items)
-  * Correct answer should be position 1 (salt) or position 3 (sugar) since they dissolve in water
-  * Voice should be: "Rất giỏi! Muối tan trong nước" or "Rất giỏi! Đường tan trong nước"
+- CRITICAL: NEVER include the main subject concept in quiz_3 options (e.g., if subject is "electricity", do NOT include "electricity" in quiz_3 options)
+- CRITICAL: Quiz_3 should ask about properties that the main subject concept has or doesn't have
+- EXAMPLE: If main subject is "electricity" and question is "Chất nào dẫn điện?" then:
+  * Options should be: ["copper", "plastic", "wood", "aluminum"] (4 items)
+  * Correct answer should be position 1 (copper) or position 4 (aluminum) since they conduct electricity like the main subject
+  * Voice should be: "Rất giỏi! Đồng dẫn điện giống như điện" or "Rất giỏi! Nhôm dẫn điện giống như điện"
 - Adapt questions based on difficulty level:
-  * Easy: basic concepts, simple experiments
-  * Medium: cause and effect, basic principles
-  * Hard: complex interactions, multiple variables
-  * Very Hard: advanced theories, detailed processes`;
+  * Easy: basic properties (conductivity, solubility, state of matter)
+  * Medium: cause and effect, basic principles, applications
+  * Hard: complex interactions, multiple variables, advanced properties
+  * Very Hard: advanced theories, detailed processes, scientific classification`;
 
         case 'history':
           return `You are an expert content creator for educational children's videos about history. Create engaging SK3QLR (Short Kids 3 Question with Lesson and Reward) format content.
@@ -265,20 +271,22 @@ IMPORTANT DIFFICULTY PROGRESSION:
 - Order 5 (Very Hard): Expert level, detailed knowledge required
 
 IMPORTANT QUIZ_3 GUIDELINES FOR HISTORY:
-- Quiz_3 should ask educational questions about different historical events, people, places, or facts
-- Make quiz_3 about learning something new, not just identifying the main subject
+- Quiz_3 should ask educational questions about historical events, people, places, or facts RELATED to the main subject
+- Make quiz_3 about learning something new about the main subject's characteristics, not just identifying the main subject
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
 - CRITICAL: Select exactly 4 different historical terms for the options
 - CRITICAL: The correct answer position must correspond to a term that actually answers the question
-- EXAMPLE: If question is "Ai là vị vua đầu tiên?" then:
-  * Options should be: ["hung_king", "le_lai", "quang_trung", "gia_long"] (4 items)
-  * Correct answer should be position 1 (hung_king) since he was the first king
-  * Voice should be: "Rất giỏi! Vua Hùng là vị vua đầu tiên của Việt Nam"
+- CRITICAL: NEVER include the main subject historical figure/event in quiz_3 options (e.g., if subject is "hung_king", do NOT include "hung_king" in quiz_3 options)
+- CRITICAL: Quiz_3 should ask about characteristics that the main subject historical figure/event has or doesn't have
+- EXAMPLE: If main subject is "hung_king" and question is "Ai là vị vua có công lập nước?" then:
+  * Options should be: ["le_lai", "quang_trung", "gia_long", "minh_mang"] (4 items)
+  * Correct answer should be position 1 (le_lai) or position 2 (quang_trung) since they were founding kings like Hung King
+  * Voice should be: "Rất giỏi! Lê Lợi có công lập nước giống như Vua Hùng" or "Rất giỏi! Quang Trung có công lập nước giống như Vua Hùng"
 - Adapt questions based on difficulty level:
-  * Easy: basic facts, simple events
-  * Medium: cause and effect, basic timelines
-  * Hard: complex relationships, multiple factors
-  * Very Hard: detailed analysis, complex historical contexts`;
+  * Easy: basic characteristics (role, time period, achievements)
+  * Medium: cause and effect, basic timelines, relationships
+  * Hard: complex relationships, multiple factors, influences
+  * Very Hard: detailed analysis, complex historical contexts, legacies`;
 
         default:
           return `You are an expert content creator for educational children's videos. Create engaging SK3QLR (Short Kids 3 Question with Lesson and Reward) format content.
@@ -307,11 +315,13 @@ IMPORTANT DIFFICULTY PROGRESSION:
 - Order 5 (Very Hard): Expert level, detailed knowledge required
 
 IMPORTANT QUIZ_3 GUIDELINES:
-- Quiz_3 should ask educational questions about different concepts, characteristics, or facts
-- Make quiz_3 about learning something new, not just identifying the main subject
+- Quiz_3 should ask educational questions about concepts, characteristics, or facts RELATED to the main subject
+- Make quiz_3 about learning something new about the main subject's characteristics, not just identifying the main subject
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
 - CRITICAL: Select exactly 4 different terms for the options
-- CRITICAL: The correct answer position must correspond to a term that actually answers the question`;
+- CRITICAL: The correct answer position must correspond to a term that actually answers the question
+- CRITICAL: NEVER include the main subject in quiz_3 options (e.g., if subject is "example", do NOT include "example" in quiz_3 options)
+- CRITICAL: Quiz_3 should ask about characteristics that the main subject has or doesn't have`;
       }
     };
 
@@ -416,7 +426,7 @@ Generate content in this exact JSON format:
       "text": "Con nào sống dưới nước?",
       "voice": "Hãy chọn con vật sống dưới nước nhé!"
     },
-    "options": ["shark", "eagle", "elephant", "dolphin"], // CRITICAL: Must be ENGLISH image names
+    "options": ["shark", "eagle", "elephant", "dolphin"], // CRITICAL: Must be ENGLISH image names, NEVER include main subject
     "answer": {
       "position": 1,
       "voice": "Rất giỏi! Cá mập sống dưới nước"
@@ -444,19 +454,23 @@ Requirements:
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
 - CRITICAL: Select exactly 4 different animal names for the options
 - CRITICAL: The correct answer position must correspond to an animal that actually answers the question
-- Quiz_3 should be diverse and educational - ask about different animals, characteristics, or facts
+- CRITICAL: NEVER include the main subject animal in quiz_3 options (e.g., if subject is "blue_whale", do NOT include "blue_whale" in quiz_3 options)
+- CRITICAL: Quiz_3 should ask about characteristics that the main subject animal has or doesn't have
+- Quiz_3 should be diverse and educational - ask about characteristics RELATED to the main subject animal
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic identification, simple facts, obvious choices
   * Order 2 (Medium): Slightly more complex, requires basic knowledge
   * Order 3 (Hard): Requires deeper understanding, multiple concepts
   * Order 4 (Hard): Advanced knowledge, complex relationships
   * Order 5 (Very Hard): Expert level, detailed knowledge required
-- Examples of good quiz_3 questions by difficulty:
-  * Easy: "Con nào sống dưới nước?", "Con nào có 4 chân?", "Con nào có lông?"
-  * Medium: "Con nào ăn cỏ?", "Con nào ngủ vào ban ngày?", "Con nào sống theo bầy?"
-  * Hard: "Con nào có khả năng thay đổi màu sắc?", "Con nào có hệ thống định vị siêu âm?", "Con nào có thể tái sinh các bộ phận?"
-  * Very Hard: "Con nào thuộc lớp bò sát có vảy?", "Con nào có hệ thống tuần hoàn kép?", "Con nào có khả năng quang hợp?"
+- Examples of good quiz_3 questions by difficulty (for blue_whale example):
+  * Easy: "Con nào có vây?", "Con nào sống ở biển?", "Con nào có kích thước lớn?"
+  * Medium: "Con nào di cư theo mùa?", "Con nào ăn sinh vật nhỏ?", "Con nào có thể lặn sâu?"
+  * Hard: "Con nào có hệ thống định vị siêu âm?", "Con nào có khả năng điều chỉnh nhiệt độ?", "Con nào có thể giao tiếp bằng âm thanh?"
+  * Very Hard: "Con nào thuộc lớp động vật có vú biển?", "Con nào có hệ thống hô hấp đặc biệt?", "Con nào có khả năng lọc thức ăn?"
 - Avoid repetitive identification questions like "Con nào là [subject]?"
+- CRITICAL: Quiz_3 must NEVER include the main subject animal in the options
+- CRITICAL: Quiz_3 should teach about characteristics RELATED to the main subject animal
 - Use appropriate ENGLISH animal names that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
@@ -553,19 +567,23 @@ Requirements:
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
 - CRITICAL: Select exactly 4 different plant names for the options
 - CRITICAL: The correct answer position must correspond to a plant that actually answers the question
-- Quiz_3 should be diverse and educational - ask about different plants, characteristics, or facts
+- CRITICAL: NEVER include the main subject plant in quiz_3 options (e.g., if subject is "oak", do NOT include "oak" in quiz_3 options)
+- CRITICAL: Quiz_3 should ask about characteristics that the main subject plant has or doesn't have
+- Quiz_3 should be diverse and educational - ask about characteristics RELATED to the main subject plant
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic identification, simple facts, obvious choices
   * Order 2 (Medium): Slightly more complex, requires basic knowledge
   * Order 3 (Hard): Requires deeper understanding, multiple concepts
   * Order 4 (Hard): Advanced knowledge, complex relationships
   * Order 5 (Very Hard): Expert level, detailed knowledge required
-- Examples of good quiz_3 questions by difficulty:
-  * Easy: "Cây nào có lá xanh?", "Cây nào có hoa?", "Cây nào cao nhất?"
-  * Medium: "Cây nào cần nhiều nước?", "Cây nào mọc nhanh?", "Cây nào có rễ sâu?"
-  * Hard: "Cây nào có thể sống trong điều kiện khô hạn?", "Cây nào có hệ thống rễ cộng sinh?", "Cây nào có thể tự phát sáng?"
-  * Very Hard: "Cây nào thuộc họ cây họ đậu?", "Cây nào có hệ thống vận chuyển nước hiệu quả nhất?", "Cây nào có thể sống hàng nghìn năm?"
+- Examples of good quiz_3 questions by difficulty (for oak example):
+  * Easy: "Cây nào có lá rộng?", "Cây nào cao lớn?", "Cây nào có thân gỗ cứng?"
+  * Medium: "Cây nào rụng lá vào mùa thu?", "Cây nào có quả hạt cứng?", "Cây nào sống lâu năm?"
+  * Hard: "Cây nào có hệ thống rễ sâu?", "Cây nào có thể chịu hạn tốt?", "Cây nào có vỏ cây dày?"
+  * Very Hard: "Cây nào thuộc họ cây sồi?", "Cây nào có hệ thống quang hợp hiệu quả?", "Cây nào có thể sống hàng trăm năm?"
 - Avoid repetitive identification questions like "Cây nào là [subject]?"
+- CRITICAL: Quiz_3 must NEVER include the main subject plant in the options
+- CRITICAL: Quiz_3 should teach about characteristics RELATED to the main subject plant
 - Use appropriate ENGLISH plant names that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
@@ -662,19 +680,23 @@ Requirements:
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
 - CRITICAL: Select exactly 4 different scientific terms for the options
 - CRITICAL: The correct answer position must correspond to a term that actually answers the question
-- Quiz_3 should be diverse and educational - ask about different scientific concepts, experiments, or phenomena
+- CRITICAL: NEVER include the main subject concept in quiz_3 options (e.g., if subject is "electricity", do NOT include "electricity" in quiz_3 options)
+- CRITICAL: Quiz_3 should ask about properties that the main subject concept has or doesn't have
+- Quiz_3 should be diverse and educational - ask about properties RELATED to the main subject concept
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic concepts, simple experiments
   * Order 2 (Medium): Cause and effect, basic principles
   * Order 3 (Hard): Complex interactions, multiple variables
   * Order 4 (Hard): Advanced knowledge, complex relationships
   * Order 5 (Very Hard): Expert level, detailed knowledge required
-- Examples of good quiz_3 questions by difficulty:
-  * Easy: "Chất nào tan trong nước?", "Vật nào nổi trên nước?", "Thí nghiệm nào tạo ra bong bóng?"
-  * Medium: "Chất nào thay đổi màu khi gặp axit?", "Vật nào dẫn điện tốt?", "Hiện tượng nào xảy ra khi đun nóng?"
-  * Hard: "Chất nào có thể thay đổi trạng thái ở nhiệt độ phòng?", "Vật nào có từ tính mạnh nhất?", "Hiện tượng nào liên quan đến áp suất khí quyển?"
-  * Very Hard: "Chất nào có cấu trúc tinh thể phức tạp nhất?", "Vật nào có khả năng siêu dẫn ở nhiệt độ cao?", "Hiện tượng nào liên quan đến cơ học lượng tử?"
+- Examples of good quiz_3 questions by difficulty (for electricity example):
+  * Easy: "Chất nào dẫn điện?", "Vật nào có thể tạo ra ánh sáng?", "Chất nào có thể chuyển động?"
+  * Medium: "Chất nào có thể lưu trữ năng lượng?", "Vật nào có thể tạo ra nhiệt?", "Hiện tượng nào liên quan đến dòng chảy?"
+  * Hard: "Chất nào có thể thay đổi trạng thái khi có dòng điện?", "Vật nào có khả năng cảm ứng điện từ?", "Hiện tượng nào liên quan đến điện trở?"
+  * Very Hard: "Chất nào có cấu trúc phân tử cho phép dẫn điện tốt?", "Vật nào có khả năng siêu dẫn ở nhiệt độ thấp?", "Hiện tượng nào liên quan đến điện từ học?"
 - Avoid repetitive identification questions like "Chất nào là [subject]?"
+- CRITICAL: Quiz_3 must NEVER include the main subject concept in the options
+- CRITICAL: Quiz_3 should teach about properties RELATED to the main subject concept
 - Use appropriate ENGLISH scientific terms that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
@@ -771,19 +793,23 @@ Requirements:
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
 - CRITICAL: Select exactly 4 different historical terms for the options
 - CRITICAL: The correct answer position must correspond to a term that actually answers the question
-- Quiz_3 should be diverse and educational - ask about different historical events, people, places, or facts
+- CRITICAL: NEVER include the main subject historical figure/event in quiz_3 options (e.g., if subject is "hung_king", do NOT include "hung_king" in quiz_3 options)
+- CRITICAL: Quiz_3 should ask about characteristics that the main subject historical figure/event has or doesn't have
+- Quiz_3 should be diverse and educational - ask about characteristics RELATED to the main subject historical figure/event
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic facts, simple events
   * Order 2 (Medium): Cause and effect, basic timelines
   * Order 3 (Hard): Complex relationships, multiple factors
   * Order 4 (Hard): Advanced knowledge, complex relationships
   * Order 5 (Very Hard): Expert level, detailed knowledge required
-- Examples of good quiz_3 questions by difficulty:
-  * Easy: "Ai là vị vua đầu tiên?", "Sự kiện nào xảy ra năm 1945?", "Nơi nào là thủ đô cổ?"
-  * Medium: "Ai phát minh ra điện?", "Cuộc chiến nào kết thúc năm 1975?", "Thành phố nào được xây dựng đầu tiên?"
-  * Hard: "Ai là người đầu tiên bay vòng quanh thế giới?", "Sự kiện nào dẫn đến cuộc cách mạng công nghiệp?", "Nơi nào là trung tâm thương mại cổ đại?"
-  * Very Hard: "Ai là người phát hiện ra cấu trúc DNA?", "Sự kiện nào dẫn đến sự sụp đổ của đế chế La Mã?", "Nơi nào là trung tâm học thuật cổ đại quan trọng nhất?"
+- Examples of good quiz_3 questions by difficulty (for hung_king example):
+  * Easy: "Ai là vị vua có công lập nước?", "Ai là người lãnh đạo đầu tiên?", "Ai là người có công thống nhất?"
+  * Medium: "Ai là người phát minh ra nông nghiệp?", "Ai là người lập ra triều đại đầu tiên?", "Ai là người có công mở mang bờ cõi?"
+  * Hard: "Ai là người đầu tiên thiết lập hệ thống cai trị?", "Ai là người có công phát triển văn hóa?", "Ai là người lập ra nền tảng cho quốc gia?"
+  * Very Hard: "Ai là người thiết lập hệ thống phân cấp xã hội đầu tiên?", "Ai là người có công phát triển hệ thống thủy lợi?", "Ai là người lập ra nền tảng cho nền văn minh?"
 - Avoid repetitive identification questions like "Ai là [subject]?"
+- CRITICAL: Quiz_3 must NEVER include the main subject historical figure/event in the options
+- CRITICAL: Quiz_3 should teach about characteristics RELATED to the main subject historical figure/event
 - Use appropriate ENGLISH historical terms that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
@@ -876,7 +902,9 @@ Requirements:
 - CRITICAL: Quiz_3 options must ALWAYS be in ENGLISH as they represent image filenames
 - CRITICAL: Select exactly 4 different terms for the options
 - CRITICAL: The correct answer position must correspond to a term that actually answers the question
-- Quiz_3 should be diverse and educational - ask about different concepts, characteristics, or facts
+- CRITICAL: NEVER include the main subject in quiz_3 options (e.g., if subject is "example", do NOT include "example" in quiz_3 options)
+- CRITICAL: Quiz_3 should ask about characteristics that the main subject has or doesn't have
+- Quiz_3 should be diverse and educational - ask about characteristics RELATED to the main subject
 - DIFFICULTY LEVEL: This is Order ${order}, so adjust complexity accordingly:
   * Order 1 (Easy): Basic concepts, simple facts
   * Order 2 (Medium): Slightly more complex, requires basic knowledge
@@ -884,6 +912,8 @@ Requirements:
   * Order 4 (Hard): Advanced knowledge, complex relationships
   * Order 5 (Very Hard): Expert level, detailed knowledge required
 - Avoid repetitive identification questions
+- CRITICAL: Quiz_3 must NEVER include the main subject in the options
+- CRITICAL: Quiz_3 should teach about characteristics RELATED to the main subject
 - Use appropriate ENGLISH terms that can be represented by images
 - Ensure all content is factually accurate and educational
 - CRITICAL: Make this content UNIQUE and DIFFERENT from any previous content for this subject
