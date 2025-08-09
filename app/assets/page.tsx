@@ -230,6 +230,19 @@ export default function AssetsPage() {
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [showImageGenerationDialog, setShowImageGenerationDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  
+  // Sync upload dialog state to prevent main search interference
+  useEffect(() => {
+    setIsUploadDialogOpen(showUploadDialog);
+  }, [showUploadDialog]);
+
+  // Optimized upload search handler - use ref to avoid re-renders
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  const handleUploadSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    // Update state without causing re-render of the input
+    setUploadSearchQuery(e.target.value);
+  }, []);
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [uploadingStates, setUploadingStates] = useState<{ [key: string]: boolean }>({});
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -240,9 +253,12 @@ export default function AssetsPage() {
 
   // Upload dialog search and filter state
   const [uploadSearchQuery, setUploadSearchQuery] = useState("");
+  const [debouncedUploadSearchQuery, setDebouncedUploadSearchQuery] = useState("");
   const [uploadResourceFilter, setUploadResourceFilter] = useState<'all' | 'image' | 'video' | 'quiz3-image' | 'reward'>('all');
   const [uploadSortBy, setUploadSortBy] = useState<'priority' | 'name' | 'count'>('priority');
   const [uploadSortOrder, setUploadSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  // Removed groupSearchQuery state - no longer needed
 
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -259,33 +275,82 @@ export default function AssetsPage() {
 
   // Calculate missing resources for upload dialog
   const calculateMissingResources = useMemo((): GroupUploadItem[] => {
+    console.log('🔄 calculateMissingResources triggered - assetGroups changed');
     const groups: GroupUploadItem[] = [];
     
     assetGroups.forEach(group => {
       const status = group.renderStatus;
       const missingResources: MissingResource[] = [];
       
-      // Check for missing main image
-      if (!status.hasImage) {
+      // Check for missing images (now per JSON order)
+      if (status.requiredImages > status.availableImages) {
+        const missingCount = status.requiredImages - status.availableImages;
+        
+        // Debug logging for frog group
+        if (group.key === 'frog') {
+          console.log(`🐸 Frog missing images calculation:`);
+          console.log(`  Required images: ${status.requiredImages}`);
+          console.log(`  Available images: ${status.availableImages}`);
+          console.log(`  JSON orders: ${status.jsonOrders}`);
+          console.log(`  Image orders: ${status.imageOrders}`);
+          console.log(`  Available images:`, group.assets.images.map(img => ({ name: img.name, order: img.order })));
+        }
+        
+        // Get specific missing images by JSON order
+        const missingImageItems: MissingItem[] = [];
+        group.assets.jsons.forEach(jsonAsset => {
+          if (jsonAsset.order) {
+            const hasImage = group.assets.images.some(image => image.order === jsonAsset.order);
+            if (!hasImage) {
+              missingImageItems.push({
+                name: `Image ${jsonAsset.order}`,
+                key: `image_${jsonAsset.order}`,
+                jsonOrder: jsonAsset.order,
+                description: `Upload main image for JSON order ${jsonAsset.order}`
+              });
+            }
+          }
+        });
+        
         missingResources.push({
           type: 'image',
-          label: 'Image',
+          label: 'Images',
           icon: '🖼️',
           color: 'bg-red-600',
-          count: 1,
-          description: `Upload main image for ${group.name}`
+          count: missingCount,
+          description: `Upload ${missingCount} main images`,
+          items: missingImageItems
         });
       }
       
-      // Check for missing videos
-      if (!status.hasVideos) {
+      // Check for missing videos (now per JSON order)
+      if (status.requiredVideos > status.availableVideos) {
+        const missingCount = status.requiredVideos - status.availableVideos;
+        
+        // Get specific missing videos by JSON order
+        const missingVideoItems: MissingItem[] = [];
+        group.assets.jsons.forEach(jsonAsset => {
+          if (jsonAsset.order) {
+            const hasVideo = group.assets.videos.some(video => video.order === jsonAsset.order);
+            if (!hasVideo) {
+              missingVideoItems.push({
+                name: `Video ${jsonAsset.order}`,
+                key: `video_${jsonAsset.order}`,
+                jsonOrder: jsonAsset.order,
+                description: `Upload video for JSON order ${jsonAsset.order}`
+              });
+            }
+          }
+        });
+        
         missingResources.push({
           type: 'video',
           label: 'Videos',
           icon: '🎥',
           color: 'bg-red-600',
-          count: 1,
-          description: `Upload video for ${group.name}`
+          count: missingCount,
+          description: `Upload ${missingCount} videos`,
+          items: missingVideoItems
         });
       }
       
@@ -350,6 +415,17 @@ export default function AssetsPage() {
         });
       }
       
+      // Debug logging for frog group
+      if (group.key === 'frog') {
+        console.log(`🐸 Frog calculateMissingResources:`);
+        console.log(`  Required images: ${status.requiredImages}`);
+        console.log(`  Available images: ${status.availableImages}`);
+        console.log(`  Required videos: ${status.requiredVideos}`);
+        console.log(`  Available videos: ${status.availableVideos}`);
+        console.log(`  Missing resources count: ${missingResources.length}`);
+        console.log(`  Missing resources:`, missingResources.map(r => ({ type: r.type, count: r.count })));
+      }
+      
       // Only add groups that have missing resources
       if (missingResources.length > 0) {
         // Calculate priority based on missing resource types and counts
@@ -386,23 +462,61 @@ export default function AssetsPage() {
     return groups.sort((a, b) => b.priority - a.priority);
   }, [assetGroups]);
 
-  // Filtered and sorted missing resources for upload dialog
-  const filteredMissingResources = useMemo(() => {
-    let filtered = calculateMissingResources;
+  // Base missing resources (doesn't change with search) - memoized to prevent recalculation
+  const baseMissingResources = useMemo((): GroupUploadItem[] => {
+    console.log('🔄 Recalculating base missing resources');
+    console.log('  - calculateMissingResources dependency changed');
+    return calculateMissingResources;
+  }, [calculateMissingResources]);
 
-    // Apply search filter
+  // Create search index for fast filtering
+  const searchIndex = useMemo(() => {
+    console.log('🔍 Creating search index');
+    const index = new Map<string, Set<string>>();
+    
+    baseMissingResources.forEach(group => {
+      const searchableTexts = [
+        group.name.toLowerCase(),
+        ...group.missingResources.map(r => r.label.toLowerCase()),
+        ...group.missingResources.map(r => r.description.toLowerCase())
+      ];
+      
+      searchableTexts.forEach(text => {
+        const words = text.split(/\s+/);
+        words.forEach(word => {
+          if (!index.has(word)) {
+            index.set(word, new Set());
+          }
+          index.get(word)!.add(group.key);
+        });
+      });
+    });
+    
+    console.log('🔍 Search index created with', index.size, 'words');
+    return index;
+  }, [baseMissingResources]);
+
+  // Simple state for filtered results - no complex useMemo
+  const [filteredMissingResources, setFilteredMissingResources] = useState<GroupUploadItem[]>([]);
+
+  // Initialize filtered results when base data changes
+  useEffect(() => {
+    if (baseMissingResources.length > 0) {
+      setFilteredMissingResources(baseMissingResources);
+    }
+  }, [baseMissingResources]);
+
+  // Separate effect for filtering - runs only when needed
+  useEffect(() => {
+    console.log('🔍 Starting filter operation');
+    const startTime = performance.now();
+    
+    let filtered = baseMissingResources;
+
+    // Apply group filter (simple dropdown selection)
     if (uploadSearchQuery.trim()) {
-      const query = uploadSearchQuery.toLowerCase();
       filtered = filtered.filter(group => 
-        group.name.toLowerCase().includes(query) ||
-        group.missingResources.some(resource => 
-          resource.label.toLowerCase().includes(query) ||
-          resource.description.toLowerCase().includes(query) ||
-          (resource.items && resource.items.some(item => 
-            item.name.toLowerCase().includes(query) ||
-            item.description.toLowerCase().includes(query)
-          ))
-        )
+        group.name.toLowerCase() === uploadSearchQuery.toLowerCase()
       );
     }
 
@@ -448,8 +562,11 @@ export default function AssetsPage() {
       }
     });
 
-    return filtered;
-  }, [calculateMissingResources, uploadSearchQuery, uploadResourceFilter, uploadSortBy, uploadSortOrder]);
+    const endTime = performance.now();
+    console.log(`🔍 Filter operation completed in ${endTime - startTime}ms`);
+    
+    setFilteredMissingResources(filtered);
+  }, [baseMissingResources, uploadSearchQuery, uploadResourceFilter, uploadSortBy, uploadSortOrder]);
 
   // Calculate overview status
   const calculateOverviewStatus = useMemo((): OverviewStatus => {
@@ -470,8 +587,8 @@ export default function AssetsPage() {
       if (group.name === 'Alligator') {
         // Manual calculation of completion status
         const manualIsComplete = status.hasJson && 
-                                status.hasImage && 
-                                status.hasVideos && 
+                                status.availableImages >= status.requiredImages &&
+                                status.availableVideos >= status.requiredVideos &&
                                 status.availableVoices >= status.requiredVoices &&
                                 status.availableRewards >= status.requiredRewards &&
                                 status.availableQuiz3Images >= status.requiredQuiz3Images;
@@ -481,8 +598,8 @@ export default function AssetsPage() {
           isComplete: status.isComplete,
           manualIsComplete: manualIsComplete,
           hasJson: status.hasJson,
-          hasImage: status.hasImage,
-          hasVideos: status.hasVideos,
+          hasImage: status.availableImages >= status.requiredImages,
+          hasVideos: status.availableVideos >= status.requiredVideos,
           hasVoices: status.hasVoices,
           availableVoices: status.availableVoices,
           requiredVoices: status.requiredVoices,
@@ -499,8 +616,8 @@ export default function AssetsPage() {
       
       // Calculate completion status manually to ensure consistency
       const isActuallyComplete = status.hasJson && 
-                                status.hasImage && 
-                                status.hasVideos && 
+                                status.availableImages >= status.requiredImages &&
+                                status.availableVideos >= status.requiredVideos &&
                                 status.availableVoices >= status.requiredVoices &&
                                 status.availableRewards >= status.requiredRewards &&
                                 status.availableQuiz3Images >= status.requiredQuiz3Images;
@@ -512,8 +629,8 @@ export default function AssetsPage() {
       }
 
       if (!status.hasJson) missingJson++;
-      if (!status.hasImage) missingImage++;
-      if (!status.hasVideos) missingVideos++;
+      if (status.availableImages < status.requiredImages) missingImage++;
+      if (status.availableVideos < status.requiredVideos) missingVideos++;
       if (status.availableVoices < status.requiredVoices) missingVoices++;
       if (status.availableRewards < status.requiredRewards) missingRewards++;
       if (status.availableQuiz3Images < status.requiredQuiz3Images) missingQuiz3Images++;
@@ -1194,6 +1311,13 @@ export default function AssetsPage() {
             // Track image orders
             if (asset.order && !groups[key].renderStatus.imageOrders.includes(asset.order)) {
               groups[key].renderStatus.imageOrders.push(asset.order);
+              console.log(`📸 Added image order ${asset.order} for group ${key} (${asset.name})`);
+            }
+            
+            // Debug logging for frog group
+            if (key === 'frog') {
+              console.log(`🐸 Frog image processing: ${asset.name}, order: ${asset.order}, category: ${asset.category}, key: ${asset.key}`);
+              console.log(`🐸 Current frog image orders:`, groups[key].renderStatus.imageOrders);
             }
           }
         } else if (asset.type === 'video') {
@@ -1215,11 +1339,11 @@ export default function AssetsPage() {
         
         // Update basic render status (JSON orders, basic asset presence)
         if (asset.type === 'image' && asset.category === 'image' && asset.key !== 'ignored') {
-          groups[key].renderStatus.hasImage = true;
-          groups[key].renderStatus.availableImages++;
+          // Track image orders
+          if (asset.order && !groups[key].renderStatus.imageOrders.includes(asset.order)) {
+            groups[key].renderStatus.imageOrders.push(asset.order);
+          }
         } else if (asset.type === 'video' && asset.category === 'video' && asset.key !== 'ignored') {
-          groups[key].renderStatus.hasVideos = true;
-          groups[key].renderStatus.availableVideos++;
           // Track video orders
           if (asset.order && !groups[key].renderStatus.videoOrders.includes(asset.order)) {
             groups[key].renderStatus.videoOrders.push(asset.order);
@@ -1238,33 +1362,47 @@ export default function AssetsPage() {
           groups[key].renderStatus.availableRewards++;
         }
         
-        // Calculate requirements based on JSON files
-        const jsonCount = groups[key].renderStatus.jsonOrders.length;
-        groups[key].renderStatus.requiredVoices = jsonCount * 9; // 9 voices per JSON
-        groups[key].renderStatus.requiredRewards = jsonCount; // 1 reward per JSON
-        groups[key].renderStatus.requiredImages = jsonCount; // 1 image per JSON (with order numbers)
-        groups[key].renderStatus.requiredVideos = jsonCount; // 1 video per JSON (with order numbers)
-        
-        // Check if we have matching images and videos for each JSON order
-        const missingImageOrders = groups[key].renderStatus.jsonOrders.filter(order => 
-          !groups[key].renderStatus.imageOrders.includes(order)
-        );
-        const missingVideoOrders = groups[key].renderStatus.jsonOrders.filter(order => 
-          !groups[key].renderStatus.videoOrders.includes(order)
-        );
-        
-        // Update available counts to only count matching orders
-        groups[key].renderStatus.availableImages = groups[key].renderStatus.imageOrders.filter(order => 
-          groups[key].renderStatus.jsonOrders.includes(order)
-        ).length;
-        groups[key].renderStatus.availableVideos = groups[key].renderStatus.videoOrders.filter(order => 
-          groups[key].renderStatus.jsonOrders.includes(order)
-        ).length;
-        
-        // Note: requiredQuiz3Images will be calculated later after loading JSON content
-        
         return groups;
       }, {});
+      
+      // Final calculations after all assets are processed
+      Object.values(groupedAssets).forEach((group: AssetGroup) => {
+        // Calculate requirements based on JSON files
+        const jsonCount = group.renderStatus.jsonOrders.length;
+        group.renderStatus.requiredVoices = jsonCount * 9; // 9 voices per JSON
+        group.renderStatus.requiredRewards = jsonCount; // 1 reward per JSON
+        group.renderStatus.requiredImages = jsonCount; // 1 image per JSON (with order numbers)
+        group.renderStatus.requiredVideos = jsonCount; // 1 video per JSON (with order numbers)
+        
+        // Update available counts to only count matching orders
+        const matchingImageOrders = group.renderStatus.imageOrders.filter((order: number) => 
+          group.renderStatus.jsonOrders.includes(order)
+        );
+        group.renderStatus.availableImages = matchingImageOrders.length;
+        
+        const matchingVideoOrders = group.renderStatus.videoOrders.filter((order: number) => 
+          group.renderStatus.jsonOrders.includes(order)
+        );
+        group.renderStatus.availableVideos = matchingVideoOrders.length;
+        
+        // Set hasImage and hasVideos flags based on completion
+        group.renderStatus.hasImage = group.renderStatus.availableImages >= group.renderStatus.requiredImages;
+        group.renderStatus.hasVideos = group.renderStatus.availableVideos >= group.renderStatus.requiredVideos;
+        
+                // Debug logging for frog group
+        if (group.key === 'frog') {
+          console.log(`🐸 Frog hasImage/hasVideos flags:`);
+          console.log(`  hasImage: ${group.renderStatus.hasImage} (${group.renderStatus.availableImages}/${group.renderStatus.requiredImages})`);
+          console.log(`  hasVideos: ${group.renderStatus.hasVideos} (${group.renderStatus.availableVideos}/${group.renderStatus.requiredVideos})`);
+          console.log(`🐸 Frog final calculation:`);
+          console.log(`  JSON orders: ${group.renderStatus.jsonOrders}`);
+          console.log(`  Image orders: ${group.renderStatus.imageOrders}`);
+          console.log(`  Video orders: ${group.renderStatus.videoOrders}`);
+          console.log(`  Matching image orders: ${matchingImageOrders}`);
+          console.log(`  Available images: ${group.renderStatus.availableImages}/${group.renderStatus.requiredImages}`);
+          console.log(`  Available videos: ${group.renderStatus.availableVideos}/${group.renderStatus.requiredVideos}`);
+        }
+      });
       
       // Pre-load JSON content for quiz 3 options
       const jsonAssets = processedAssets.filter((asset: Asset) => asset.type === 'json');
@@ -1363,8 +1501,8 @@ export default function AssetsPage() {
         
         // Check if complete (has all required assets)
         const hasRequiredAssets = (group as AssetGroup).renderStatus.hasJson && 
-                                 (group as AssetGroup).renderStatus.hasImage && 
-                                 (group as AssetGroup).renderStatus.hasVideos && 
+                                 (group as AssetGroup).renderStatus.availableImages >= (group as AssetGroup).renderStatus.requiredImages &&
+                                 (group as AssetGroup).renderStatus.availableVideos >= (group as AssetGroup).renderStatus.requiredVideos &&
                                  (group as AssetGroup).renderStatus.availableVoices >= (group as AssetGroup).renderStatus.requiredVoices &&
                                  (group as AssetGroup).renderStatus.availableRewards >= (group as AssetGroup).renderStatus.requiredRewards &&
                                  (group as AssetGroup).renderStatus.availableQuiz3Images >= (group as AssetGroup).renderStatus.requiredQuiz3Images;
@@ -1435,8 +1573,13 @@ export default function AssetsPage() {
     }
   }, [selectedChannel, selectedTopic]);
 
-  // Debounced search effect
+  // Debounced search effect - only when upload dialog is not open
   useEffect(() => {
+    if (isUploadDialogOpen) {
+      console.log('🚫 Skipping main search - upload dialog is open');
+      return;
+    }
+    
     const timer = setTimeout(() => {
       if (searchQuery.trim()) {
         console.log('🔍 Triggering server-side search for:', searchQuery);
@@ -1448,7 +1591,9 @@ export default function AssetsPage() {
     }, 500); // Increased delay to 500ms for better typing experience
 
     return () => clearTimeout(timer);
-  }, [searchQuery, fetchAssets]);
+  }, [searchQuery, fetchAssets, isUploadDialogOpen]);
+
+  // Remove debounced search - no longer needed with dropdown
 
   // Filter change effect
   useEffect(() => {
@@ -1486,17 +1631,17 @@ export default function AssetsPage() {
         switch (statusFilter) {
           case 'complete':
             return status.hasJson && 
-                   status.hasImage && 
-                   status.hasVideos && 
+                   status.availableImages >= status.requiredImages &&
+                   status.availableVideos >= status.requiredVideos &&
                    status.availableVoices >= status.requiredVoices &&
                    status.availableRewards >= status.requiredRewards &&
                    status.availableQuiz3Images >= status.requiredQuiz3Images;
           case 'missing-json':
             return !status.hasJson;
           case 'missing-image':
-            return !status.hasImage;
+            return status.availableImages < status.requiredImages;
           case 'missing-videos':
-            return !status.hasVideos;
+            return status.availableVideos < status.requiredVideos;
           case 'missing-voices':
             return status.availableVoices < status.requiredVoices;
           case 'missing-rewards':
@@ -1639,8 +1784,8 @@ export default function AssetsPage() {
       missingVoices: Math.max(0, renderStatus.requiredVoices - renderStatus.availableVoices),
       missingRewards: Math.max(0, renderStatus.requiredRewards - renderStatus.availableRewards),
       // Add image and video status
-      hasImage: renderStatus.availableImages > 0,
-      hasVideos: renderStatus.availableVideos > 0,
+      hasImage: renderStatus.availableImages >= renderStatus.requiredImages,
+      hasVideos: renderStatus.availableVideos >= renderStatus.requiredVideos,
       imageStatus: renderStatus.availableImages >= renderStatus.requiredImages ? 'Available' : 'Missing',
       videoStatus: renderStatus.availableVideos >= renderStatus.requiredVideos ? 'Available' : 'Missing',
       imageProgress: `${renderStatus.availableImages}/${renderStatus.requiredImages}`,
@@ -1787,7 +1932,8 @@ export default function AssetsPage() {
       });
       
       if (!response.ok) {
-        throw new Error('Upload failed');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
       
       const result = await response.json();
@@ -1805,7 +1951,7 @@ export default function AssetsPage() {
       console.error('Upload error:', error);
       setToast({
         type: 'error',
-        message: 'Upload failed. Please try again.'
+        message: `Failed to upload files: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
     } finally {
       // Clear loading state for this specific upload
@@ -1840,40 +1986,63 @@ export default function AssetsPage() {
         
         switch (resourceType) {
           case 'image':
-            // Update image asset
+            // Update image asset with order number
             const imageFile = fileArray[0];
-            if (imageFile) {
+            if (imageFile && jsonOrder) {
               const imageAsset: Asset = {
-                id: `image_${groupKey}_${Date.now()}`,
-                name: imageFile.name,
+                id: `image_${groupKey}_${jsonOrder}_${Date.now()}`,
+                name: `${groupKey}_${jsonOrder}${getFileExtension(imageFile.name)}`,
                 type: 'image',
                 category: 'image',
-                path: joinPaths(config.getAssetPaths(selectedChannel, selectedTopic).image, `${groupKey}${getFileExtension(imageFile.name)}`),
+                path: joinPaths(config.getAssetPaths(selectedChannel, selectedTopic).image, `${groupKey}_${jsonOrder}${getFileExtension(imageFile.name)}`),
                 size: imageFile.size,
                 lastModified: new Date(),
                 status: 'available',
-                key: groupKey
+                key: groupKey,
+                order: jsonOrder
               };
               updatedGroup.assets.images.push(imageAsset);
-              updatedGroup.renderStatus.hasImage = true;
+              if (!updatedGroup.renderStatus.imageOrders.includes(jsonOrder)) {
+                updatedGroup.renderStatus.imageOrders.push(jsonOrder);
+              }
+              
+              // Recalculate available images count based on matching orders
+              const matchingImageOrders = updatedGroup.renderStatus.imageOrders.filter(order => 
+                updatedGroup.renderStatus.jsonOrders.includes(order)
+              );
+              updatedGroup.renderStatus.availableImages = matchingImageOrders.length;
             }
             break;
             
           case 'video':
-            // Update video assets
-            const videoAssets: Asset[] = fileArray.map((file, index) => ({
-              id: `video_${groupKey}_${index}_${Date.now()}`,
-              name: file.name,
-              type: 'video',
-              category: 'video',
-              path: joinPaths(config.getAssetPaths(selectedChannel, selectedTopic).video, `${groupKey}${getFileExtension(file.name)}`),
-              size: file.size,
-              lastModified: new Date(),
-              status: 'available',
-              key: groupKey
-            }));
-            updatedGroup.assets.videos = [...updatedGroup.assets.videos, ...videoAssets];
-            updatedGroup.renderStatus.hasVideos = true;
+            // Update video assets with order number
+            if (jsonOrder) {
+              const videoFile = fileArray[0];
+              if (videoFile) {
+                const videoAsset: Asset = {
+                  id: `video_${groupKey}_${jsonOrder}_${Date.now()}`,
+                  name: `${groupKey}_${jsonOrder}${getFileExtension(videoFile.name)}`,
+                  type: 'video',
+                  category: 'video',
+                  path: joinPaths(config.getAssetPaths(selectedChannel, selectedTopic).video, `${groupKey}_${jsonOrder}${getFileExtension(videoFile.name)}`),
+                  size: videoFile.size,
+                  lastModified: new Date(),
+                  status: 'available',
+                  key: groupKey,
+                  order: jsonOrder
+                };
+                updatedGroup.assets.videos.push(videoAsset);
+                if (!updatedGroup.renderStatus.videoOrders.includes(jsonOrder)) {
+                  updatedGroup.renderStatus.videoOrders.push(jsonOrder);
+                }
+                
+                // Recalculate available videos count based on matching orders
+                const matchingVideoOrders = updatedGroup.renderStatus.videoOrders.filter(order => 
+                  updatedGroup.renderStatus.jsonOrders.includes(order)
+                );
+                updatedGroup.renderStatus.availableVideos = matchingVideoOrders.length;
+              }
+            }
             break;
             
           case 'quiz3-image':
@@ -1923,15 +2092,42 @@ export default function AssetsPage() {
             break;
         }
         
+        // Final recalculation to ensure all counts are correct
+        const jsonCount = updatedGroup.renderStatus.jsonOrders.length;
+        updatedGroup.renderStatus.requiredVoices = jsonCount * 9;
+        updatedGroup.renderStatus.requiredRewards = jsonCount;
+        updatedGroup.renderStatus.requiredImages = jsonCount;
+        updatedGroup.renderStatus.requiredVideos = jsonCount;
+        
+        // Recalculate available counts based on matching orders
+        const matchingImageOrders = updatedGroup.renderStatus.imageOrders.filter(order => 
+          updatedGroup.renderStatus.jsonOrders.includes(order)
+        );
+        updatedGroup.renderStatus.availableImages = matchingImageOrders.length;
+        
+        const matchingVideoOrders = updatedGroup.renderStatus.videoOrders.filter(order => 
+          updatedGroup.renderStatus.jsonOrders.includes(order)
+        );
+        updatedGroup.renderStatus.availableVideos = matchingVideoOrders.length;
+        
         // Recalculate completion status
         const status = updatedGroup.renderStatus;
         updatedGroup.renderStatus.isComplete = 
           status.hasJson && 
-          status.hasImage && 
-          status.hasVideos && 
+          status.availableImages >= status.requiredImages &&
+          status.availableVideos >= status.requiredVideos &&
           status.availableVoices >= status.requiredVoices &&
           status.availableRewards >= status.requiredRewards &&
           status.availableQuiz3Images >= status.requiredQuiz3Images;
+        
+        // Debug logging for frog group
+        if (groupKey === 'frog') {
+          console.log(`🐸 Frog after upload update:`);
+          console.log(`  JSON orders: ${updatedGroup.renderStatus.jsonOrders}`);
+          console.log(`  Image orders: ${updatedGroup.renderStatus.imageOrders}`);
+          console.log(`  Available images: ${updatedGroup.renderStatus.availableImages}/${updatedGroup.renderStatus.requiredImages}`);
+          console.log(`  Available videos: ${updatedGroup.renderStatus.availableVideos}/${updatedGroup.renderStatus.requiredVideos}`);
+        }
         
         return updatedGroup;
       });
@@ -5212,7 +5408,7 @@ export default function AssetsPage() {
                 <div>
                   <h2 className="text-2xl font-bold text-white">📤 Upload Missing Assets</h2>
                   <p className="text-sm text-gray-400 mt-1">
-                    {calculateMissingResources.length} groups with missing assets • {calculateMissingResources.reduce((sum, group) => sum + group.missingResources.reduce((s, r) => s + r.count, 0), 0)} total items to upload
+                    {baseMissingResources.length} groups with missing assets • {baseMissingResources.reduce((sum, group) => sum + group.missingResources.reduce((s, r) => s + r.count, 0), 0)} total items to upload
                   </p>
                 </div>
                 <button
@@ -5232,7 +5428,7 @@ export default function AssetsPage() {
                     { type: 'quiz3-image', icon: '🖼️', label: 'Quiz 3 Images', color: 'bg-blue-600' },
                     { type: 'reward', icon: '🏆', label: 'Rewards', color: 'bg-yellow-600' }
                   ].map(({ type, icon, label, color }) => {
-                    const count = calculateMissingResources.reduce((sum, group) => 
+                    const count = baseMissingResources.reduce((sum, group) => 
                       sum + group.missingResources.filter(r => r.type === type).reduce((s, r) => s + r.count, 0), 0
                     );
                     return (
@@ -5250,36 +5446,25 @@ export default function AssetsPage() {
                 </div>
               </div>
 
-              {/* Search and Filter Controls */}
-              <div className="mb-6 space-y-4">
-                {/* Search Bar */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search groups, resources, or items..."
-                    value={uploadSearchQuery}
-                    onChange={(e) => setUploadSearchQuery(e.target.value)}
-                    className="w-full px-4 py-2 pl-10 pr-10 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  {uploadSearchQuery && (
-                    <button
-                      onClick={() => setUploadSearchQuery("")}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition-colors"
-                    >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-
-                {/* Filter and Sort Controls */}
+              {/* Filter and Sort Controls */}
+              <div className="mb-6">
                 <div className="flex flex-wrap gap-4 items-center">
+                  {/* Simple Group Selection */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-300">Group:</label>
+                    <select
+                      value={uploadSearchQuery}
+                      onChange={(e) => setUploadSearchQuery(e.target.value)}
+                      className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">All Groups</option>
+                      {baseMissingResources.map(group => (
+                        <option key={group.key} value={group.name.toLowerCase()}>
+                          {group.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   {/* Resource Type Filter */}
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium text-gray-300">Filter:</label>
@@ -5336,7 +5521,7 @@ export default function AssetsPage() {
 
                   {/* Results Count */}
                   <div className="ml-auto text-sm text-gray-400">
-                    {filteredMissingResources.length} of {calculateMissingResources.length} groups
+                    {filteredMissingResources.length} of {baseMissingResources.length} groups
                   </div>
                 </div>
               </div>
@@ -5345,7 +5530,7 @@ export default function AssetsPage() {
               <div className="flex-1 overflow-y-auto">
                 {filteredMissingResources.length === 0 ? (
                   <div className="text-center py-12">
-                    {calculateMissingResources.length === 0 ? (
+                    {baseMissingResources.length === 0 ? (
                       <>
                         <div className="text-6xl mb-4">🎉</div>
                         <h3 className="text-xl font-bold text-green-400 mb-2">All Assets Complete!</h3>
@@ -5407,7 +5592,7 @@ export default function AssetsPage() {
                                 {resource.description}
                               </p>
 
-                              {/* Show individual items for quiz3-image and reward */}
+                              {/* Show individual items for all resource types that have specific items */}
                               {resource.items && resource.items.length > 0 ? (
                                 <div className="space-y-2 max-h-32 overflow-y-auto">
                                   {resource.items.map((item, itemIndex) => (
@@ -5426,9 +5611,9 @@ export default function AssetsPage() {
                                             input.multiple = false;
                                             
                                             // Set file type restrictions
-                                            if (resource.type === 'quiz3-image') {
+                                            if (resource.type === 'image' || resource.type === 'quiz3-image') {
                                               input.accept = 'image/*';
-                                            } else if (resource.type === 'reward') {
+                                            } else if (resource.type === 'video' || resource.type === 'reward') {
                                               input.accept = 'video/*';
                                             }
                                             
@@ -5440,6 +5625,12 @@ export default function AssetsPage() {
                                                 } else if (resource.type === 'quiz3-image') {
                                                   // For quiz3-image, we need to handle the specific image name
                                                   handleUploadSpecificAsset(group.key, resource.type, files, undefined, item.name);
+                                                } else if (resource.type === 'image' && item.jsonOrder) {
+                                                  // For images, we need to handle the JSON order
+                                                  handleUploadSpecificAsset(group.key, resource.type, files, item.jsonOrder);
+                                                } else if (resource.type === 'video' && item.jsonOrder) {
+                                                  // For videos, we need to handle the JSON order
+                                                  handleUploadSpecificAsset(group.key, resource.type, files, item.jsonOrder);
                                                 }
                                               }
                                             };
@@ -5473,7 +5664,7 @@ export default function AssetsPage() {
                                   ))}
                                 </div>
                               ) : (
-                                /* Default upload button for other resource types */
+                                /* Default upload button for resource types without specific items */
                                 <button
                                   onClick={() => {
                                     const input = document.createElement('input');

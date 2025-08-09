@@ -36,13 +36,25 @@ export async function POST(req: NextRequest) {
     // Determine upload path and filename based on resource type
     switch (resourceType) {
       case 'image':
+        if (!jsonOrder) {
+          return NextResponse.json(
+            { error: 'JSON order is required for image uploads' },
+            { status: 400 }
+          );
+        }
         uploadPath = assetPaths.image;
-        fileName = `${groupKey}.jpg`; // Default to jpg, but will be updated based on actual file
+        fileName = `${groupKey}_${jsonOrder}.jpg`; // Include order number in filename
         break;
       
       case 'video':
+        if (!jsonOrder) {
+          return NextResponse.json(
+            { error: 'JSON order is required for video uploads' },
+            { status: 400 }
+          );
+        }
         uploadPath = assetPaths.video;
-        fileName = `${groupKey}.mp4`; // Default to mp4, but will be updated based on actual file
+        fileName = `${groupKey}_${jsonOrder}.mp4`; // Include order number in filename
         break;
       
       case 'quiz3-image':
@@ -91,8 +103,13 @@ export async function POST(req: NextRequest) {
           finalFileName = file.name;
         }
       } else if (fileExtension) {
-        // For other types, use the group key with the actual file extension
-        finalFileName = `${groupKey}${fileExtension}`;
+        // For images and videos, use the group key with order number and actual file extension
+        if (resourceType === 'image' || resourceType === 'video') {
+          finalFileName = `${groupKey}_${jsonOrder}${fileExtension}`;
+        } else {
+          // For other types, use the group key with the actual file extension
+          finalFileName = `${groupKey}${fileExtension}`;
+        }
       }
 
       const filePath = path.join(uploadPath, finalFileName);
