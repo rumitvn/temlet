@@ -1366,7 +1366,7 @@ export default function AssetsPage() {
       }, {});
       
       // Final calculations after all assets are processed
-      Object.values(groupedAssets).forEach((group: AssetGroup) => {
+      (Object.values(groupedAssets) as AssetGroup[]).forEach((group) => {
         // Calculate requirements based on JSON files
         const jsonCount = group.renderStatus.jsonOrders.length;
         group.renderStatus.requiredVoices = jsonCount * 9; // 9 voices per JSON
