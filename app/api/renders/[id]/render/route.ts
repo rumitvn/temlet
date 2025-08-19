@@ -42,8 +42,8 @@ export async function POST(
       renderOutputFolder: renderItem.renderOutputFolder
     });
 
-    // Generate assets
-    const assets = generateAssets(renderItem);
+    // Generate assets using the channel and topic from the render item
+    const assets = generateAssets(renderItem, renderItem.channelName, renderItem.topic);
 
     // Create job in Nexrender
     const requestBody = {

@@ -111,6 +111,17 @@ export default function CreateRenderDialog({
     }
   };
 
+  const clearCache = () => {
+    try {
+      Object.values(CACHE_KEYS).forEach(key => {
+        localStorage.removeItem(key);
+      });
+      console.log('🔧 Cache cleared');
+    } catch (error) {
+      console.warn('Failed to clear cache:', error);
+    }
+  };
+
   const [formData, setFormData] = useState({
     channelId: '',
     channelName: '',
@@ -159,22 +170,36 @@ export default function CreateRenderDialog({
       const cachedChannel = channels.find(c => c.id === cachedChannelId);
       const cachedRenderFormatId = loadFromCache(CACHE_KEYS.LAST_TEMPLATE_AE_RENDER_FORMAT);
       const cachedRenderFormat = renderFormats.find(f => f.id === cachedRenderFormatId);
+      const cachedTopic = loadFromCache(CACHE_KEYS.LAST_TOPIC);
       
-      setFormData(prev => ({
-        ...prev,
-        channelId: cachedChannelId,
-        channelName: cachedChannel?.name || '',
-        topic: loadFromCache(CACHE_KEYS.LAST_TOPIC),
-        type: loadFromCache(CACHE_KEYS.LAST_TYPE),
-        outputFolderPath: loadFromCache(CACHE_KEYS.LAST_OUTPUT_FOLDER),
-        templateAeUrl: loadFromCache(CACHE_KEYS.LAST_TEMPLATE_AE_URL),
-        templateAeComposition: loadFromCache(CACHE_KEYS.LAST_TEMPLATE_AE_COMPOSITION) || 'Final',
-        templateAeRenderFormat: cachedRenderFormat ? {
-          id: cachedRenderFormat.id,
-          name: cachedRenderFormat.name,
-          code: cachedRenderFormat.code || ''
-        } : { id: '', name: '', code: '' },
-      }));
+      console.log('🔧 Loading cached values - cachedChannelId:', cachedChannelId, 'cachedChannel:', cachedChannel?.name, 'cachedTopic:', cachedTopic);
+      
+      // Only load cached values if the form is empty (first time opening)
+      setFormData(prev => {
+        const shouldLoadCache = !prev.channelName && !prev.topic;
+        
+        if (shouldLoadCache) {
+          console.log('🔧 Loading from cache (form was empty)');
+          return {
+            ...prev,
+            channelId: cachedChannelId,
+            channelName: cachedChannel?.name || '',
+            topic: cachedTopic,
+            type: loadFromCache(CACHE_KEYS.LAST_TYPE),
+            outputFolderPath: loadFromCache(CACHE_KEYS.LAST_OUTPUT_FOLDER),
+            templateAeUrl: loadFromCache(CACHE_KEYS.LAST_TEMPLATE_AE_URL),
+            templateAeComposition: loadFromCache(CACHE_KEYS.LAST_TEMPLATE_AE_COMPOSITION) || 'Final',
+            templateAeRenderFormat: cachedRenderFormat ? {
+              id: cachedRenderFormat.id,
+              name: cachedRenderFormat.name,
+              code: cachedRenderFormat.code || ''
+            } : { id: '', name: '', code: '' },
+          };
+        } else {
+          console.log('🔧 Not loading from cache (form has values)');
+          return prev;
+        }
+      });
     }
   }, [isOpen, channels, renderFormats]);
 
@@ -487,6 +512,8 @@ export default function CreateRenderDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('🔧 Form submission - formData.channelName:', formData.channelName, 'formData.topic:', formData.topic);
+    
     if (useAssetSelection) {
       if (selectedJsonFiles.length === 0) {
         setError('Please select at least one JSON file');
@@ -519,8 +546,27 @@ export default function CreateRenderDialog({
         
         for (const jsonAsset of selectedJsonAssets) {
             try {
-              // Read JSON content from file
-              const response = await fetch(`/api/assets/json-content?path=${encodeURIComponent(jsonAsset.path)}`);
+              // Extract channel and topic from the JSON file path
+              const pathParts = jsonAsset.path.split(/[\\\/]/);
+              const minimateIndex = pathParts.findIndex(part => part.toLowerCase() === 'minimate');
+              let detectedTopic = formData.topic;
+              
+              if (minimateIndex !== -1 && minimateIndex + 1 < pathParts.length) {
+                detectedTopic = pathParts[minimateIndex + 1];
+                console.log('🔧 Detected topic from JSON path:', detectedTopic);
+                
+                // Update form data with detected topic if it's different
+                if (detectedTopic !== formData.topic) {
+                  console.log('🔧 Updating form topic from', formData.topic, 'to', detectedTopic);
+                  setFormData(prev => ({
+                    ...prev,
+                    topic: detectedTopic
+                  }));
+                }
+              }
+              
+              // Read JSON content from file using detected topic
+              const response = await fetch(`/api/assets/json-content?path=${encodeURIComponent(jsonAsset.path)}&channel=${encodeURIComponent(formData.channelName)}&topic=${encodeURIComponent(detectedTopic)}`);
               if (!response.ok) {
                 throw new Error(`Failed to read JSON file: ${jsonAsset.name}`);
               }
@@ -530,9 +576,10 @@ export default function CreateRenderDialog({
               
               const { outputFolderPath, outputFolderPathValue, ...rest } = formData;
               
-              // Create the render data
+              // Create the render data with detected topic
               const renderData: CreateRenderItemDto = {
                 ...rest,
+                topic: detectedTopic, // Use the detected topic instead of form data
                 fileName,
                 jsonContent,
                 nexrenderUid: '',
@@ -542,8 +589,9 @@ export default function CreateRenderDialog({
                 type: formData.type as 'short' | 'long',
               };
 
-              // Generate assets using the generateAssets function
-              const templateAeAssets = generateAssets(renderData as any);
+              // Generate assets using the generateAssets function with detected topic
+              console.log('🔧 generateAssets called with channel:', formData.channelName, 'topic:', detectedTopic);
+              const templateAeAssets = generateAssets(renderData as any, formData.channelName, detectedTopic);
               renderData.templateAeAssets = templateAeAssets as TemplateAeAsset[];
 
               await onSave({
@@ -586,7 +634,8 @@ export default function CreateRenderDialog({
               type: formData.type as 'short' | 'long',
             };
 
-            const templateAeAssets = generateAssets(renderData as any);
+            console.log('🔧 generateAssets called with channel:', formData.channelName, 'topic:', formData.topic);
+            const templateAeAssets = generateAssets(renderData as any, formData.channelName, formData.topic);
             renderData.templateAeAssets = templateAeAssets as TemplateAeAsset[];
 
             await onSave({
@@ -683,6 +732,16 @@ export default function CreateRenderDialog({
                         </option>
                       ))}
                     </select>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Debug: channelName="{formData.channelName}", topic="{formData.topic}"
+                      <button 
+                        type="button" 
+                        onClick={clearCache}
+                        className="ml-2 text-blue-400 hover:text-blue-300"
+                      >
+                        Clear Cache
+                      </button>
+                    </div>
                   </div>
 
                   {/* Topic Selection */}

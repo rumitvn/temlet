@@ -3,6 +3,7 @@ import { TemplateAeAsset } from "../types/render";
 import { config, normalizePath } from "../../lib/config";
 
 export const generateAssets = (renderItem: RenderItem, channel: string = "minimate", topic: string = "animals"): TemplateAeAsset[] => {
+  console.log('🔧 generateAssets function received channel:', channel, 'topic:', topic);
   const { templateAeRenderFormat, jsonContent } = renderItem;
   const content = typeof jsonContent === 'string' ? JSON.parse(jsonContent) : jsonContent;
   
