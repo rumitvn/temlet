@@ -18,6 +18,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { config } from "../../lib/config";
 import ImageGenerationDialog from "../components/ImageGenerationDialog";
+import ProviderSelectionDialog from "../components/ProviderSelectionDialog";
 import ImageEditor from "../components/ImageEditor";
 
 interface Asset {
@@ -229,6 +230,12 @@ export default function AssetsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [showImageGenerationDialog, setShowImageGenerationDialog] = useState(false);
+  const [showProviderSelectionDialog, setShowProviderSelectionDialog] = useState(false);
+  const [providerSelectionConfig, setProviderSelectionConfig] = useState<{
+    title: string;
+    description?: string;
+    onSelect: (provider: 'openai' | 'grok' | 'comfyui') => void;
+  } | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   
   // Sync upload dialog state to prevent main search interference
@@ -3495,12 +3502,13 @@ export default function AssetsPage() {
         body: JSON.stringify({
           subject: group.name,
           topic: topic, // This will handle 'histories' -> 'history' mapping in the API
-          model: 'grok', // Default to Grok
+          model: 'comfyui', // Use ComfyUI for better quality
           size: '1024x1024',
           quality: 'standard',
           style: 'vivid',
           channel: selectedChannel,
-          topicParam: selectedTopic
+          topicParam: selectedTopic,
+          comfyuiUrl: 'http://localhost:8188' // Specify ComfyUI URL
         }),
       });
 
@@ -3561,7 +3569,18 @@ export default function AssetsPage() {
     }
   };
 
-  const handleGenerateMainImage = async (jsonAsset: Asset) => {
+  const showProviderSelectionForMainImage = (jsonAsset: Asset) => {
+    setProviderSelectionConfig({
+      title: `Generate Main Image for ${jsonAsset.key}_${jsonAsset.order}`,
+      description: 'Choose an AI provider to generate the main image',
+      onSelect: (provider: 'openai' | 'grok' | 'comfyui') => {
+        handleGenerateMainImage(jsonAsset, provider);
+      }
+    });
+    setShowProviderSelectionDialog(true);
+  };
+
+  const handleGenerateMainImage = async (jsonAsset: Asset, provider: 'openai' | 'grok' | 'comfyui' = 'comfyui') => {
     const assetKey = `${jsonAsset.key}_${jsonAsset.order}`;
     
     // Set loading state for this specific JSON asset
@@ -3580,13 +3599,14 @@ export default function AssetsPage() {
         body: JSON.stringify({
           subject: jsonAsset.key,
           topic: topic,
-          model: 'grok',
+          model: provider,
           size: '1024x1024',
           quality: 'standard',
           style: 'vivid',
           channel: selectedChannel,
           topicParam: selectedTopic,
-          order: jsonAsset.order // Pass the order to generate the correct filename
+          order: jsonAsset.order, // Pass the order to generate the correct filename
+          comfyuiUrl: provider === 'comfyui' ? 'http://localhost:8188' : undefined
         }),
       });
 
@@ -3642,7 +3662,7 @@ export default function AssetsPage() {
         
         // Show success message
         setToast({
-          message: `Image for "${jsonAsset.key}_${jsonAsset.order}" generated and saved successfully!`,
+          message: `Image for "${jsonAsset.key}_${jsonAsset.order}" generated with ${provider.toUpperCase()} and saved successfully!`,
           type: 'success'
         });
         
@@ -3666,7 +3686,7 @@ export default function AssetsPage() {
     }
   };
 
-  const handleGenerateMissingQuiz3Images = async (pair: JSONAssetPair) => {
+  const showProviderSelectionForMissingImages = (pair: JSONAssetPair) => {
     if (pair.quiz3ImageOptions.missingImages.length === 0) {
       setToast({
         message: 'No missing images to generate',
@@ -3675,6 +3695,17 @@ export default function AssetsPage() {
       return;
     }
 
+    setProviderSelectionConfig({
+      title: `Generate Missing Quiz 3 Images for ${pair.json.key}_${pair.json.order}`,
+      description: `Choose an AI provider to generate ${pair.quiz3ImageOptions.missingImages.length} missing images`,
+      onSelect: (provider: 'openai' | 'grok' | 'comfyui') => {
+        handleGenerateMissingQuiz3Images(pair, provider);
+      }
+    });
+    setShowProviderSelectionDialog(true);
+  };
+
+  const handleGenerateMissingQuiz3Images = async (pair: JSONAssetPair, provider: 'openai' | 'grok' | 'comfyui' = 'comfyui') => {
     const pairKey = `${pair.json.key}_${pair.json.order}`;
     
     // Set loading state for this specific JSON pair
@@ -3695,12 +3726,13 @@ export default function AssetsPage() {
             body: JSON.stringify({
               subject: missingImage,
               topic: topic,
-              model: 'grok',
+              model: provider,
               size: '512x512',
               quality: 'standard',
               style: 'vivid',
               channel: selectedChannel,
               topicParam: selectedTopic,
+              comfyuiUrl: provider === 'comfyui' ? 'http://localhost:8188' : undefined,
               // Specify that this is for quiz 3 options
               isQuiz3Option: true
             }),
@@ -3767,7 +3799,7 @@ export default function AssetsPage() {
 
       // Show success message
       setToast({
-        message: `Generated ${generatedImages.length} missing quiz 3 images successfully!`,
+        message: `Generated ${generatedImages.length} missing quiz 3 images with ${provider.toUpperCase()} successfully!`,
         type: 'success'
       });
       
@@ -4639,7 +4671,7 @@ export default function AssetsPage() {
                         {/* Generate missing images button */}
                         {pair.quiz3ImageOptions.missingImages.length > 0 && (
                           <button
-                            onClick={() => handleGenerateMissingQuiz3Images(pair)}
+                            onClick={() => showProviderSelectionForMissingImages(pair)}
                             disabled={imageGeneratingStates[`${pair.json.key}_${pair.json.order}`]}
                             className="w-full mt-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:text-gray-400 rounded-lg px-3 py-2 text-center transition-colors"
                           >
@@ -4685,7 +4717,7 @@ export default function AssetsPage() {
                                 </span>
                               </div>
                               <button
-                                onClick={() => handleGenerateMainImage(pair.json)}
+                                onClick={() => showProviderSelectionForMainImage(pair.json)}
                                 disabled={imageGeneratingStates[`${pair.json.key}_${pair.json.order}`]}
                                 className="text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:text-gray-400 rounded px-3 py-1 transition-colors"
                               >
@@ -5749,6 +5781,17 @@ export default function AssetsPage() {
         channel={selectedChannel}
         topic={selectedTopic}
       />
+
+      {/* Provider Selection Dialog */}
+      {providerSelectionConfig && (
+        <ProviderSelectionDialog
+          isOpen={showProviderSelectionDialog}
+          onClose={() => setShowProviderSelectionDialog(false)}
+          onProviderSelect={providerSelectionConfig.onSelect}
+          title={providerSelectionConfig.title}
+          description={providerSelectionConfig.description}
+        />
+      )}
 
       {/* Image Editor */}
       {editingImage && (

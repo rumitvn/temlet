@@ -18,7 +18,7 @@ const grok = new OpenAI({
 interface GenerateTopicImageRequest {
   subject: string;
   topic: 'animals' | 'plants' | 'science' | 'history' | 'histories';
-  model?: 'openai' | 'grok';
+  model?: 'openai' | 'grok' | 'comfyui';
   size?: '256x256' | '512x512' | '1024x1024' | '1792x1024' | '1024x1792';
   quality?: 'standard' | 'hd';
   style?: 'vivid' | 'natural';
@@ -26,6 +26,7 @@ interface GenerateTopicImageRequest {
   topicParam?: string;
   isQuiz3Option?: boolean;
   order?: number; // Add order parameter for proper filename generation
+  comfyuiUrl?: string;
 }
 
 // Helper function to generate topic-specific prompts
@@ -112,6 +113,238 @@ async function generateImageWithGrok(params: GenerateTopicImageRequest) {
   }
 }
 
+// Helper function to generate image using ComfyUI
+async function generateImageWithComfyUI(params: GenerateTopicImageRequest) {
+  try {
+    const comfyuiUrl = params.comfyuiUrl || "http://localhost:8188";
+    
+    // Check if ComfyUI is available
+    try {
+      const healthCheck = await fetch(`${comfyuiUrl}/system_stats`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (!healthCheck.ok) {
+        throw new Error('ComfyUI not available');
+      }
+    } catch (error) {
+      throw new Error('ComfyUI connection failed');
+    }
+    
+    const prompt = generateTopicPrompt(params.subject, params.topic, params.size);
+    
+    // Use a simplified but functional workflow based on the user's requirements
+    const workflow = {
+      "2": {
+        "inputs": {
+          "samples": [
+            "5",
+            0
+          ],
+          "vae": [
+            "11",
+            0
+          ]
+        },
+        "class_type": "VAEDecode",
+        "_meta": {
+          "title": "VAE Decode"
+        }
+      },
+      "4": {
+        "inputs": {
+          "width": parseInt(params.size?.split('x')[0] || "512"),
+          "height": parseInt(params.size?.split('x')[1] || "512"),
+          "batch_size": 1
+        },
+        "class_type": "EmptySD3LatentImage",
+        "_meta": {
+          "title": "EmptySD3LatentImage"
+        }
+      },
+      "5": {
+        "inputs": {
+          "seed": Math.floor(Math.random() * 100000000000000),
+          "steps": 20,
+          "cfg": 1,
+          "sampler_name": "euler",
+          "scheduler": "simple",
+          "denoise": 1,
+          "model": [
+            "9",
+            0
+          ],
+          "positive": [
+            "19",
+            0
+          ],
+          "negative": [
+            "6",
+            0
+          ],
+          "latent_image": [
+            "4",
+            0
+          ]
+        },
+        "class_type": "KSampler",
+        "_meta": {
+          "title": "KSampler"
+        }
+      },
+      "6": {
+        "inputs": {
+          "text": "low quality, bad quality, blurry, distorted",
+          "clip": [
+            "10",
+            0
+          ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+          "title": "CLIP Text Encode (Negative Prompt)"
+        }
+      },
+      "9": {
+        "inputs": {
+          "unet_name": "flux1-dev-Q4_K_S.gguf"
+        },
+        "class_type": "UnetLoaderGGUF",
+        "_meta": {
+          "title": "Unet Loader (GGUF)"
+        }
+      },
+      "10": {
+        "inputs": {
+          "clip_name1": "t5-v1_1-xxl-encoder-Q4_K_S.gguf",
+          "clip_name2": "clip_l.safetensors",
+          "type": "flux"
+        },
+        "class_type": "DualCLIPLoaderGGUF",
+        "_meta": {
+          "title": "DualCLIPLoader (GGUF)"
+        }
+      },
+      "11": {
+        "inputs": {
+          "vae_name": "ae.safetensors"
+        },
+        "class_type": "VAELoader",
+        "_meta": {
+          "title": "Load VAE"
+        }
+      },
+      "19": {
+        "inputs": {
+          "text": [
+            "22",
+            0
+          ],
+          "clip": [
+            "10",
+            0
+          ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+          "title": "CLIP Text Encode (Positive Prompt)"
+        }
+      },
+      "22": {
+        "inputs": {
+          "Text": prompt
+        },
+        "class_type": "DF_Text",
+        "_meta": {
+          "title": "Text"
+        }
+      },
+      "27": {
+        "inputs": {
+          "filename_prefix": "ComfyUI",
+          "images": [
+            "2",
+            0
+          ]
+        },
+        "class_type": "SaveImage",
+        "_meta": {
+          "title": "Save Image"
+        }
+      }
+    };
+
+    // Queue the prompt
+    console.log('Sending ComfyUI workflow:', JSON.stringify({ prompt: workflow, extra_data: {} }, null, 2));
+    const queueResponse = await fetch(`${comfyuiUrl}/prompt`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt: workflow, extra_data: {} }),
+    });
+
+    if (!queueResponse.ok) {
+      const errorText = await queueResponse.text();
+      console.error("ComfyUI queue error response:", errorText);
+      console.error("ComfyUI workflow sent:", JSON.stringify(workflow, null, 2));
+      console.error("ComfyUI URL:", comfyuiUrl);
+      throw new Error(`ComfyUI queue failed: ${queueResponse.statusText} - ${errorText}`);
+    }
+
+    const queueData = await queueResponse.json();
+    const promptId = queueData.prompt_id;
+
+    // Poll for completion
+    let attempts = 0;
+    const maxAttempts = 60; // 5 minutes max wait
+    let imageData = null;
+
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+
+      const historyResponse = await fetch(`${comfyuiUrl}/history/${promptId}`);
+      if (historyResponse.ok) {
+        const history = await historyResponse.json();
+        if (history[promptId] && history[promptId].outputs) {
+          const outputs = history[promptId].outputs;
+          const imageNode = Object.values(outputs).find((output: any) => 
+            output.images && output.images.length > 0
+          ) as any;
+
+          if (imageNode && imageNode.images[0]) {
+            const image = imageNode.images[0];
+            const imageUrl = `${comfyuiUrl}/view?filename=${image.filename}&subfolder=${image.subfolder}&type=${image.type}`;
+            imageData = {
+              filename: image.filename,
+              subfolder: image.subfolder,
+              type: image.type,
+              url: imageUrl
+            };
+            break;
+          }
+        }
+      }
+      attempts++;
+    }
+
+    if (!imageData) {
+      throw new Error("ComfyUI generation timed out");
+    }
+
+    return {
+      success: true,
+      imageUrl: imageData.url,
+      filename: imageData.filename,
+      subfolder: imageData.subfolder,
+    };
+  } catch (error) {
+    console.error("ComfyUI image generation error:", error);
+    throw new Error(`ComfyUI generation failed: ${error}`);
+  }
+}
+
 // POST /api/assets/generate-topic-image - Generate topic-specific image
 export async function POST(req: NextRequest) {
   try {
@@ -139,9 +372,17 @@ export async function POST(req: NextRequest) {
       result = await generateImageWithOpenAI(body);
     } else if (model === 'grok') {
       result = await generateImageWithGrok(body);
+    } else if (model === 'comfyui') {
+      try {
+        result = await generateImageWithComfyUI(body);
+      } catch (error) {
+        console.error('ComfyUI failed, falling back to Grok:', error);
+        // Fallback to Grok if ComfyUI fails
+        result = await generateImageWithGrok(body);
+      }
     } else {
       return NextResponse.json(
-        { error: 'Invalid model specified' },
+        { error: 'Invalid model specified. Supported: openai, grok, comfyui' },
         { status: 400 }
       );
     }
@@ -215,6 +456,40 @@ export async function POST(req: NextRequest) {
 // GET /api/assets/generate-topic-image - Get available models and configurations
 export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const checkComfyUI = searchParams.get('check_comfyui') === 'true';
+    
+    let comfyuiStatus = null;
+    
+    if (checkComfyUI) {
+      try {
+        const response = await fetch('http://localhost:8188/system_stats', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          const stats = await response.json();
+          comfyuiStatus = {
+            available: true,
+            stats
+          };
+        } else {
+          comfyuiStatus = {
+            available: false,
+            error: 'ComfyUI not responding'
+          };
+        }
+      } catch (error) {
+        comfyuiStatus = {
+          available: false,
+          error: 'ComfyUI connection failed'
+        };
+      }
+    }
+
     return NextResponse.json({
       models: {
         openai: {
@@ -230,6 +505,13 @@ export async function GET(req: NextRequest) {
           sizes: ['1024x1024'], // Grok uses fixed size
           qualities: ['standard'],
           styles: ['vivid']
+        },
+        comfyui: {
+          name: 'ComfyUI (Local)',
+          available: comfyuiStatus?.available || false,
+          status: comfyuiStatus,
+          sizes: ['512x512', '768x768', '1024x1024', '1024x1536', '1536x1024'],
+          defaultUrl: 'http://localhost:8188'
         }
       },
       topics: [

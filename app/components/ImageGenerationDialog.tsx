@@ -52,7 +52,7 @@ export default function ImageGenerationDialog({
 }: ImageGenerationDialogProps) {
   const [formData, setFormData] = useState({
     prompt: '',
-    model: 'openai' as 'openai' | 'grok' | 'comfyui',
+    model: 'comfyui' as 'openai' | 'grok' | 'comfyui',
     size: '1024x1024',
     quality: 'standard' as 'standard' | 'hd',
     style: 'vivid' as 'vivid' | 'natural',
@@ -83,7 +83,7 @@ export default function ImageGenerationDialog({
     if (!isOpen) {
       setFormData({
         prompt: '',
-        model: 'openai',
+        model: 'comfyui',
         size: '1024x1024',
         quality: 'standard',
         style: 'vivid',

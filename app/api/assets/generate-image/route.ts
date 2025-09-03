@@ -90,82 +90,177 @@ async function generateImageWithComfyUI(params: GenerateImageRequest) {
   try {
     const comfyuiUrl = params.comfyuiUrl || "http://localhost:8188";
     
-    // Default workflow for ComfyUI if none provided
-    const defaultWorkflow = {
-      prompt: {
-        "1": {
-          "inputs": {
-            "text": params.prompt,
-            "clip": ["4", 1]
-          },
-          "class_type": "CLIPTextEncode"
+    // Check if ComfyUI is available
+    try {
+      const healthCheck = await fetch(`${comfyuiUrl}/system_stats`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (!healthCheck.ok) {
+        throw new Error('ComfyUI not available');
+      }
+    } catch (error) {
+      throw new Error('ComfyUI connection failed');
+    }
+    
+    // Use the same workflow structure as the topic image endpoint
+    const workflow = {
+      "2": {
+        "inputs": {
+          "samples": [
+            "5",
+            0
+          ],
+          "vae": [
+            "11",
+            0
+          ]
         },
-        "2": {
-          "inputs": {
-            "seed": Math.floor(Math.random() * 1000000),
-            "steps": 20,
-            "cfg": 8,
-            "sampler_name": "euler",
-            "scheduler": "normal",
-            "denoise": 1,
-            "model": ["4", 0],
-            "positive": ["1", 0],
-            "negative": ["6", 0],
-            "latent_image": ["5", 0]
-          },
-          "class_type": "KSampler"
+        "class_type": "VAEDecode",
+        "_meta": {
+          "title": "VAE Decode"
+        }
+      },
+      "4": {
+        "inputs": {
+          "width": parseInt(params.size?.split('x')[0] || "512"),
+          "height": parseInt(params.size?.split('x')[1] || "512"),
+          "batch_size": 1
         },
-        "3": {
-          "inputs": {
-            "samples": ["2", 0],
-            "vae": ["4", 2]
-          },
-          "class_type": "VAEDecode"
+        "class_type": "EmptySD3LatentImage",
+        "_meta": {
+          "title": "EmptySD3LatentImage"
+        }
+      },
+      "5": {
+        "inputs": {
+          "seed": Math.floor(Math.random() * 100000000000000),
+          "steps": 20,
+          "cfg": 1,
+          "sampler_name": "euler",
+          "scheduler": "simple",
+          "denoise": 1,
+          "model": [
+            "9",
+            0
+          ],
+          "positive": [
+            "19",
+            0
+          ],
+          "negative": [
+            "6",
+            0
+          ],
+          "latent_image": [
+            "4",
+            0
+          ]
         },
-        "4": {
-          "inputs": {
-            "ckpt_name": "v1-5-pruned.ckpt"
-          },
-          "class_type": "CheckpointLoaderSimple"
+        "class_type": "KSampler",
+        "_meta": {
+          "title": "KSampler"
+        }
+      },
+      "6": {
+        "inputs": {
+          "text": "low quality, bad quality, blurry, distorted",
+          "clip": [
+            "10",
+            0
+          ]
         },
-        "5": {
-          "inputs": {
-            "width": parseInt(params.size?.split('x')[0] || "1024"),
-            "height": parseInt(params.size?.split('x')[1] || "1024"),
-            "batch_size": 1
-          },
-          "class_type": "EmptyLatentImage"
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+          "title": "CLIP Text Encode (Negative Prompt)"
+        }
+      },
+      "9": {
+        "inputs": {
+          "unet_name": "flux1-dev-Q4_K_S.gguf"
         },
-        "6": {
-          "inputs": {
-            "text": "low quality, bad quality, sketches",
-            "clip": ["4", 1]
-          },
-          "class_type": "CLIPTextEncode"
+        "class_type": "UnetLoaderGGUF",
+        "_meta": {
+          "title": "Unet Loader (GGUF)"
+        }
+      },
+      "10": {
+        "inputs": {
+          "clip_name1": "t5-v1_1-xxl-encoder-Q4_K_S.gguf",
+          "clip_name2": "clip_l.safetensors",
+          "type": "flux"
         },
-        "7": {
-          "inputs": {
-            "filename_prefix": "ComfyUI",
-            "images": ["3", 0]
-          },
-          "class_type": "SaveImage"
+        "class_type": "DualCLIPLoaderGGUF",
+        "_meta": {
+          "title": "DualCLIPLoader (GGUF)"
+        }
+      },
+      "11": {
+        "inputs": {
+          "vae_name": "ae.safetensors"
+        },
+        "class_type": "VAELoader",
+        "_meta": {
+          "title": "Load VAE"
+        }
+      },
+      "19": {
+        "inputs": {
+          "text": [
+            "22",
+            0
+          ],
+          "clip": [
+            "10",
+            0
+          ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+          "title": "CLIP Text Encode (Positive Prompt)"
+        }
+      },
+      "22": {
+        "inputs": {
+          "Text": params.prompt
+        },
+        "class_type": "DF_Text",
+        "_meta": {
+          "title": "Text"
+        }
+      },
+      "27": {
+        "inputs": {
+          "filename_prefix": "ComfyUI",
+          "images": [
+            "2",
+            0
+          ]
+        },
+        "class_type": "SaveImage",
+        "_meta": {
+          "title": "Save Image"
         }
       }
     };
 
-    const workflow = params.comfyuiWorkflow || defaultWorkflow;
-
     // Queue the prompt
+    console.log('Sending ComfyUI workflow:', JSON.stringify({ prompt: workflow, extra_data: {} }, null, 2));
     const queueResponse = await fetch(`${comfyuiUrl}/prompt`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(workflow),
+      body: JSON.stringify({ prompt: workflow, extra_data: {} }),
     });
 
     if (!queueResponse.ok) {
-      throw new Error(`ComfyUI queue failed: ${queueResponse.statusText}`);
+      const errorText = await queueResponse.text();
+      console.error("ComfyUI queue error response:", errorText);
+      console.error("ComfyUI workflow sent:", JSON.stringify(workflow, null, 2));
+      console.error("ComfyUI URL:", comfyuiUrl);
+      throw new Error(`ComfyUI queue failed: ${queueResponse.statusText} - ${errorText}`);
     }
 
     const queueData = await queueResponse.json();
@@ -240,10 +335,16 @@ export async function POST(req: NextRequest) {
     } else if (model === 'grok') {
       result = await generateImageWithGrok(body);
     } else if (model === 'comfyui') {
-      result = await generateImageWithComfyUI(body);
+      try {
+        result = await generateImageWithComfyUI(body);
+      } catch (error) {
+        console.error('ComfyUI failed, falling back to Grok:', error);
+        // Fallback to Grok if ComfyUI fails
+        result = await generateImageWithGrok(body);
+      }
     } else {
       return NextResponse.json(
-        { error: 'Invalid model specified' },
+        { error: 'Invalid model specified. Supported: openai, grok, comfyui' },
         { status: 400 }
       );
     }
