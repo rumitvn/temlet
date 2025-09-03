@@ -1,55 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-// Mock data for demonstration
-const mockJobs = [
-  {
-    id: "1",
-    name: "Capybara Videos",
-    keyword: "capybara",
-    site: "pexels",
-    type: "video",
-    channel: "RumitX Nature",
-    topic: "Animals",
-    status: "completed",
-    progress: 100,
-    totalItems: 8,
-    downloadedItems: 8,
-    failedItems: 0,
-    createdAt: new Date("2024-01-15"),
-    startedAt: new Date("2024-01-15T10:00:00"),
-    completedAt: new Date("2024-01-15T10:15:00"),
-    outputPath: "/channelName/animals/crawler/video",
-    settings: {
-      maxItems: 10,
-      quality: "high",
-      format: "mp4"
-    }
-  },
-  {
-    id: "2",
-    name: "Bear Images",
-    keyword: "bear",
-    site: "pixabay",
-    type: "image",
-    channel: "RumitX Studio",
-    topic: "Animals",
-    status: "crawling",
-    progress: 45,
-    totalItems: 20,
-    downloadedItems: 9,
-    failedItems: 1,
-    createdAt: new Date("2024-01-16"),
-    startedAt: new Date("2024-01-16T14:30:00"),
-    outputPath: "/channelName/animals/crawler/image",
-    settings: {
-      maxItems: 20,
-      quality: "medium",
-      format: "jpg"
-    }
-  }
-];
+import { crawlerService } from '@/app/services/crawlerService';
 
 export async function GET(request: NextRequest) {
   try {
@@ -65,67 +15,24 @@ export async function GET(request: NextRequest) {
     const site = searchParams.get('site');
     const status = searchParams.get('status');
 
-    // Filter jobs based on search parameters
-    let filteredJobs = [...mockJobs];
+    const filters: any = {
+      q,
+      type,
+      topic,
+      channel,
+      site,
+      status,
+      sortBy,
+      sortOrder
+    };
 
-    if (q) {
-      filteredJobs = filteredJobs.filter(job => 
-        job.name.toLowerCase().includes(q.toLowerCase()) ||
-        job.keyword.toLowerCase().includes(q.toLowerCase())
-      );
-    }
-
-    if (type) {
-      filteredJobs = filteredJobs.filter(job => job.type === type.toLowerCase());
-    }
-
-    if (topic) {
-      filteredJobs = filteredJobs.filter(job => job.topic === topic);
-    }
-
-    if (channel) {
-      filteredJobs = filteredJobs.filter(job => job.channel === channel);
-    }
-
-    if (site) {
-      filteredJobs = filteredJobs.filter(job => job.site === site);
-    }
-
-    if (status) {
-      filteredJobs = filteredJobs.filter(job => job.status === status);
-    }
-
-    // Sort jobs
-    filteredJobs.sort((a, b) => {
-      let aValue: any = a[sortBy as keyof typeof a];
-      let bValue: any = b[sortBy as keyof typeof b];
-
-      if (aValue instanceof Date && bValue instanceof Date) {
-        aValue = aValue.getTime();
-        bValue = bValue.getTime();
-      }
-
-      if (aValue === undefined) aValue = '';
-      if (bValue === undefined) bValue = '';
-
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
-
-    // Paginate
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedJobs = filteredJobs.slice(startIndex, endIndex);
-    const totalPages = Math.ceil(filteredJobs.length / limit);
+    const result = await crawlerService.getAllJobs(page, limit, filters);
 
     return NextResponse.json({
-      jobs: paginatedJobs,
-      totalPages,
+      jobs: result.jobs,
+      totalPages: result.totalPages,
       currentPage: page,
-      totalJobs: filteredJobs.length
+      totalJobs: result.totalJobs
     });
   } catch (error) {
     console.error('Error fetching crawler jobs:', error);
@@ -149,32 +56,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new job
-    const newJob: any = {
-      id: Date.now().toString(),
+    // Generate output path
+    const outputPath = `/${channel.toLowerCase().replace(/\s+/g, '')}/${topic.toLowerCase()}/crawler/${type}`;
+
+    // Create new job using the service
+    const newJob = await crawlerService.createJob({
       name,
       keyword,
       site,
       type,
       channel,
       topic,
-      status: 'pending',
-      progress: 0,
-      totalItems: 0,
-      downloadedItems: 0,
-      failedItems: 0,
-      createdAt: new Date(),
-      outputPath: `/${channel.toLowerCase().replace(/\s+/g, '')}/${topic.toLowerCase()}/crawler/${type}`,
+      outputPath,
       settings: {
         maxItems: settings.maxItems || 10,
         quality: settings.quality || 'medium',
         format: settings.format || (type === 'image' ? 'jpg' : 'mp4')
       }
-    };
-
-    // In a real implementation, you would save this to a database
-    // For now, we'll just return the new job
-    mockJobs.unshift(newJob);
+    });
 
     return NextResponse.json(newJob, { status: 201 });
   } catch (error) {

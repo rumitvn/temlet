@@ -347,7 +347,8 @@ export default function CrawlersPage() {
         throw new Error('Failed to delete jobs');
       }
 
-      setJobs(prev => prev.filter(job => !selectedItems.includes(job.id)));
+      // Refresh the jobs list instead of filtering locally
+      fetchJobs();
       setSelectedItems([]);
       fetchStatusCounts();
       fetchStats();
@@ -357,28 +358,49 @@ export default function CrawlersPage() {
     }
   };
 
-  const handleActionClick = async (action: string) => {
-    if (selectedItems.length === 0) return;
+  const handleActionClick = async (action: string, jobId?: string) => {
+    const ids = jobId ? [jobId] : selectedItems;
+    if (ids.length === 0) return;
 
     try {
-      const response = await fetch('/api/crawlers/batch-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ids: selectedItems, 
-          action 
-        })
-      });
+      if (action === 'delete') {
+        // Handle delete separately
+        if (!confirm(`Are you sure you want to delete ${ids.length} crawler job(s)?`)) {
+          return;
+        }
 
-      if (!response.ok) {
-        throw new Error(`Failed to ${action} jobs`);
+        const response = await fetch('/api/crawlers/batch', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to delete jobs');
+        }
+      } else {
+        // Handle other actions
+        const response = await fetch('/api/crawlers/batch-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            ids, 
+            action 
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to ${action} jobs`);
+        }
       }
 
       // Refresh the jobs list
       fetchJobs();
       fetchStatusCounts();
       fetchStats();
-      setSelectedItems([]);
+      if (!jobId) {
+        setSelectedItems([]);
+      }
     } catch (error) {
       console.error(`Error ${action}ing jobs:`, error);
       alert(`Failed to ${action} jobs`);
@@ -957,7 +979,7 @@ export default function CrawlersPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleActionClick('start');
+                                handleActionClick('start', job.id);
                               }}
                               className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 rounded transition-colors"
                             >
@@ -968,7 +990,7 @@ export default function CrawlersPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleActionClick('pause');
+                                handleActionClick('pause', job.id);
                               }}
                               className="px-2 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 rounded transition-colors"
                             >
@@ -979,7 +1001,7 @@ export default function CrawlersPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleActionClick('resume');
+                                handleActionClick('resume', job.id);
                               }}
                               className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 rounded transition-colors"
                             >
@@ -989,7 +1011,7 @@ export default function CrawlersPage() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteSelected();
+                              handleActionClick('delete', job.id);
                             }}
                             className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 rounded transition-colors"
                           >

@@ -82,4 +82,33 @@ model OutputFolder {
   updatedAt DateTime @updatedAt
 
   @@index([type])
+}
+
+model CrawlerJob {
+  id                String   @id @default(cuid())
+  name              String
+  keyword           String
+  site              String
+  type              String   // 'image' or 'video'
+  channel           String
+  topic             String
+  status            String   // 'pending', 'crawling', 'downloading', 'completed', 'failed', 'paused'
+  progress          Float    @default(0)
+  totalItems        Int      @default(0)
+  downloadedItems   Int      @default(0)
+  failedItems       Int      @default(0)
+  createdAt         DateTime @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  error             String?
+  outputPath        String
+  settings          Json     // Store maxItems, quality, format as JSON
+  updatedAt         DateTime @updatedAt
+
+  @@index([status])
+  @@index([type])
+  @@index([site])
+  @@index([channel])
+  @@index([topic])
+  @@index([createdAt])
 } 

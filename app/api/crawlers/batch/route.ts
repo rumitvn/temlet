@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { crawlerService } from '@/app/services/crawlerService';
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -7,20 +8,14 @@ export async function DELETE(request: NextRequest) {
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json(
-        { error: 'Invalid job IDs' },
+        { error: 'Invalid or missing ids' },
         { status: 400 }
       );
     }
 
-    // In a real implementation, you would delete the jobs from the database
-    // For now, we'll just return a success response
-    console.log(`Deleting jobs:`, ids);
+    await crawlerService.deleteJobs(ids);
 
-    return NextResponse.json({
-      success: true,
-      message: `Successfully deleted ${ids.length} job(s)`,
-      deletedJobs: ids.length
-    });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting jobs:', error);
     return NextResponse.json(

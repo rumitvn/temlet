@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { crawlerService } from '@/app/services/crawlerService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,7 +8,7 @@ export async function POST(request: NextRequest) {
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json(
-        { error: 'Invalid job IDs' },
+        { error: 'Invalid or missing ids' },
         { status: 400 }
       );
     }
@@ -19,19 +20,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // In a real implementation, you would update the jobs in the database
-    // For now, we'll just return a success response
-    console.log(`Performing action '${action}' on jobs:`, ids);
+    // Process each job based on the action
+    for (const id of ids) {
+      try {
+        switch (action) {
+          case 'start':
+            await crawlerService.startJob(id);
+            break;
+          case 'pause':
+            await crawlerService.pauseJob(id);
+            break;
+          case 'resume':
+            await crawlerService.resumeJob(id);
+            break;
+          default:
+            console.warn(`Unknown action: ${action}`);
+        }
+      } catch (error) {
+        console.error(`Error processing job ${id} with action ${action}:`, error);
+        // Continue with other jobs even if one fails
+      }
+    }
 
-    return NextResponse.json({
-      success: true,
-      message: `Successfully performed ${action} on ${ids.length} job(s)`,
-      affectedJobs: ids.length
-    });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error performing batch action:', error);
+    console.error('Error processing batch action:', error);
     return NextResponse.json(
-      { error: 'Failed to perform batch action' },
+      { error: 'Failed to process batch action' },
       { status: 500 }
     );
   }
