@@ -1,8 +1,29 @@
 import { prisma } from '@/app/lib/db';
+import { config } from '@/lib/config';
 import fs from 'fs';
 import path from 'path';
 import puppeteer from 'puppeteer';
 
+/**
+ * Crawler Service for downloading images and videos from various sites
+ * 
+ * Path Structure:
+ * - Uses WORKING_DIRECTORY environment variable as base path
+ * - Creates structure: {WORKING_DIRECTORY}/{channel}/{topic}/crawler/{type}/{keyword}/
+ * - Example: C:/Users/youruser/Documents/animals/wildlife/crawler/image/capybara/
+ * - For videos: C:/Users/youruser/Documents/animals/wildlife/crawler/video/capybara/
+ * 
+ * File Naming:
+ * - Format: {keyword}_{site}_{index}.{format}
+ * - Example: capybara_pexels_1.jpg, capybara_pixabay_2.png
+ * - Benefits: Easy sorting by keyword, then by site, then by index
+ * 
+ * Supported Sites:
+ * - Pexels (images)
+ * - Pixabay (images) 
+ * - Unsplash (images)
+ * - Video crawling not yet implemented
+ */
 export interface CrawlerConfig {
   keyword: string;
   site: string;
@@ -10,7 +31,6 @@ export interface CrawlerConfig {
   maxItems: number;
   quality: 'low' | 'medium' | 'high';
   format: string;
-  outputPath: string;
 }
 
 export interface CrawlerResult {
@@ -39,7 +59,7 @@ export interface CrawlerJob {
   startedAt?: Date | null;
   completedAt?: Date | null;
   error?: string | null;
-  outputPath: string;
+  outputPath?: string | null;
   settings: {
     maxItems: number;
     quality: 'low' | 'medium' | 'high';
@@ -66,7 +86,7 @@ export class CrawlerService {
           totalItems: 0,
           downloadedItems: 0,
           failedItems: 0,
-          outputPath: data.outputPath,
+          outputPath: '',
           settings: data.settings
         }
       });
@@ -533,39 +553,54 @@ export class CrawlerService {
       // Update progress to show items found
       await this.updateJobProgress(id, 10, 0, 0, totalItems);
 
-      // Create output directory
-      const outputDir = path.join(process.cwd(), 'public', job.outputPath);
+      // Create output directory using WORKING_DIRECTORY with channel/topic structure
+      // Path will be: {WORKING_DIRECTORY}/{channel}/{topic}/crawler/{type}/{keyword}/
+      // Example: C:/Users/youruser/Documents/animals/wildlife/crawler/image/capybara/
+      // For videos: C:/Users/youruser/Documents/animals/wildlife/crawler/video/capybara/
+      const outputDir = config.getCrawlerPathsWithKeyword(job.channel, job.topic, job.keyword)[job.type];
+      console.log(`Creating output directory: ${outputDir}`);
+      console.log(`Base working directory: ${config.workingDirectory}`);
+      console.log(`Channel: ${job.channel}, Topic: ${job.topic}, Type: ${job.type}, Keyword: ${job.keyword}`);
+      console.log(`File naming pattern: ${job.keyword}_${job.site}_[index].${job.settings.format}`);
+      
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
+        console.log(`Successfully created directory: ${outputDir}`);
+      } else {
+        console.log(`Directory already exists: ${outputDir}`);
       }
 
       // Download images
       let downloadedItems = 0;
       let failedItems = 0;
 
+      // Note: Currently only image crawling is implemented
+      // Video crawling would need similar site-specific implementations
+      // for sites like YouTube, Vimeo, etc.
       for (let i = 0; i < imageUrls.length; i++) {
         try {
           const imageUrl = imageUrls[i];
-          console.log(`Downloading image ${i + 1}/${totalItems}: ${imageUrl}`);
+          console.log(`Downloading ${job.type} ${i + 1}/${totalItems}: ${imageUrl}`);
           
           // Download image using page.goto and response.buffer()
           const response = await page.goto(imageUrl);
           if (response && response.ok()) {
             const buffer = await response.buffer();
-            const fileName = `${keyword}_${i + 1}.${format}`;
+            const fileName = `${keyword}_${site}_${i + 1}.${format}`;
             const filePath = path.join(outputDir, fileName);
             
+            console.log(`Saving file: ${fileName} to: ${filePath}`);
             fs.writeFileSync(filePath, buffer);
             downloadedItems++;
             
             console.log(`Successfully downloaded: ${fileName}`);
           } else {
             failedItems++;
-            console.log(`Failed to download image ${i + 1}`);
+            console.log(`Failed to download ${job.type} ${i + 1}`);
           }
         } catch (error) {
           failedItems++;
-          console.error(`Error downloading image ${i + 1}:`, error);
+          console.error(`Error downloading ${job.type} ${i + 1}:`, error);
         }
 
         // Update progress
@@ -580,7 +615,7 @@ export class CrawlerService {
       await this.updateJobStatus(id, 'completed');
       await this.updateJobProgress(id, 100, downloadedItems, failedItems, totalItems);
       
-      console.log(`Job ${id} completed: Downloaded ${downloadedItems}, Failed ${failedItems}`);
+      console.log(`Job ${id} completed: Downloaded ${downloadedItems} ${job.type}s, Failed ${failedItems}`);
 
     } catch (error) {
       console.error(`Error starting job ${id}:`, error);

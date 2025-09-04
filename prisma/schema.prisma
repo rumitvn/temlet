@@ -101,7 +101,7 @@ model CrawlerJob {
   startedAt         DateTime?
   completedAt       DateTime?
   error             String?
-  outputPath        String
+  outputPath        String?
   settings          Json     // Store maxItems, quality, format as JSON
   updatedAt         DateTime @updatedAt
 

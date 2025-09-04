@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   PlusIcon, 
@@ -203,6 +203,15 @@ export default function CrawlersPage() {
     averageSpeed: 0
   });
 
+  // Polling for active jobs updates
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  
+  // Track jobs that are currently being updated
+  const [updatingJobs, setUpdatingJobs] = useState<Set<string>>(new Set());
+
+  // SSE monitoring for real-time updates
+  const [sseConnections, setSseConnections] = useState<Map<string, EventSource>>(new Map());
+
   const fetchStatusCounts = useCallback(async () => {
     try {
       setLoadingCounts(true);
@@ -231,6 +240,103 @@ export default function CrawlersPage() {
       console.error('Error fetching stats:', error);
     }
   }, []);
+
+  // Function to start monitoring a specific job
+  const startJobMonitoring = useCallback((jobId: string) => {
+    // Close existing connection if any
+    if (sseConnections.has(jobId)) {
+      sseConnections.get(jobId)?.close();
+    }
+
+    // Create new SSE connection
+    const eventSource = new EventSource(`/api/crawlers/stream?jobId=${jobId}`);
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('SSE update received:', data);
+        
+        if (data.type === 'job_update') {
+          // Update the specific job in the UI
+          setJobs(prevJobs => prevJobs.map(job => {
+            if (job.id === data.job.id) {
+              console.log(`Updating job ${job.id}:`, { from: { status: job.status, progress: job.progress }, to: { status: data.job.status, progress: data.job.progress } });
+              return { ...job, ...data.job };
+            }
+            return job;
+          }));
+        } else if (data.type === 'completed') {
+          console.log(`Job ${jobId} completed, closing SSE connection`);
+          eventSource.close();
+          setSseConnections(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(jobId);
+            return newMap;
+          });
+          // Refresh stats after completion
+          fetchStatusCounts();
+          fetchStats();
+        }
+      } catch (error) {
+        console.error('Error parsing SSE data:', error);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('SSE connection error:', error);
+      eventSource.close();
+      setSseConnections(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(jobId);
+        return newMap;
+      });
+    };
+
+    // Store the connection
+    setSseConnections(prev => new Map(prev).set(jobId, eventSource));
+  }, [sseConnections, fetchStatusCounts, fetchStats]);
+
+  // Monitor active jobs and start SSE connections
+  useEffect(() => {
+    const activeJobs = jobs.filter(job => 
+      ['pending', 'crawling', 'downloading'].includes(job.status)
+    );
+
+    // Start monitoring for new active jobs
+    activeJobs.forEach(job => {
+      if (!sseConnections.has(job.id)) {
+        console.log(`Starting SSE monitoring for job ${job.id}`);
+        startJobMonitoring(job.id);
+      }
+    });
+
+    // Clean up completed jobs
+    const completedJobs = jobs.filter(job => 
+      ['completed', 'failed'].includes(job.status)
+    );
+    
+    completedJobs.forEach(job => {
+      if (sseConnections.has(job.id)) {
+        console.log(`Closing SSE connection for completed job ${job.id}`);
+        sseConnections.get(job.id)?.close();
+        setSseConnections(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(job.id);
+          return newMap;
+        });
+      }
+    });
+  }, [jobs, sseConnections, startJobMonitoring]);
+
+  // Cleanup SSE connections on unmount
+  useEffect(() => {
+    return () => {
+      sseConnections.forEach((eventSource, jobId) => {
+        console.log(`Cleaning up SSE connection for job ${jobId}`);
+        eventSource.close();
+      });
+    };
+  }, [sseConnections]);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -362,6 +468,11 @@ export default function CrawlersPage() {
     const ids = jobId ? [jobId] : selectedItems;
     if (ids.length === 0) return;
 
+    // Show updating state for individual jobs
+    if (jobId) {
+      // No longer needed as SSE handles updates
+    }
+
     try {
       if (action === 'delete') {
         // Handle delete separately
@@ -394,8 +505,15 @@ export default function CrawlersPage() {
         }
       }
 
-      // Refresh the jobs list
-      fetchJobs();
+      // Update the specific jobs in the UI immediately
+      if (jobId) {
+        // Single job action - update immediately
+        // No longer needed as SSE handles updates
+      } else {
+        // Multiple jobs action - refresh the list
+        fetchJobs();
+      }
+      
       fetchStatusCounts();
       fetchStats();
       if (!jobId) {
@@ -404,7 +522,51 @@ export default function CrawlersPage() {
     } catch (error) {
       console.error(`Error ${action}ing jobs:`, error);
       alert(`Failed to ${action} jobs`);
+      
+      // No longer needed as SSE handles updates
     }
+  };
+
+  // Function to update a specific job in the UI
+  const updateJobInUI = (jobId: string, action: string) => {
+    setJobs(prevJobs => prevJobs.map(job => {
+      if (job.id === jobId) {
+        const updatedJob = { ...job };
+        
+        switch (action) {
+          case 'start':
+            updatedJob.status = 'crawling';
+            updatedJob.startedAt = new Date();
+            updatedJob.progress = 0;
+            updatedJob.downloadedItems = 0;
+            updatedJob.failedItems = 0;
+            updatedJob.totalItems = 0;
+            break;
+          case 'pause':
+            updatedJob.status = 'paused';
+            break;
+          case 'resume':
+            updatedJob.status = 'crawling';
+            break;
+          case 'delete':
+            // Job will be removed from the list
+            return null;
+        }
+        
+        return updatedJob;
+      }
+      return job;
+    }).filter(Boolean) as CrawlerJob[]);
+  };
+
+  // Function to update job progress from external updates
+  const updateJobProgress = (jobId: string, updates: any) => {
+    setJobs(prevJobs => prevJobs.map(job => {
+      if (job.id === jobId) {
+        return { ...job, ...updates };
+      }
+      return job;
+    }));
   };
 
   const handleCreateCrawler = async (data: any) => {
@@ -594,10 +756,33 @@ export default function CrawlersPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex justify-end gap-2 mb-6"
+        className="flex justify-between gap-2 mb-6"
       >
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              fetchJobs();
+              fetchStatusCounts();
+              fetchStats();
+            }}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          >
+            <ArrowPathIcon className="w-4 h-4 inline mr-2" />
+            Refresh
+          </button>
+          <button
+            onClick={() => {
+              console.log('Current jobs state:', jobs);
+              console.log('Active jobs:', jobs.filter(job => ['pending', 'crawling', 'downloading'].includes(job.status)));
+            }}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-600 text-white hover:bg-gray-700 transition-colors"
+          >
+            Debug Jobs
+          </button>
+        </div>
+        
         {selectedItems.length > 0 && (
-          <>
+          <div className="flex gap-2">
             <button
               onClick={handleDeleteSelected}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
@@ -616,7 +801,7 @@ export default function CrawlersPage() {
             >
               Resume ({selectedItems.length})
             </button>
-          </>
+          </div>
         )}
       </motion.div>
 
@@ -975,6 +1160,7 @@ export default function CrawlersPage() {
                       <td className="px-4 py-3 text-gray-300">{formatDate(job.createdAt)}</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
+                          {/* No longer needed as SSE handles updates */}
                           {job.status === 'pending' && (
                             <button
                               onClick={(e) => {
@@ -1008,15 +1194,17 @@ export default function CrawlersPage() {
                               Resume
                             </button>
                           )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleActionClick('delete', job.id);
-                            }}
-                            className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 rounded transition-colors"
-                          >
-                            Delete
-                          </button>
+                          {!updatingJobs.has(job.id) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleActionClick('delete', job.id);
+                              }}
+                              className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 rounded transition-colors"
+                            >
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </motion.tr>
