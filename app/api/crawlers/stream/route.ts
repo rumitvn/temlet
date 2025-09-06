@@ -22,6 +22,12 @@ export async function GET(request: NextRequest) {
         try {
           const job = await crawlerService.getJob(jobId);
           if (job) {
+            // Check if controller is closed before sending any messages
+            if (request.signal.aborted) {
+              clearInterval(interval);
+              return;
+            }
+
             const update = {
               type: 'job_update',
               job: {
@@ -39,21 +45,42 @@ export async function GET(request: NextRequest) {
             
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(update)}\n\n`));
             
-            // If job is completed or failed, close the stream
-            if (job.status === 'completed' || job.status === 'failed') {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'completed', jobId })}\n\n`));
-              controller.close();
+            // If job is completed, failed, or paused, close the stream
+            if (['completed', 'failed', 'paused'].includes(job.status)) {
+              if (!request.signal.aborted) {
+                // Send one final update
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                  type: 'completed', 
+                  jobId,
+                  finalStatus: job.status,
+                  stats: {
+                    downloadedItems: job.downloadedItems,
+                    failedItems: job.failedItems,
+                    totalItems: job.totalItems,
+                    progress: job.progress
+                  }
+                })}\n\n`));
+                clearInterval(interval);
+                controller.close();
+              }
               return;
             }
           }
         } catch (error) {
           console.error('Error sending job update:', error);
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: 'Failed to get job update' })}\n\n`));
+          if (!request.signal.aborted) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: 'Failed to get job update' })}\n\n`));
+            clearInterval(interval);
+            controller.close();
+          }
         }
       };
 
       // Send updates every second
       const interval = setInterval(sendUpdate, 1000);
+      
+      // Send initial update immediately
+      await sendUpdate();
       
       // Cleanup on close
       request.signal.addEventListener('abort', () => {

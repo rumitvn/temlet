@@ -570,6 +570,9 @@ export class CrawlerService {
         console.log(`Directory already exists: ${outputDir}`);
       }
 
+      // Update status to downloading before starting downloads
+      await this.updateJobStatus(id, 'downloading');
+
       // Download images
       let downloadedItems = 0;
       let failedItems = 0;
@@ -611,9 +614,13 @@ export class CrawlerService {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // Mark job as completed
+      // Mark job as completed when all possible downloads are finished
+      const actualTotal = downloadedItems + failedItems;
+      const finalProgress = Math.floor((downloadedItems / totalItems) * 100);
+      
+      // Update final status and progress
       await this.updateJobStatus(id, 'completed');
-      await this.updateJobProgress(id, 100, downloadedItems, failedItems, totalItems);
+      await this.updateJobProgress(id, finalProgress, downloadedItems, failedItems, totalItems);
       
       console.log(`Job ${id} completed: Downloaded ${downloadedItems} ${job.type}s, Failed ${failedItems}`);
 
@@ -639,7 +646,20 @@ export class CrawlerService {
 
   async resumeJob(id: string): Promise<void> {
     try {
+      const job = await this.getJob(id);
+      if (!job) {
+        throw new Error('Job not found');
+      }
+
+      // Update status first
       await this.updateJobStatus(id, 'crawling');
+
+      // Start the job process
+      this.startJob(id).catch(error => {
+        console.error(`Error starting resumed job ${id}:`, error);
+        // If starting fails, mark as failed
+        this.updateJobStatus(id, 'failed', undefined, error instanceof Error ? error.message : 'Failed to resume job');
+      });
     } catch (error) {
       console.error('Error resuming job:', error);
       throw new Error('Failed to resume job');

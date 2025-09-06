@@ -98,6 +98,23 @@ const statusColors = {
   paused: "bg-gray-500/20 text-gray-400"
 };
 
+const getProgressBarColor = (status: CrawlerJob['status']) => {
+  switch (status) {
+    case 'crawling':
+      return 'bg-orange-500';
+    case 'downloading':
+      return 'bg-yellow-500';
+    case 'completed':
+      return 'bg-green-500';
+    case 'failed':
+      return 'bg-red-500';
+    case 'paused':
+      return 'bg-gray-500';
+    default:
+      return 'bg-purple-500';
+  }
+};
+
 const statusGroups = {
   active: {
     title: "Active",
@@ -172,6 +189,10 @@ const getStatusIcon = (status: CrawlerStatus) => {
   }
 };
 
+const isActiveStatus = (status: CrawlerJob['status']) => {
+  return status === 'crawling' || status === 'downloading';
+};
+
 export default function CrawlersPage() {
   const [jobs, setJobs] = useState<CrawlerJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -203,140 +224,8 @@ export default function CrawlersPage() {
     averageSpeed: 0
   });
 
-  // Polling for active jobs updates
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
-  
-  // Track jobs that are currently being updated
-  const [updatingJobs, setUpdatingJobs] = useState<Set<string>>(new Set());
-
   // SSE monitoring for real-time updates
   const [sseConnections, setSseConnections] = useState<Map<string, EventSource>>(new Map());
-
-  const fetchStatusCounts = useCallback(async () => {
-    try {
-      setLoadingCounts(true);
-      const response = await fetch('/api/crawlers/status-counts');
-      if (!response.ok) {
-        throw new Error('Failed to fetch status counts');
-      }
-      const data = await response.json();
-      setStatusCounts(data);
-    } catch (error) {
-      console.error('Error fetching status counts:', error);
-    } finally {
-      setLoadingCounts(false);
-    }
-  }, []);
-
-  const fetchStats = useCallback(async () => {
-    try {
-      const response = await fetch('/api/crawlers/stats');
-      if (!response.ok) {
-        throw new Error('Failed to fetch stats');
-      }
-      const data = await response.json();
-      setStats(data);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  }, []);
-
-  // Function to start monitoring a specific job
-  const startJobMonitoring = useCallback((jobId: string) => {
-    // Close existing connection if any
-    if (sseConnections.has(jobId)) {
-      sseConnections.get(jobId)?.close();
-    }
-
-    // Create new SSE connection
-    const eventSource = new EventSource(`/api/crawlers/stream?jobId=${jobId}`);
-    
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('SSE update received:', data);
-        
-        if (data.type === 'job_update') {
-          // Update the specific job in the UI
-          setJobs(prevJobs => prevJobs.map(job => {
-            if (job.id === data.job.id) {
-              console.log(`Updating job ${job.id}:`, { from: { status: job.status, progress: job.progress }, to: { status: data.job.status, progress: data.job.progress } });
-              return { ...job, ...data.job };
-            }
-            return job;
-          }));
-        } else if (data.type === 'completed') {
-          console.log(`Job ${jobId} completed, closing SSE connection`);
-          eventSource.close();
-          setSseConnections(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(jobId);
-            return newMap;
-          });
-          // Refresh stats after completion
-          fetchStatusCounts();
-          fetchStats();
-        }
-      } catch (error) {
-        console.error('Error parsing SSE data:', error);
-      }
-    };
-
-    eventSource.onerror = (error) => {
-      console.error('SSE connection error:', error);
-      eventSource.close();
-      setSseConnections(prev => {
-        const newMap = new Map(prev);
-        newMap.delete(jobId);
-        return newMap;
-      });
-    };
-
-    // Store the connection
-    setSseConnections(prev => new Map(prev).set(jobId, eventSource));
-  }, [sseConnections, fetchStatusCounts, fetchStats]);
-
-  // Monitor active jobs and start SSE connections
-  useEffect(() => {
-    const activeJobs = jobs.filter(job => 
-      ['pending', 'crawling', 'downloading'].includes(job.status)
-    );
-
-    // Start monitoring for new active jobs
-    activeJobs.forEach(job => {
-      if (!sseConnections.has(job.id)) {
-        console.log(`Starting SSE monitoring for job ${job.id}`);
-        startJobMonitoring(job.id);
-      }
-    });
-
-    // Clean up completed jobs
-    const completedJobs = jobs.filter(job => 
-      ['completed', 'failed'].includes(job.status)
-    );
-    
-    completedJobs.forEach(job => {
-      if (sseConnections.has(job.id)) {
-        console.log(`Closing SSE connection for completed job ${job.id}`);
-        sseConnections.get(job.id)?.close();
-        setSseConnections(prev => {
-          const newMap = new Map(prev);
-          newMap.delete(job.id);
-          return newMap;
-        });
-      }
-    });
-  }, [jobs, sseConnections, startJobMonitoring]);
-
-  // Cleanup SSE connections on unmount
-  useEffect(() => {
-    return () => {
-      sseConnections.forEach((eventSource, jobId) => {
-        console.log(`Cleaning up SSE connection for job ${jobId}`);
-        eventSource.close();
-      });
-    };
-  }, [sseConnections]);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -371,6 +260,221 @@ export default function CrawlersPage() {
       setLoading(false);
     }
   }, [currentPage, sortBy, sortOrder, itemsPerPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, selectedSite, selectedStatus]);
+
+  const fetchStatusCounts = useCallback(async () => {
+    try {
+      setLoadingCounts(true);
+      const response = await fetch('/api/crawlers/status-counts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch status counts');
+      }
+      const data = await response.json();
+      setStatusCounts(data);
+    } catch (error) {
+      console.error('Error fetching status counts:', error);
+    } finally {
+      setLoadingCounts(false);
+    }
+  }, []);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const response = await fetch('/api/crawlers/stats');
+      if (!response.ok) {
+        throw new Error('Failed to fetch stats');
+      }
+      const data = await response.json();
+      setStats(data);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  }, []);
+
+  // Function to start monitoring a specific job
+  const startJobMonitoring = useCallback((jobId: string) => {
+    // Close existing connection if any
+    const existingConnection = sseConnections.get(jobId);
+    if (existingConnection) {
+      existingConnection.close();
+    }
+
+    // Create new SSE connection
+    const eventSource = new EventSource(`/api/crawlers/stream?jobId=${jobId}`);
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log(`SSE update received for job ${jobId}:`, {
+          type: data.type,
+          jobData: data.job,
+          rawData: data
+        });
+        
+        if (data.type === 'job_update' && data.job) {
+          // Update the specific job in the UI immediately
+          setJobs(prevJobs => {
+            const updatedJobs = prevJobs.map(job => {
+              if (job.id === data.job.id) {
+                const oldStatus = job.status;
+                const newStatus = data.job.status as CrawlerStatus;
+                const statusChanged = oldStatus !== newStatus;
+
+                console.log(`Job ${job.id} update:`, {
+                  oldStatus,
+                  newStatus,
+                  oldProgress: job.progress,
+                  newProgress: data.job.progress,
+                  oldDownloaded: job.downloadedItems,
+                  newDownloaded: data.job.downloadedItems,
+                  statusChanged
+                });
+                
+                // If status changed, update counts immediately
+                if (statusChanged) {
+                  console.log(`Status changed from ${oldStatus} to ${newStatus}, updating counts...`);
+                  Promise.all([
+                    fetchStatusCounts(),
+                    fetchStats()
+                  ]).catch(error => console.error('Error updating counts:', error));
+                }
+                
+                // Create updated job object
+                const updatedJob: CrawlerJob = {
+                  ...job,
+                  ...data.job,
+                  // Ensure type safety for critical fields
+                  status: data.job.status as CrawlerStatus,
+                  type: data.job.type as 'image' | 'video',
+                  progress: data.job.progress || 0,
+                  downloadedItems: data.job.downloadedItems || 0,
+                  totalItems: data.job.totalItems || 0,
+                  failedItems: data.job.failedItems || 0,
+                  settings: {
+                    maxItems: data.job.settings.maxItems,
+                    quality: data.job.settings.quality as 'low' | 'medium' | 'high',
+                    format: data.job.settings.format
+                  }
+                };
+
+                console.log('Updated job object:', updatedJob);
+                return updatedJob;
+              }
+              return job;
+            });
+
+            return updatedJobs;
+          });
+        } else if (data.type === 'completed') {
+          console.log(`Job ${jobId} completed event received:`, data);
+          
+          // Update job status one final time
+          setJobs(prevJobs => {
+            const updatedJobs = prevJobs.map(job => {
+              if (job.id === jobId) {
+                const finalJob: CrawlerJob = {
+                  ...job,
+                  status: 'completed' as CrawlerStatus,
+                  progress: Math.floor((job.downloadedItems / (job.totalItems || 1)) * 100),
+                  completedAt: new Date(),
+                  type: job.type, // Preserve the original type
+                  settings: { ...job.settings } // Preserve the original settings
+                };
+                console.log('Setting final job state:', finalJob);
+                return finalJob;
+              }
+              return job;
+            });
+            return updatedJobs;
+          });
+
+          // Close SSE connection
+          console.log(`Closing SSE connection for completed job ${jobId}`);
+          eventSource.close();
+          setSseConnections(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(jobId);
+            return newMap;
+          });
+
+          // Refresh all data
+          Promise.all([
+            fetchJobs(),
+            fetchStatusCounts(),
+            fetchStats()
+          ]).catch(error => console.error('Error refreshing data after completion:', error));
+        }
+      } catch (error) {
+        console.error('Error parsing SSE data:', error);
+        console.error('Raw event data:', event.data);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error(`SSE connection error for job ${jobId}:`, error);
+      
+      // Only close on real errors, not disconnects
+      if (error instanceof Error) {
+        console.log(`Closing SSE connection for job ${jobId} due to error`);
+        eventSource.close();
+        setSseConnections(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(jobId);
+          return newMap;
+        });
+        
+        // Refresh data on error to ensure UI is in sync
+        Promise.all([
+          fetchJobs(),
+          fetchStatusCounts(),
+          fetchStats()
+        ]).catch(error => console.error('Error refreshing data after SSE error:', error));
+      }
+    };
+
+    // Store the connection
+    setSseConnections(prev => new Map(prev).set(jobId, eventSource));
+  }, [fetchStatusCounts, fetchStats, fetchJobs]);
+
+  // Monitor active jobs and start SSE connections
+  useEffect(() => {
+    // Get all jobs that should be monitored
+    const jobsToMonitor = jobs.filter(job => 
+      ['pending', 'crawling', 'downloading'].includes(job.status)
+    );
+
+    // Start monitoring for each job that needs it
+    jobsToMonitor.forEach(job => {
+      if (!sseConnections.has(job.id)) {
+        console.log(`Starting SSE monitoring for job ${job.id}`);
+        startJobMonitoring(job.id);
+      }
+    });
+
+    // Clean up completed jobs
+    Array.from(sseConnections.keys()).forEach(jobId => {
+      const job = jobs.find(j => j.id === jobId);
+      if (!job || !['pending', 'crawling', 'downloading'].includes(job.status)) {
+        console.log(`Closing SSE connection for completed job ${jobId}`);
+        const connection = sseConnections.get(jobId);
+        if (connection) {
+          connection.close();
+          setSseConnections(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(jobId);
+            return newMap;
+          });
+        }
+      }
+    });
+
+    // Cleanup on unmount
+    return () => {
+      sseConnections.forEach((eventSource, jobId) => {
+        console.log(`Cleaning up SSE connection for job ${jobId}`);
+        eventSource.close();
+      });
+    };
+  }, [jobs, sseConnections, startJobMonitoring]);
 
   useEffect(() => {
     fetchJobs();
@@ -418,14 +522,44 @@ export default function CrawlersPage() {
   };
 
   const handleItemSelect = (itemId: string, event: React.MouseEvent) => {
+    // Prevent row click from triggering when clicking checkboxes or action buttons
+    if ((event.target as HTMLElement).closest('button, input[type="checkbox"]')) {
+      return;
+    }
+
     if (event.ctrlKey || event.metaKey) {
+      // Toggle selection with Ctrl/Cmd key
       setSelectedItems(prev => 
         prev.includes(itemId) 
           ? prev.filter(id => id !== itemId)
           : [...prev, itemId]
       );
+    } else if (event.shiftKey && selectedItems.length > 0) {
+      // Range selection with Shift key
+      const allJobIds = jobs.map(job => job.id);
+      const lastSelectedIndex = allJobIds.indexOf(selectedItems[selectedItems.length - 1]);
+      const currentIndex = allJobIds.indexOf(itemId);
+      const start = Math.min(lastSelectedIndex, currentIndex);
+      const end = Math.max(lastSelectedIndex, currentIndex);
+      const rangeIds = allJobIds.slice(start, end + 1);
+      
+      setSelectedItems(prev => {
+        const newSelection = [...new Set([...prev, ...rangeIds])];
+        return newSelection;
+      });
     } else {
+      // Single selection without modifier keys
       setSelectedItems([itemId]);
+    }
+  };
+
+  const handleCheckboxChange = (itemId: string, checked: boolean, event: React.ChangeEvent<HTMLInputElement>) => {
+    event.stopPropagation();
+    
+    if (checked) {
+      setSelectedItems(prev => [...prev, itemId]);
+    } else {
+      setSelectedItems(prev => prev.filter(id => id !== itemId));
     }
   };
 
@@ -468,11 +602,6 @@ export default function CrawlersPage() {
     const ids = jobId ? [jobId] : selectedItems;
     if (ids.length === 0) return;
 
-    // Show updating state for individual jobs
-    if (jobId) {
-      // No longer needed as SSE handles updates
-    }
-
     try {
       if (action === 'delete') {
         // Handle delete separately
@@ -489,8 +618,13 @@ export default function CrawlersPage() {
         if (!response.ok) {
           throw new Error('Failed to delete jobs');
         }
+
+        // Immediately update counts after deletion
+        fetchJobs();
+        fetchStatusCounts();
+        fetchStats();
       } else {
-        // Handle other actions
+        // Handle other actions (start, pause, resume)
         const response = await fetch('/api/crawlers/batch-action', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -503,27 +637,19 @@ export default function CrawlersPage() {
         if (!response.ok) {
           throw new Error(`Failed to ${action} jobs`);
         }
-      }
 
-      // Update the specific jobs in the UI immediately
-      if (jobId) {
-        // Single job action - update immediately
-        // No longer needed as SSE handles updates
-      } else {
-        // Multiple jobs action - refresh the list
-        fetchJobs();
-      }
-      
-      fetchStatusCounts();
-      fetchStats();
-      if (!jobId) {
-        setSelectedItems([]);
+        // For single job actions, let SSE handle the updates
+        if (!jobId) {
+          // For batch actions, refresh everything immediately
+          fetchJobs();
+          fetchStatusCounts();
+          fetchStats();
+          setSelectedItems([]);
+        }
       }
     } catch (error) {
       console.error(`Error ${action}ing jobs:`, error);
       alert(`Failed to ${action} jobs`);
-      
-      // No longer needed as SSE handles updates
     }
   };
 
@@ -582,10 +708,12 @@ export default function CrawlersPage() {
       }
 
       const newJob = await response.json();
-      setJobs(prev => [newJob, ...prev]);
-      setIsCreateDialogOpen(false);
+      
+      // Refresh everything after creating a new job
+      fetchJobs();
       fetchStatusCounts();
       fetchStats();
+      setIsCreateDialogOpen(false);
     } catch (error) {
       console.error('Error creating crawler job:', error);
       alert('Failed to create crawler job');
@@ -1099,15 +1227,14 @@ export default function CrawlersPage() {
                       animate={{ opacity: 1 }}
                       className={`border-b border-gray-700 hover:bg-gray-700/30 transition-colors ${
                         isSelected ? 'bg-purple-600/20' : ''
-                      }`}
+                      } cursor-pointer`}
                       onClick={(e) => handleItemSelect(job.id, e)}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => handleCheckboxChange(job.id, e.target.checked, e)}
                           className="rounded border-gray-600 bg-gray-700"
                         />
                       </td>
@@ -1134,10 +1261,10 @@ export default function CrawlersPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <StatusIcon className="w-4 h-4" />
+                          <StatusIcon className={`w-4 h-4 ${isActiveStatus(job.status) ? 'animate-pulse' : ''}`} />
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             statusColors[job.status]
-                          }`}>
+                          } ${isActiveStatus(job.status) ? 'animate-pulse' : ''}`}>
                             {job.status}
                           </span>
                         </div>
@@ -1146,7 +1273,7 @@ export default function CrawlersPage() {
                         <div className="flex items-center gap-2">
                           <div className="w-20 bg-gray-700 rounded-full h-2">
                             <div 
-                              className="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                              className={`${getProgressBarColor(job.status)} h-2 rounded-full transition-all duration-300`}
                               style={{ width: `${job.progress}%` }}
                             ></div>
                           </div>
@@ -1194,17 +1321,15 @@ export default function CrawlersPage() {
                               Resume
                             </button>
                           )}
-                          {!updatingJobs.has(job.id) && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleActionClick('delete', job.id);
-                              }}
-                              className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 rounded transition-colors"
-                            >
-                              Delete
-                            </button>
-                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleActionClick('delete', job.id);
+                            }}
+                            className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 rounded transition-colors"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </motion.tr>

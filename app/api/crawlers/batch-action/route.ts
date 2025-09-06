@@ -20,29 +20,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Process each job based on the action
-    for (const id of ids) {
-      try {
-        switch (action) {
-          case 'start':
-            await crawlerService.startJob(id);
-            break;
-          case 'pause':
-            await crawlerService.pauseJob(id);
-            break;
-          case 'resume':
-            await crawlerService.resumeJob(id);
-            break;
-          default:
-            console.warn(`Unknown action: ${action}`);
+    // Process all jobs in parallel
+    const results = await Promise.allSettled(
+      ids.map(async (id) => {
+        try {
+          switch (action) {
+            case 'start':
+              await crawlerService.startJob(id);
+              return { id, success: true };
+            case 'pause':
+              await crawlerService.pauseJob(id);
+              return { id, success: true };
+            case 'resume':
+              await crawlerService.resumeJob(id);
+              return { id, success: true };
+            default:
+              console.warn(`Unknown action: ${action}`);
+              return { id, success: false, error: 'Unknown action' };
+          }
+        } catch (error) {
+          console.error(`Error processing job ${id} with action ${action}:`, error);
+          return { 
+            id, 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          };
         }
-      } catch (error) {
-        console.error(`Error processing job ${id} with action ${action}:`, error);
-        // Continue with other jobs even if one fails
-      }
+      })
+    );
+
+    // Check results
+    const failed = results.filter(
+      (result): result is PromiseRejectedResult => result.status === 'rejected'
+    );
+
+    if (failed.length > 0) {
+      console.error('Some jobs failed:', failed);
+      return NextResponse.json({
+        success: false,
+        error: `Failed to process ${failed.length} job(s)`,
+        details: failed
+      }, { status: 207 }); // 207 Multi-Status
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ 
+      success: true,
+      results: results.map(r => r.status === 'fulfilled' ? r.value : null)
+    });
   } catch (error) {
     console.error('Error processing batch action:', error);
     return NextResponse.json(
