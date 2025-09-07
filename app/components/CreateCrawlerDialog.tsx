@@ -2,19 +2,26 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { XMarkIcon } from "@heroicons/react/24/solid";
 import { 
-  XMarkIcon,
   PhotoIcon,
   VideoCameraIcon,
   GlobeAltIcon,
   ArrowDownTrayIcon,
   CogIcon
-} from "@heroicons/react/24/outline";
+} from "@heroicons/react/24/solid";
+
+interface Site {
+  id: string;
+  name: string;
+  type: 'image' | 'video' | 'both';
+  url: string;
+}
 
 interface CreateCrawlerData {
   name: string;
   keyword: string;
-  site: string;
+  sites: string[];
   type: 'image' | 'video';
   channel: string;
   topic: string;
@@ -25,19 +32,40 @@ interface CreateCrawlerData {
   };
 }
 
+interface FormErrors {
+  name?: string;
+  keyword?: string;
+  sites?: string;
+  type?: string;
+  channel?: string;
+  topic?: string;
+  settings?: {
+    maxItems?: string;
+    quality?: string;
+    format?: string;
+  };
+}
+
 interface CreateCrawlerDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: CreateCrawlerData) => void;
 }
 
-const defaultSites = [
+const defaultSites: Site[] = [
   { id: "pexels", name: "Pexels", type: "both", url: "https://www.pexels.com" },
   { id: "pixabay", name: "Pixabay", type: "both", url: "https://pixabay.com" },
   { id: "unsplash", name: "Unsplash", type: "image", url: "https://unsplash.com" },
   { id: "pexels-videos", name: "Pexels Videos", type: "video", url: "https://www.pexels.com/videos" },
   { id: "pixabay-videos", name: "Pixabay Videos", type: "video", url: "https://pixabay.com/videos" }
 ];
+
+// Helper function to get available sites for a content type
+const getAvailableSitesForType = (contentType: 'image' | 'video'): Site[] => {
+  return defaultSites.filter(site => 
+    site.type === "both" || site.type === contentType
+  );
+};
 
 const defaultChannels = [
   "MiniMate",
@@ -62,10 +90,13 @@ const defaultTopics = [
 ];
 
 export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: CreateCrawlerDialogProps) {
+  // Get initial sites based on default type (image)
+  const initialSites = getAvailableSitesForType("image").map(site => site.id);
+  
   const [formData, setFormData] = useState<CreateCrawlerData>({
     name: "",
     keyword: "",
-    site: "",
+    sites: initialSites, // Initialize with all available sites
     type: "image",
     channel: "",
     topic: "",
@@ -76,19 +107,39 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
     }
   });
 
-  const [errors, setErrors] = useState<Partial<CreateCrawlerData>>({});
+  const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load persisted values after component mounts
+  useEffect(() => {
+    // Only access localStorage after component mounts in browser
+    if (typeof window !== 'undefined') {
+      const lastChannel = localStorage.getItem('lastUsedChannel');
+      const lastTopic = localStorage.getItem('lastUsedTopic');
+
+      if (lastChannel || lastTopic) {
+        setFormData(prev => ({
+          ...prev,
+          channel: lastChannel || prev.channel,
+          topic: lastTopic || prev.topic
+        }));
+      }
+    }
+  }, []);
 
   // Reset form when dialog opens
   useEffect(() => {
     if (isOpen) {
+      // Get available sites for the current type
+      const availableSites = getAvailableSitesForType("image").map(site => site.id);
+      
       setFormData({
         name: "",
         keyword: "",
-        site: "",
+        sites: availableSites, // Set all available sites
         type: "image",
-        channel: "",
-        topic: "",
+        channel: localStorage.getItem('lastUsedChannel') || "",
+        topic: localStorage.getItem('lastUsedTopic') || "",
         settings: {
           maxItems: 10,
           quality: "medium",
@@ -99,8 +150,39 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
     }
   }, [isOpen]);
 
+  // Auto-fill name when keyword changes
+  useEffect(() => {
+    if (formData.keyword) {
+      const capitalizedKeyword = formData.keyword.charAt(0).toUpperCase() + formData.keyword.slice(1);
+      const typeText = formData.type === "image" ? "Images" : "Videos";
+      setFormData(prev => ({ ...prev, name: `${capitalizedKeyword} ${typeText}` }));
+    }
+  }, [formData.keyword, formData.type]);
+
+  // Select all available sites when type changes
+  useEffect(() => {
+    const availableSites = getAvailableSitesForType(formData.type).map(site => site.id);
+    setFormData(prev => ({
+      ...prev,
+      sites: availableSites // Update to all available sites for the new type
+    }));
+  }, [formData.type]);
+
+  // Save channel and topic to localStorage when they change
+  useEffect(() => {
+    // Only save to localStorage in browser environment
+    if (typeof window !== 'undefined') {
+      if (formData.channel) {
+        localStorage.setItem('lastUsedChannel', formData.channel);
+      }
+      if (formData.topic) {
+        localStorage.setItem('lastUsedTopic', formData.topic);
+      }
+    }
+  }, [formData.channel, formData.topic]);
+
   const validateForm = (): boolean => {
-    const newErrors: Partial<CreateCrawlerData> = {};
+    const newErrors: FormErrors = {};
 
     if (!formData.name.trim()) {
       newErrors.name = "Name is required";
@@ -110,8 +192,8 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
       newErrors.keyword = "Keyword is required";
     }
 
-    if (!formData.site) {
-      newErrors.site = "Site is required";
+    if (formData.sites.length === 0) {
+      newErrors.sites = "At least one site must be selected";
     }
 
     if (!formData.channel) {
@@ -123,7 +205,10 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
     }
 
     if (formData.settings.maxItems < 1 || formData.settings.maxItems > 100) {
-      newErrors.settings = { ...newErrors.settings, maxItems: "Max items must be between 1 and 100" };
+      newErrors.settings = {
+        ...newErrors.settings,
+        maxItems: "Max items must be between 1 and 100"
+      };
     }
 
     setErrors(newErrors);
@@ -140,6 +225,7 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
     setIsSubmitting(true);
     
     try {
+      console.log('Submitting form data:', formData); // Add logging
       await onSubmit(formData);
       onClose();
     } catch (error) {
@@ -156,11 +242,10 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
     }));
     
     // Clear error for this field
-    if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: undefined
-      }));
+    if (field in errors) {
+      const newErrors = { ...errors };
+      delete newErrors[field as keyof FormErrors];
+      setErrors(newErrors);
     }
   };
 
@@ -183,12 +268,6 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
         }
       }));
     }
-  };
-
-  const getAvailableSites = () => {
-    return defaultSites.filter(site => 
-      site.type === "both" || site.type === formData.type
-    );
   };
 
   const getFormatOptions = () => {
@@ -217,6 +296,66 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
       }
     }
   }, [formData.keyword, formData.type]);
+
+  // Update SiteSelection component to include "Select All" functionality
+  const SiteSelection = () => {
+    const availableSites = getAvailableSitesForType(formData.type);
+    const allSelected = availableSites.every(site => formData.sites.includes(site.id));
+
+    const handleSelectAll = () => {
+      if (allSelected) {
+        // Deselect all
+        setFormData(prev => ({
+          ...prev,
+          sites: []
+        }));
+      } else {
+        // Select all
+        setFormData(prev => ({
+          ...prev,
+          sites: availableSites.map(site => site.id)
+        }));
+      }
+    };
+
+    return (
+      <div>
+        <div className="flex justify-between items-center mb-2">
+          <label className="text-sm font-medium text-gray-300">
+            Source Websites *
+          </label>
+          <button
+            type="button"
+            onClick={handleSelectAll}
+            className="text-sm text-purple-400 hover:text-purple-300"
+          >
+            {allSelected ? 'Deselect All' : 'Select All'}
+          </button>
+        </div>
+        <div className="space-y-2">
+          {availableSites.map((site) => (
+            <label key={site.id} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={formData.sites.includes(site.id)}
+                onChange={(e) => {
+                  const newSites = e.target.checked
+                    ? [...formData.sites, site.id]
+                    : formData.sites.filter(s => s !== site.id);
+                  handleInputChange("sites", newSites);
+                }}
+                className="rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+              />
+              <span className="text-gray-300">{site.name}</span>
+            </label>
+          ))}
+        </div>
+        {errors.sites && (
+          <p className="mt-1 text-sm text-red-400">{errors.sites}</p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <AnimatePresence>
@@ -261,26 +400,8 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
                   Basic Information
                 </h3>
                 
+                {/* Move keyword field before name */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Name */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Crawler Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => handleInputChange("name", e.target.value)}
-                      className={`w-full px-3 py-2 bg-gray-700 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                        errors.name ? "border-red-500" : "border-gray-600"
-                      }`}
-                      placeholder="e.g., Capybara Videos"
-                    />
-                    {errors.name && (
-                      <p className="mt-1 text-sm text-red-400">{errors.name}</p>
-                    )}
-                  </div>
-
                   {/* Keyword */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -294,9 +415,29 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
                         errors.keyword ? "border-red-500" : "border-gray-600"
                       }`}
                       placeholder="e.g., capybara"
+                      autoFocus
                     />
                     {errors.keyword && (
                       <p className="mt-1 text-sm text-red-400">{errors.keyword}</p>
+                    )}
+                  </div>
+
+                  {/* Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Crawler Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => handleInputChange("name", e.target.value)}
+                      className={`w-full px-3 py-2 bg-gray-700 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                        errors.name ? "border-red-500" : "border-gray-600"
+                      }`}
+                      placeholder="Auto-generated from keyword"
+                    />
+                    {errors.name && (
+                      <p className="mt-1 text-sm text-red-400">{errors.name}</p>
                     )}
                   </div>
                 </div>
@@ -309,7 +450,10 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
                   <div className="flex gap-4">
                     <button
                       type="button"
-                      onClick={() => handleInputChange("type", "image")}
+                      onClick={() => {
+                        console.log('Setting type to image'); // Add logging
+                        handleInputChange("type", "image");
+                      }}
                       className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
                         formData.type === "image"
                           ? "border-purple-500 bg-purple-500/20 text-purple-400"
@@ -321,7 +465,10 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleInputChange("type", "video")}
+                      onClick={() => {
+                        console.log('Setting type to video'); // Add logging
+                        handleInputChange("type", "video");
+                      }}
                       className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
                         formData.type === "video"
                           ? "border-purple-500 bg-purple-500/20 text-purple-400"
@@ -343,29 +490,8 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
                 </h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Site Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Source Website *
-                    </label>
-                    <select
-                      value={formData.site}
-                      onChange={(e) => handleInputChange("site", e.target.value)}
-                      className={`w-full px-3 py-2 bg-gray-700 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                        errors.site ? "border-red-500" : "border-gray-600"
-                      }`}
-                    >
-                      <option value="">Select a website</option>
-                      {getAvailableSites().map((site) => (
-                        <option key={site.id} value={site.id}>
-                          {site.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.site && (
-                      <p className="mt-1 text-sm text-red-400">{errors.site}</p>
-                    )}
-                  </div>
+                  {/* Replace site dropdown with SiteSelection component */}
+                  <SiteSelection />
 
                   {/* Channel Selection */}
                   <div>
