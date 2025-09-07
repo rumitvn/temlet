@@ -3,6 +3,7 @@ import { config } from '@/lib/config';
 import fs from 'fs';
 import path from 'path';
 import puppeteer from 'puppeteer';
+import type { Browser } from 'puppeteer';
 
 /**
  * Crawler Service for downloading images and videos from various sites
@@ -68,6 +69,12 @@ export interface CrawlerJob {
 }
 
 export class CrawlerService {
+  private prisma: typeof prisma;
+
+  constructor() {
+    this.prisma = prisma;
+  }
+
   async createJob(data: Omit<CrawlerJob, 'id' | 'status' | 'progress' | 'totalItems' | 'downloadedItems' | 'failedItems' | 'createdAt' | 'updatedAt'>): Promise<CrawlerJob> {
     try {
       // Test database connection first
@@ -331,296 +338,305 @@ export class CrawlerService {
   }
 
   async startJob(id: string): Promise<void> {
-    let browser;
+    let browser: Browser | null = null;
     try {
       await this.updateJobStatus(id, 'crawling');
-      console.log(`Starting job ${id}`);
-      
-      // Get job details
       const job = await this.getJob(id);
       if (!job) {
-        throw new Error(`Job ${id} not found`);
+        throw new Error('Job not found');
       }
 
-      const { keyword, site, type, settings } = job;
+      const { keyword, site, type, channel, topic, settings } = job;
       const { maxItems, quality, format } = settings;
 
       console.log(`Starting real crawl for: ${keyword} on ${site}, type: ${type}`);
 
-      // Launch browser
+      // Configure browser with stealth mode
       browser = await puppeteer.launch({
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-infobars',
+          '--window-position=0,0',
+          '--ignore-certifcate-errors',
+          '--ignore-certifcate-errors-spki-list',
+          '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+        ],
       });
 
       const page = await browser.newPage();
       
-      // Set user agent to avoid being blocked
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+      // Add stealth configurations
+      await page.setExtraHTTPHeaders({
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br'
+      });
 
-      let imageUrls: string[] = [];
+      await page.setViewport({
+        width: 1920,
+        height: 1080,
+        deviceScaleFactor: 1,
+      });
+
+      let videoUrls: string[] = [];
       let totalItems = 0;
 
       // Crawl based on site and type
-      if (site === 'pexels' && type === 'image') {
-        console.log(`Crawling Pexels for images with keyword: ${keyword}`);
+      if (site === 'freepik') {
+        console.log(`Crawling Freepik for videos with keyword: ${keyword}`);
         
-        const searchUrl = `https://www.pexels.com/search/${encodeURIComponent(keyword)}/`;
+        const searchUrl = `https://www.freepik.com/video-search/${encodeURIComponent(keyword)}`;
         await page.goto(searchUrl, { waitUntil: 'networkidle2' });
         
-        // Wait for images to load
-        await page.waitForSelector('img', { timeout: 10000 });
-        
-        // Scroll to load more images
-        for (let i = 0; i < 3; i++) {
-          await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-        
-        // Extract image URLs with better filtering
-        imageUrls = await page.evaluate((keyword) => {
-          // Look for actual search result images, not promotional content
-          const images = document.querySelectorAll('img');
-          const validImages: string[] = [];
+        try {
+          // Wait for videos to load
+          await page.waitForSelector('.showcase__item, .showcase-item, [data-type="video"]', { timeout: 15000 });
           
-          images.forEach((img: any) => {
-            const src = img.src;
-            const alt = img.alt || '';
-            const parent = img.closest('article, .photo-item, .search-result-item, [data-testid*="photo"]');
+          // Scroll to load more videos
+          for (let i = 0; i < 3; i++) {
+            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          
+          // Extract video URLs
+          videoUrls = await page.evaluate(() => {
+            const validUrls: string[] = [];
             
-            // Skip promotional images
-            if (src.includes('canva') || 
-                src.includes('assets/static') || 
-                src.includes('lib/') ||
-                src.includes('promo') ||
-                src.includes('advertisement') ||
-                src.includes('banner')) {
-              return;
+            // Try multiple selectors
+            const selectors = [
+              '.showcase__item a[href*="/video/"]',
+              '.showcase-item a[href*="/video/"]',
+              '[data-type="video"] a[href*="/video/"]'
+            ];
+            
+            for (const selector of selectors) {
+              document.querySelectorAll(selector).forEach((el: any) => {
+                if (el.href && el.href.includes('/video/') && !validUrls.includes(el.href)) {
+                  validUrls.push(el.href);
+                }
+              });
             }
             
-            // Only include images that are likely search results
-            if (src.includes('images.pexels.com/photos/') && 
-                src.includes('pexels-photo-') &&
-                src.includes('auto=compress') &&
-                parent) {
-              validImages.push(src);
-            }
+            return [...new Set(validUrls)];
           });
           
-          // Remove duplicates and return
-          return [...new Set(validImages)];
-        }, keyword);
-        
-        totalItems = Math.min(imageUrls.length, maxItems);
-        imageUrls = imageUrls.slice(0, totalItems);
-        
-        console.log(`Filtered to ${totalItems} valid search result images`);
-        
-      } else if (site === 'pixabay' && type === 'image') {
-        console.log(`Crawling Pixabay for images with keyword: ${keyword}`);
-        
-        const searchUrl = `https://pixabay.com/images/search/${encodeURIComponent(keyword)}/`;
-        await page.goto(searchUrl, { waitUntil: 'networkidle2' });
-        
-        await page.waitForSelector('img', { timeout: 10000 });
-        
-        // Scroll to load more images
-        for (let i = 0; i < 3; i++) {
-          await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          console.log(`Found ${videoUrls.length} potential video URLs on Freepik`);
+          totalItems = Math.min(videoUrls.length, maxItems);
+          
+        } catch (error) {
+          console.error('Error crawling Freepik:', error);
+          throw new Error('Failed to crawl Freepik videos');
         }
+      } else if (site === 'mixkit') {
+        console.log(`Crawling Mixkit for videos with keyword: ${keyword}`);
         
-        // Extract image URLs with better filtering
-        imageUrls = await page.evaluate((keyword) => {
-          const images = document.querySelectorAll('img');
-          const validImages: string[] = [];
+        // First go to the search results page
+        const searchUrl = `https://mixkit.co/free-stock-video/${encodeURIComponent(keyword)}/`;
+        await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+        
+        try {
+          // Wait for any video content to load
+          await page.waitForSelector('a[href*="/free-stock-video/"][href*="-"]', { timeout: 20000 });
           
-          images.forEach((img: any) => {
-            const src = img.src;
-            const parent = img.closest('.item, .photo, .search-result, [data-id]');
+          // Scroll to load more videos
+          for (let i = 0; i < 3; i++) {
+            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          
+          // Extract video IDs and titles directly from the search page
+          const videos = await page.evaluate((maxItems) => {
+            const items: { id: string; title: string }[] = [];
             
-            // Skip promotional and non-search images
-            if (src.includes('cdn.pixabay.com/photo/') && 
-                src.includes('_') && // Pixabay photos have underscores
-                src.includes('_640') && // Standard size indicator
-                parent) {
-              validImages.push(src);
+            // Get all video links that end with a number
+            document.querySelectorAll('a[href*="/free-stock-video/"]').forEach((link: any) => {
+              // Only collect up to maxItems
+              if (items.length >= maxItems) return;
+
+              const href = link.href;
+              // Match URLs that end with a number after the last dash
+              const match = href.match(/\/free-stock-video\/([^\/]+)\-(\d+)\/?$/);
+              if (match && !href.includes('elements.envato.com')) {
+                const title = match[1].replace(/-/g, ' ');
+                const id = match[2];
+                if (!items.some(item => item.id === id)) {
+                  items.push({ id, title });
+                }
+              }
+            });
+            
+            return items;
+          }, maxItems);
+
+          console.log(`Found ${videos.length} videos on Mixkit (limited to ${maxItems})`);
+          console.log('First few videos:', videos.slice(0, 3));
+
+          // For each video, construct the direct download URL
+          const downloadUrls: string[] = [];
+
+          for (const video of videos) {
+            try {
+              // Construct direct download URL
+              const downloadUrl = `https://assets.mixkit.co/videos/${video.id}/${video.id}-720.mp4`;
+              console.log(`Checking download URL for video ${video.id}: ${downloadUrl}`);
+
+              // Verify the URL is accessible
+              const response = await fetch(downloadUrl, {
+                method: 'HEAD',
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                  'Accept': 'video/mp4,video/*',
+                  'Referer': 'https://mixkit.co/'
+                }
+              });
+
+              if (response.ok) {
+                downloadUrls.push(downloadUrl);
+                console.log(`Found working download URL for video ${video.id}`);
+              } else {
+                console.error(`Download URL returned status ${response.status} for video ${video.id}`);
+              }
+            } catch (error) {
+              console.error(`Error checking download URL for video ${video.id}:`, error);
             }
-          });
+
+            // Add a small delay between requests to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+
+          videoUrls = [...new Set(downloadUrls)]; // Remove duplicates
+          console.log(`Successfully got ${videoUrls.length} download URLs from Mixkit`);
+          totalItems = videoUrls.length;
           
-          return [...new Set(validImages)];
-        }, keyword);
-        
-        totalItems = Math.min(imageUrls.length, maxItems);
-        imageUrls = imageUrls.slice(0, totalItems);
-        
-        console.log(`Filtered to ${totalItems} valid search result images`);
-        
-      } else if (site === 'unsplash' && type === 'image') {
-        console.log(`Crawling Unsplash for images with keyword: ${keyword}`);
-        
-        const searchUrl = `https://unsplash.com/s/photos/${encodeURIComponent(keyword)}`;
-        await page.goto(searchUrl, { waitUntil: 'networkidle2' });
-        
-        await page.waitForSelector('img', { timeout: 10000 });
-        
-        // Scroll to load more images
-        for (let i = 0; i < 3; i++) {
-          await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        } catch (error) {
+          console.error('Error crawling Mixkit:', error);
+          throw new Error('Failed to crawl Mixkit videos');
         }
-        
-        // Extract image URLs with better filtering
-        imageUrls = await page.evaluate((keyword) => {
-          const images = document.querySelectorAll('img');
-          const validImages: string[] = [];
-          
-          images.forEach((img: any) => {
-            const src = img.src;
-            const parent = img.closest('figure, .photo-item, .search-result, [data-testid*="photo"]');
-            
-            // Skip promotional and non-search images
-            if (src.includes('images.unsplash.com/photo-') && 
-                src.includes('?') && // Unsplash photos have query parameters
-                src.includes('w=') && // Width parameter
-                parent) {
-              validImages.push(src);
-            }
-          });
-          
-          return [...new Set(validImages)];
-        }, keyword);
-        
-        totalItems = Math.min(imageUrls.length, maxItems);
-        imageUrls = imageUrls.slice(0, totalItems);
-        
-        console.log(`Filtered to ${totalItems} valid search result images`);
       }
 
-      console.log(`Found ${totalItems} images to download`);
-
       if (totalItems === 0) {
-        throw new Error('No images found for the given keyword');
+        throw new Error(`No ${type}s found for the given keyword`);
       }
 
       // Debug: Show what we found
-      console.log('Image URLs found:');
-      imageUrls.slice(0, 5).forEach((url, index) => {
-        console.log(`  ${index + 1}: ${url}`);
-      });
-      if (imageUrls.length > 5) {
-        console.log(`  ... and ${imageUrls.length - 5} more`);
-      }
+      console.log(`Found ${totalItems} ${type}s to download`);
+      console.log('First few video URLs:', videoUrls.slice(0, 3));
 
-      // If we found fewer images than requested, try to get more
-      if (totalItems < maxItems && site === 'pexels') {
-        console.log(`Found only ${totalItems} images, trying to get more...`);
-        
-        // Scroll more and try different selectors
-        await page.evaluate(() => {
-          window.scrollTo(0, 0);
-          window.scrollTo(0, document.body.scrollHeight);
-        });
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Try alternative selectors for Pexels
-        const additionalImages = await page.evaluate((keyword) => {
-          const images = document.querySelectorAll('img[src*="images.pexels.com/photos/"]');
-          const validImages: string[] = [];
-          
-          images.forEach((img: any) => {
-            const src = img.src;
-            if (src.includes('pexels-photo-') && 
-                src.includes('auto=compress') &&
-                !src.includes('canva') &&
-                !src.includes('assets/static') &&
-                !src.includes('lib/')) {
-              validImages.push(src);
-            }
-          });
-          
-          return [...new Set(validImages)];
-        }, keyword);
-        
-        if (additionalImages.length > imageUrls.length) {
-          imageUrls = additionalImages;
-          totalItems = Math.min(imageUrls.length, maxItems);
-          imageUrls = imageUrls.slice(0, totalItems);
-          console.log(`Found ${totalItems} total images after fallback`);
-        }
-      }
-
-      // Update progress to show items found
-      await this.updateJobProgress(id, 10, 0, 0, totalItems);
-
-      // Create output directory using WORKING_DIRECTORY with channel/topic structure
-      // Path will be: {WORKING_DIRECTORY}/{channel}/{topic}/crawler/{type}/{keyword}/
-      // Example: C:/Users/youruser/Documents/animals/wildlife/crawler/image/capybara/
-      // For videos: C:/Users/youruser/Documents/animals/wildlife/crawler/video/capybara/
-      const outputDir = config.getCrawlerPathsWithKeyword(job.channel, job.topic, job.keyword)[job.type];
-      console.log(`Creating output directory: ${outputDir}`);
-      console.log(`Base working directory: ${config.workingDirectory}`);
-      console.log(`Channel: ${job.channel}, Topic: ${job.topic}, Type: ${job.type}, Keyword: ${job.keyword}`);
-      console.log(`File naming pattern: ${job.keyword}_${job.site}_[index].${job.settings.format}`);
-      
+      // Create output directory if it doesn't exist
+      const outputDir = path.join(config.workingDirectory, channel.toLowerCase(), topic.toLowerCase(), 'crawler', type, keyword);
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
-        console.log(`Successfully created directory: ${outputDir}`);
-      } else {
-        console.log(`Directory already exists: ${outputDir}`);
       }
 
-      // Update status to downloading before starting downloads
-      await this.updateJobStatus(id, 'downloading');
+      // Update job with total items found
+      await this.prisma.crawlerJob.update({
+        where: { id },
+        data: {
+          totalItems,
+          status: 'downloading',
+          progress: 0
+        }
+      });
 
-      // Download images
+      // Download files
       let downloadedItems = 0;
       let failedItems = 0;
 
-      // Note: Currently only image crawling is implemented
-      // Video crawling would need similar site-specific implementations
-      // for sites like YouTube, Vimeo, etc.
-      for (let i = 0; i < imageUrls.length; i++) {
+      for (let i = 0; i < videoUrls.length; i++) {
         try {
-          const imageUrl = imageUrls[i];
-          console.log(`Downloading ${job.type} ${i + 1}/${totalItems}: ${imageUrl}`);
-          
-          // Download image using page.goto and response.buffer()
-          const response = await page.goto(imageUrl);
-          if (response && response.ok()) {
-            const buffer = await response.buffer();
-            const fileName = `${keyword}_${site}_${i + 1}.${format}`;
-            const filePath = path.join(outputDir, fileName);
-            
-            console.log(`Saving file: ${fileName} to: ${filePath}`);
-            fs.writeFileSync(filePath, buffer);
-            downloadedItems++;
-            
-            console.log(`Successfully downloaded: ${fileName}`);
-          } else {
-            failedItems++;
-            console.log(`Failed to download ${job.type} ${i + 1}`);
-          }
-        } catch (error) {
-          failedItems++;
-          console.error(`Error downloading ${job.type} ${i + 1}:`, error);
-        }
+          const videoUrl = videoUrls[i];
+          console.log(`Downloading video ${i + 1}/${totalItems}: ${videoUrl}`);
 
-        // Update progress
-        const progress = Math.floor(((i + 1) / totalItems) * 100);
-        await this.updateJobProgress(id, progress, downloadedItems, failedItems, totalItems);
-        
-        // Small delay to avoid overwhelming the server
-        await new Promise(resolve => setTimeout(resolve, 500));
+          // Download video using node-fetch with timeout
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 60000); // Increase timeout for video downloads
+
+          try {
+            const response = await fetch(videoUrl, { 
+              signal: controller.signal,
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                'Accept': 'video/mp4,video/*',
+                'Referer': 'https://mixkit.co/'
+              }
+            });
+
+            if (!response.ok) {
+              throw new Error(`Failed to download video: ${response.statusText}`);
+            }
+
+            const arrayBuffer = await response.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+
+            const filename = `${keyword}_${site}_${i + 1}.mp4`; // Changed extension to .mp4
+            const outputPath = path.join(outputDir, filename);
+            fs.writeFileSync(outputPath, buffer);
+
+            downloadedItems++;
+            const progress = Math.round((downloadedItems / totalItems) * 100);
+            
+            await this.prisma.crawlerJob.update({
+              where: { id },
+              data: {
+                status: 'downloading',
+                progress,
+                downloadedItems,
+                failedItems
+              }
+            });
+
+          } catch (error) {
+            console.error(`Error downloading video ${i + 1}:`, error);
+            failedItems++;
+          } finally {
+            clearTimeout(timeout);
+          }
+
+        } catch (error) {
+          console.error(`Error processing video ${i + 1}:`, error);
+          failedItems++;
+          
+          await this.prisma.crawlerJob.update({
+            where: { id },
+            data: {
+              status: 'downloading',
+              downloadedItems,
+              failedItems
+            }
+          });
+        }
       }
 
-      // Mark job as completed when all possible downloads are finished
-      const actualTotal = downloadedItems + failedItems;
-      const finalProgress = Math.floor((downloadedItems / totalItems) * 100);
-      
-      // Update final status and progress
-      await this.updateJobStatus(id, 'completed');
-      await this.updateJobProgress(id, finalProgress, downloadedItems, failedItems, totalItems);
+      // Update final status
+      if (downloadedItems === 0) {
+        await this.prisma.crawlerJob.update({
+          where: { id },
+          data: {
+            status: 'failed',
+            progress: 100,
+            error: `Failed to download any ${type}s`
+          }
+        });
+      } else if (failedItems > 0) {
+        await this.prisma.crawlerJob.update({
+          where: { id },
+          data: {
+            status: 'completed',
+            progress: 100,
+            error: `Completed with ${failedItems} failed ${type}s`
+          }
+        });
+      } else {
+        await this.prisma.crawlerJob.update({
+          where: { id },
+          data: {
+            status: 'completed',
+            progress: 100
+          }
+        });
+      }
       
       console.log(`Job ${id} completed: Downloaded ${downloadedItems} ${job.type}s, Failed ${failedItems}`);
 

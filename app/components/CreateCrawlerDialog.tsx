@@ -53,11 +53,11 @@ interface CreateCrawlerDialogProps {
 }
 
 const defaultSites: Site[] = [
-  { id: "pexels", name: "Pexels", type: "both", url: "https://www.pexels.com" },
-  { id: "pixabay", name: "Pixabay", type: "both", url: "https://pixabay.com" },
-  { id: "unsplash", name: "Unsplash", type: "image", url: "https://unsplash.com" },
-  { id: "pexels-videos", name: "Pexels Videos", type: "video", url: "https://www.pexels.com/videos" },
-  { id: "pixabay-videos", name: "Pixabay Videos", type: "video", url: "https://pixabay.com/videos" }
+  { id: "freepik", name: "Freepik", type: "video", url: "https://www.freepik.com/videos" },
+  { id: "mixkit", name: "Mixkit", type: "video", url: "https://mixkit.co" },
+  { id: "pexels", name: "Pexels", type: "image", url: "https://www.pexels.com" },
+  { id: "pixabay", name: "Pixabay", type: "image", url: "https://pixabay.com" },
+  { id: "unsplash", name: "Unsplash", type: "image", url: "https://unsplash.com" }
 ];
 
 // Helper function to get available sites for a content type
