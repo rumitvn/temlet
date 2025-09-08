@@ -387,47 +387,173 @@ export class CrawlerService {
       if (site === 'freepik') {
         console.log(`Crawling Freepik for videos with keyword: ${keyword}`);
         
-        const searchUrl = `https://www.freepik.com/video-search/${encodeURIComponent(keyword)}`;
-        await page.goto(searchUrl, { waitUntil: 'networkidle2' });
+        // Use the search URL with free content filter
+        const searchUrl = `https://www.freepik.com/search?format=search&query=${encodeURIComponent(keyword)}&selection=1&type=video`;
         
         try {
-          // Wait for videos to load
-          await page.waitForSelector('.showcase__item, .showcase-item, [data-type="video"]', { timeout: 15000 });
+          // Navigate with longer timeout and wait for network to be idle
+          await page.goto(searchUrl, { 
+            waitUntil: ['networkidle2', 'domcontentloaded'], 
+            timeout: 30000 
+          });
+
+          // Wait for any content to load - using multiple possible selectors
+          console.log('Waiting for content to load...');
+          await Promise.race([
+            page.waitForSelector('.showcase__item', { timeout: 20000 }),
+            page.waitForSelector('.showcase-item', { timeout: 20000 }),
+            page.waitForSelector('.slider-item', { timeout: 20000 }),
+            page.waitForSelector('.grid-items', { timeout: 20000 }),
+            page.waitForSelector('.no-results', { timeout: 20000 })
+          ]).catch(error => {
+            console.log('Initial selector wait failed, continuing anyway:', error.message);
+          });
+
+          // Add a small delay to ensure dynamic content loads
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Check if we have any results
+          const hasResults = await page.evaluate(() => {
+            // Check for no results message first
+            const noResults = document.querySelector('.no-results, .empty-message, .empty-state');
+            if (noResults && noResults.textContent?.toLowerCase().includes('no result')) {
+              return false;
+            }
+            
+            // Try multiple selectors for video items
+            const items = document.querySelectorAll(
+              '.showcase__item, .showcase-item, .slider-item, ' + 
+              '.grid-items > div, [data-type="video"], .card-item'
+            );
+            
+            console.log('Found items:', items.length);
+            return items.length > 0;
+          });
+
+          if (!hasResults) {
+            throw new Error(`No videos found for keyword: ${keyword}`);
+          }
           
           // Scroll to load more videos
+          console.log('Scrolling to load more content...');
           for (let i = 0; i < 3; i++) {
-            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+            await page.evaluate(() => {
+              window.scrollTo(0, document.body.scrollHeight);
+            });
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
           
-          // Extract video URLs
-          videoUrls = await page.evaluate(() => {
-            const validUrls: string[] = [];
-            
-            // Try multiple selectors
+          // Extract video detail page URLs with broader selectors
+          const detailUrls = await page.evaluate(() => {
+            const urls: string[] = [];
+            // Try multiple selectors and patterns for video links
             const selectors = [
-              '.showcase__item a[href*="/video/"]',
-              '.showcase-item a[href*="/video/"]',
-              '[data-type="video"] a[href*="/video/"]'
-            ];
-            
-            for (const selector of selectors) {
-              document.querySelectorAll(selector).forEach((el: any) => {
-                if (el.href && el.href.includes('/video/') && !validUrls.includes(el.href)) {
-                  validUrls.push(el.href);
-                }
-              });
-            }
-            
-            return [...new Set(validUrls)];
+              'a[href*="/free-video/"]',
+              'a[href*="/video/"]',
+              '.card-item a[href]',
+              '.showcase__item a[href]',
+              '.showcase-item a[href]',
+              '.slider-item a[href]',
+              '[data-type="video"] a[href]'
+            ].join(', ');
+
+            document.querySelectorAll(selectors).forEach((item: any) => {
+              if (item.href && (
+                item.href.includes('/free-video/') || 
+                item.href.includes('/video/') ||
+                item.closest('[data-type="video"]')
+              )) {
+                urls.push(item.href);
+              }
+            });
+            return [...new Set(urls)]; // Remove duplicates
           });
+
+          console.log(`Found ${detailUrls.length} video detail pages on Freepik`);
           
-          console.log(`Found ${videoUrls.length} potential video URLs on Freepik`);
-          totalItems = Math.min(videoUrls.length, maxItems);
+          if (detailUrls.length === 0) {
+            throw new Error('No video links found on the search page');
+          }
+          
+          // Visit each detail page and get the download URL
+          const downloadUrls: string[] = [];
+          
+          for (const detailUrl of detailUrls.slice(0, maxItems)) {
+            try {
+              console.log(`Processing detail page: ${detailUrl}`);
+              await page.goto(detailUrl, { 
+                waitUntil: ['networkidle2', 'domcontentloaded'],
+                timeout: 30000 
+              });
+              
+              // Wait for the page to be fully loaded
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              
+              // Get the download URL with broader selectors
+              const downloadUrl = await page.evaluate(() => {
+                // First check if it's a premium video
+                const isPremium = document.querySelector('.premium-indicator, .premium-badge, .premium-label');
+                if (isPremium) {
+                  console.log('Premium video detected, skipping');
+                  return null;
+                }
+
+                // Try multiple methods to find the download URL
+                const selectors = [
+                  '[data-resolution="720"]',
+                  '[data-quality="720p"]',
+                  '[data-format*="720"]',
+                  '.download-button[href*=".mp4"]',
+                  'a[href*=".mp4"]',
+                  '[data-download]',
+                  '.download-options a'
+                ];
+
+                for (const selector of selectors) {
+                  const element = document.querySelector(selector);
+                  if (!element) continue;
+
+                  // Try different attributes that might contain the URL
+                  const url = element.getAttribute('data-url') || 
+                            element.getAttribute('href') || 
+                            element.getAttribute('data-href') ||
+                            element.getAttribute('data-download') ||
+                            element.getAttribute('data-src');
+
+                  if (url && (url.includes('.mp4') || url.includes('/videos/'))) {
+                    return url;
+                  }
+                }
+                return null;
+              });
+
+              if (downloadUrl) {
+                downloadUrls.push(downloadUrl);
+                console.log(`Found download URL from detail page: ${detailUrl}`);
+              } else {
+                console.log(`No download URL found for: ${detailUrl}`);
+              }
+
+              // Add a delay between requests
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              
+            } catch (error) {
+              console.error(`Error processing detail page ${detailUrl}:`, error);
+            }
+          }
+
+          videoUrls = downloadUrls;
+          totalItems = downloadUrls.length;
+          
+          if (totalItems === 0) {
+            throw new Error('No downloadable videos found on Freepik');
+          }
+          
+          console.log(`Successfully found ${totalItems} downloadable videos on Freepik`);
           
         } catch (error) {
           console.error('Error crawling Freepik:', error);
-          throw new Error('Failed to crawl Freepik videos');
+          throw new Error(`Failed to crawl Freepik videos: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       } else if (site === 'mixkit') {
         console.log(`Crawling Mixkit for videos with keyword: ${keyword}`);

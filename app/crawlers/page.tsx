@@ -1360,6 +1360,17 @@ export default function CrawlersPage() {
                               Resume
                             </button>
                           )}
+                          {job.status === 'failed' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleActionClick('start', job.id);
+                              }}
+                              className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+                            >
+                              Retry
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
