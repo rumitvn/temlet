@@ -389,152 +389,243 @@ export class CrawlerService {
         
         // Use the search URL with free content filter
         const searchUrl = `https://www.freepik.com/search?format=search&query=${encodeURIComponent(keyword)}&selection=1&type=video`;
+        console.log('Search URL:', searchUrl);
         
         try {
+          // Create output directory
+          const outputDir = path.join(config.workingDirectory, channel.toLowerCase(), topic.toLowerCase(), 'crawler', type, keyword);
+          if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+          }
+
+          // Set initial status to crawling
+          await this.updateJobStatus(id, 'crawling', 0);
+
           // Navigate with longer timeout and wait for network to be idle
+          console.log('Navigating to search page...');
           await page.goto(searchUrl, { 
             waitUntil: ['networkidle2', 'domcontentloaded'], 
-            timeout: 30000 
+            timeout: 45000 
           });
 
-          // Wait for any content to load - using multiple possible selectors
+          // Wait for JavaScript to initialize...
+          console.log('Waiting for JavaScript to initialize...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+
+          // Wait for the content to be loaded
           console.log('Waiting for content to load...');
-          await Promise.race([
-            page.waitForSelector('.showcase__item', { timeout: 20000 }),
-            page.waitForSelector('.showcase-item', { timeout: 20000 }),
-            page.waitForSelector('.slider-item', { timeout: 20000 }),
-            page.waitForSelector('.grid-items', { timeout: 20000 }),
-            page.waitForSelector('.no-results', { timeout: 20000 })
-          ]).catch(error => {
-            console.log('Initial selector wait failed, continuing anyway:', error.message);
-          });
-
-          // Add a small delay to ensure dynamic content loads
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Check if we have any results
-          const hasResults = await page.evaluate(() => {
-            // Check for no results message first
-            const noResults = document.querySelector('.no-results, .empty-message, .empty-state');
-            if (noResults && noResults.textContent?.toLowerCase().includes('no result')) {
-              return false;
-            }
-            
-            // Try multiple selectors for video items
-            const items = document.querySelectorAll(
-              '.showcase__item, .showcase-item, .slider-item, ' + 
-              '.grid-items > div, [data-type="video"], .card-item'
+          await page.waitForFunction(() => {
+            // Check for either videos or no results message
+            return (
+              document.querySelectorAll('[class*="gridItem"], [class*="listItem"], [class*="card"], [class*="showcase"], article, [data-type="video"]').length > 0 ||
+              document.querySelector('[class*="empty"], [class*="noResults"]') !== null
             );
-            
-            console.log('Found items:', items.length);
-            return items.length > 0;
+          }, { timeout: 30000 });
+
+          // Log the page content for debugging
+          const pageContent = await page.content();
+          console.log('Page loaded. Content length:', pageContent.length);
+          console.log('First 500 characters:', pageContent.substring(0, 500));
+
+          // Check for any error messages or captcha
+          const hasError = await page.evaluate(() => {
+            const errorElements = document.querySelectorAll('.error-message, .captcha, .blocked-message');
+            return Array.from(errorElements).map(el => el.textContent).join(', ');
           });
 
-          if (!hasResults) {
-            throw new Error(`No videos found for keyword: ${keyword}`);
+          if (hasError) {
+            console.log('Found error message on page:', hasError);
+            throw new Error(`Page error: ${hasError}`);
           }
-          
-          // Scroll to load more videos
-          console.log('Scrolling to load more content...');
-          for (let i = 0; i < 3; i++) {
-            await page.evaluate(() => {
-              window.scrollTo(0, document.body.scrollHeight);
-            });
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-          
-          // Extract video detail page URLs with broader selectors
-          const detailUrls = await page.evaluate(() => {
-            const urls: string[] = [];
-            // Try multiple selectors and patterns for video links
-            const selectors = [
-              'a[href*="/free-video/"]',
-              'a[href*="/video/"]',
-              '.card-item a[href]',
-              '.showcase__item a[href]',
-              '.showcase-item a[href]',
-              '.slider-item a[href]',
-              '[data-type="video"] a[href]'
-            ].join(', ');
 
-            document.querySelectorAll(selectors).forEach((item: any) => {
-              if (item.href && (
-                item.href.includes('/free-video/') || 
-                item.href.includes('/video/') ||
-                item.closest('[data-type="video"]')
-              )) {
-                urls.push(item.href);
+          // Try to find any video elements with broader selectors
+          console.log('Searching for video elements...');
+          const videoElements = await page.evaluate(() => {
+            const selectors = [
+              // Grid and list items
+              '[class*="gridItem"]',
+              '[class*="listItem"]',
+              // Cards and articles
+              '[class*="card"]',
+              'article',
+              // Video specific
+              '[data-type="video"]',
+              '[data-category="video"]',
+              // Generic containers
+              '[class*="item"]',
+              '[class*="showcase"]',
+              // Specific Freepik selectors (based on their current structure)
+              '[class*="ResultsContainer"] > div',
+              '[class*="SearchResults"] > div'
+            ];
+
+            const elements = document.querySelectorAll(selectors.join(', '));
+            console.log('Found elements:', elements.length);
+
+            // Log some details about what we found
+            const details = Array.from(elements).map(el => ({
+              classes: el.className,
+              type: el.getAttribute('data-type'),
+              href: el.querySelector('a')?.href,
+              text: el.textContent?.slice(0, 50)
+            }));
+
+            return {
+              count: elements.length,
+              details
+            };
+          });
+
+          console.log('Video elements found:', videoElements.count);
+          console.log('Element details:', JSON.stringify(videoElements.details, null, 2));
+
+          // Extract video URLs with broader matching
+          const detailUrls = await page.evaluate(() => {
+            const urls = new Set<string>();
+            
+            // Function to check if a URL is a video link
+            const isVideoUrl = (url: string) => {
+              const videoPatterns = ['/video/', '/free-video/', 'videos', '.mp4'];
+              return videoPatterns.some(pattern => url.includes(pattern));
+            };
+
+            // Function to check if it's a promotional/watermark video
+            const isPromotionalVideo = (element: Element) => {
+              // Check for common characteristics of Freepik's promotional videos
+              const isPromo = (
+                // Check if it's the first video in the grid
+                element.closest('[class*="first"], [class*="banner"], [class*="promo"]') !== null ||
+                // Check for promotional content indicators
+                element.querySelector('[class*="premium"], [class*="promo"], [class*="banner"]') !== null ||
+                // Check video title/description for promotional content
+                element.textContent?.toLowerCase().includes('freepik') ||
+                element.textContent?.toLowerCase().includes('premium') ||
+                // Check for specific promotional video classes
+                element.classList.toString().toLowerCase().includes('promo') ||
+                element.classList.toString().toLowerCase().includes('banner') ||
+                // Check for specific promotional video attributes
+                element.getAttribute('data-type')?.includes('promo') ||
+                element.getAttribute('data-category')?.includes('promo')
+              );
+
+              if (isPromo) {
+                console.log('Skipping promotional video:', element.textContent);
+              }
+              return isPromo;
+            };
+
+            // Get all links within video containers
+            document.querySelectorAll([
+              '[class*="gridItem"] a',
+              '[class*="listItem"] a',
+              '[class*="card"] a',
+              'article a',
+              '[data-type="video"] a',
+              '[class*="item"] a',
+              '[class*="showcase"] a',
+              '[class*="ResultsContainer"] a',
+              'a[href*="/video/"]',
+              'a[href*="/free-video/"]'
+            ].join(', ')).forEach((link: any) => {
+              // Skip if it's a promotional video
+              if (isPromotionalVideo(link.parentElement)) return;
+
+              if (link.href && isVideoUrl(link.href)) {
+                urls.add(link.href);
               }
             });
-            return [...new Set(urls)]; // Remove duplicates
+
+            return Array.from(urls);
           });
 
-          console.log(`Found ${detailUrls.length} video detail pages on Freepik`);
-          
+          console.log(`Found ${detailUrls.length} video URLs:`, detailUrls);
+
           if (detailUrls.length === 0) {
-            throw new Error('No video links found on the search page');
+            // Try to get more information about the page state
+            const pageState = await page.evaluate(() => ({
+              title: document.title,
+              url: window.location.href,
+              bodyClasses: document.body.className,
+              mainContent: document.querySelector('main')?.innerHTML?.length || 0,
+              errorMessages: Array.from(document.querySelectorAll('.error, .message, .notification')).map(el => el.textContent),
+              totalLinks: document.querySelectorAll('a').length,
+              possibleVideos: document.querySelectorAll('[data-type="video"], video, .video').length
+            }));
+
+            console.log('Page state when no videos found:', pageState);
+            throw new Error(`No videos found for keyword: ${keyword}. Page title: ${pageState.title}`);
           }
-          
-          // Visit each detail page and get the download URL
+
+          // Process each detail URL
           const downloadUrls: string[] = [];
           
           for (const detailUrl of detailUrls.slice(0, maxItems)) {
             try {
-              console.log(`Processing detail page: ${detailUrl}`);
+              console.log(`\nProcessing detail page: ${detailUrl}`);
               await page.goto(detailUrl, { 
                 waitUntil: ['networkidle2', 'domcontentloaded'],
                 timeout: 30000 
               });
-              
-              // Wait for the page to be fully loaded
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              
-              // Get the download URL with broader selectors
-              const downloadUrl = await page.evaluate(() => {
-                // First check if it's a premium video
-                const isPremium = document.querySelector('.premium-indicator, .premium-badge, .premium-label');
-                if (isPremium) {
-                  console.log('Premium video detected, skipping');
-                  return null;
-                }
 
-                // Try multiple methods to find the download URL
-                const selectors = [
-                  '[data-resolution="720"]',
-                  '[data-quality="720p"]',
-                  '[data-format*="720"]',
-                  '.download-button[href*=".mp4"]',
+              // Wait for the page to be fully loaded
+              await new Promise(resolve => setTimeout(resolve, 3000));
+
+              // Try to find download options
+              const downloadInfo = await page.evaluate(() => {
+                const info: any = {
+                  isPremium: false,
+                  downloadUrl: null,
+                  buttonFound: false,
+                  selectors: []
+                };
+
+                // Check premium status
+                const premiumIndicators = document.querySelectorAll('.premium, [data-premium="true"], .premium-badge');
+                info.isPremium = premiumIndicators.length > 0;
+
+                // Look for download buttons and URLs
+                const downloadSelectors = [
                   'a[href*=".mp4"]',
-                  '[data-download]',
-                  '.download-options a'
+                  'button[data-download]',
+                  '.download-button',
+                  '[data-type="download"]',
+                  'video source',
+                  '.video-player source',
+                  '[data-video-source]'
                 ];
 
-                for (const selector of selectors) {
+                for (const selector of downloadSelectors) {
                   const element = document.querySelector(selector);
-                  if (!element) continue;
-
-                  // Try different attributes that might contain the URL
-                  const url = element.getAttribute('data-url') || 
-                            element.getAttribute('href') || 
-                            element.getAttribute('data-href') ||
-                            element.getAttribute('data-download') ||
-                            element.getAttribute('data-src');
-
-                  if (url && (url.includes('.mp4') || url.includes('/videos/'))) {
-                    return url;
+                  if (element) {
+                    info.selectors.push(selector);
+                    info.buttonFound = true;
+                    
+                    // Try various attributes that might contain the URL
+                    const url = element.getAttribute('href') ||
+                              element.getAttribute('src') ||
+                              element.getAttribute('data-src') ||
+                              element.getAttribute('data-download') ||
+                              element.getAttribute('data-video-source');
+                              
+                    if (url && url.includes('.mp4')) {
+                      info.downloadUrl = url;
+                      break;
+                    }
                   }
                 }
-                return null;
+
+                return info;
               });
 
-              if (downloadUrl) {
-                downloadUrls.push(downloadUrl);
-                console.log(`Found download URL from detail page: ${detailUrl}`);
+              console.log('Download info:', downloadInfo);
+
+              if (downloadInfo.downloadUrl) {
+                downloadUrls.push(downloadInfo.downloadUrl);
+                console.log(`Found download URL: ${downloadInfo.downloadUrl}`);
               } else {
-                console.log(`No download URL found for: ${detailUrl}`);
+                console.log(`No download URL found. Premium: ${downloadInfo.isPremium}, Button found: ${downloadInfo.buttonFound}`);
               }
 
-              // Add a delay between requests
               await new Promise(resolve => setTimeout(resolve, 1500));
               
             } catch (error) {
@@ -542,17 +633,110 @@ export class CrawlerService {
             }
           }
 
+          // Update status to downloading before starting downloads
+          console.log('Starting download phase...');
+          await this.updateJobStatus(id, 'downloading', 0);
+          
           videoUrls = downloadUrls;
           totalItems = downloadUrls.length;
-          
-          if (totalItems === 0) {
-            throw new Error('No downloadable videos found on Freepik');
+
+          // Update job with total items found
+          await this.prisma.crawlerJob.update({
+            where: { id },
+            data: {
+              totalItems,
+              downloadedItems: 0,
+              failedItems: 0
+            }
+          });
+
+          // Download files
+          let downloadedItems = 0;
+          let failedItems = 0;
+
+          for (let i = 0; i < videoUrls.length; i++) {
+            try {
+              const videoUrl = videoUrls[i];
+              console.log(`Downloading video ${i + 1}/${totalItems}: ${videoUrl}`);
+
+              // Download video using node-fetch with timeout
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 60000);
+
+              try {
+                const response = await fetch(videoUrl, { 
+                  signal: controller.signal,
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                    'Accept': 'video/mp4,video/*',
+                    'Referer': 'https://www.freepik.com/'
+                  }
+                });
+
+                if (!response.ok) {
+                  throw new Error(`Failed to download video: ${response.statusText}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+
+                const filename = `${keyword}_${site}_${i + 1}.mp4`;
+                const outputPath = path.join(outputDir, filename);
+                fs.writeFileSync(outputPath, buffer);
+
+                downloadedItems++;
+                const progress = Math.round((downloadedItems / totalItems) * 100);
+                
+                // Update progress
+                await this.prisma.crawlerJob.update({
+                  where: { id },
+                  data: {
+                    status: 'downloading',
+                    progress,
+                    downloadedItems,
+                    failedItems
+                  }
+                });
+
+              } catch (error) {
+                console.error(`Error downloading video ${i + 1}:`, error);
+                failedItems++;
+                
+                // Update failed items count
+                await this.prisma.crawlerJob.update({
+                  where: { id },
+                  data: {
+                    failedItems,
+                    downloadedItems
+                  }
+                });
+              } finally {
+                clearTimeout(timeout);
+              }
+
+              // Add a small delay between downloads
+              await new Promise(resolve => setTimeout(resolve, 1000));
+
+            } catch (error) {
+              console.error(`Error processing video ${i + 1}:`, error);
+              failedItems++;
+            }
           }
-          
-          console.log(`Successfully found ${totalItems} downloadable videos on Freepik`);
+
+          // Update final status
+          if (downloadedItems === 0) {
+            await this.updateJobStatus(id, 'failed', 100, 'Failed to download any videos');
+          } else if (failedItems > 0) {
+            await this.updateJobStatus(id, 'completed', 100, `Completed with ${failedItems} failed videos`);
+          } else {
+            await this.updateJobStatus(id, 'completed', 100);
+          }
+
+          console.log(`Job ${id} completed: Downloaded ${downloadedItems} videos, Failed ${failedItems}`);
           
         } catch (error) {
           console.error('Error crawling Freepik:', error);
+          await this.updateJobStatus(id, 'failed', undefined, `Failed to crawl Freepik videos: ${error instanceof Error ? error.message : 'Unknown error'}`);
           throw new Error(`Failed to crawl Freepik videos: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       } else if (site === 'mixkit') {
