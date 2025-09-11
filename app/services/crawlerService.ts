@@ -483,62 +483,24 @@ export class CrawlerService {
           const detailUrls = await page.evaluate(() => {
             const urls = new Set<string>();
             
-            // Function to check if a URL is a video link
-            const isVideoUrl = (url: string) => {
-              const videoPatterns = ['/video/', '/free-video/', 'videos', '.mp4'];
-              return videoPatterns.some(pattern => url.includes(pattern));
-            };
-
-            // Function to check if it's a promotional/watermark video
-            const isPromotionalVideo = (element: Element) => {
-              // Check for common characteristics of Freepik's promotional videos
-              const isPromo = (
-                // Check if it's the first video in the grid
-                element.closest('[class*="first"], [class*="banner"], [class*="promo"]') !== null ||
-                // Check for promotional content indicators
-                element.querySelector('[class*="premium"], [class*="promo"], [class*="banner"]') !== null ||
-                // Check video title/description for promotional content
-                element.textContent?.toLowerCase().includes('freepik') ||
-                element.textContent?.toLowerCase().includes('premium') ||
-                // Check for specific promotional video classes
-                element.classList.toString().toLowerCase().includes('promo') ||
-                element.classList.toString().toLowerCase().includes('banner') ||
-                // Check for specific promotional video attributes
-                element.getAttribute('data-type')?.includes('promo') ||
-                element.getAttribute('data-category')?.includes('promo')
-              );
-
-              if (isPromo) {
-                console.log('Skipping promotional video:', element.textContent);
-              }
-              return isPromo;
-            };
-
-            // Get all links within video containers
-            document.querySelectorAll([
-              '[class*="gridItem"] a',
-              '[class*="listItem"] a',
-              '[class*="card"] a',
-              'article a',
-              '[data-type="video"] a',
-              '[class*="item"] a',
-              '[class*="showcase"] a',
-              '[class*="ResultsContainer"] a',
-              'a[href*="/video/"]',
-              'a[href*="/free-video/"]'
-            ].join(', ')).forEach((link: any) => {
-              // Skip if it's a promotional video
-              if (isPromotionalVideo(link.parentElement)) return;
-
-              if (link.href && isVideoUrl(link.href)) {
-                urls.add(link.href);
+            // Get all links that match video detail pages
+            document.querySelectorAll('a[href*="/free-video/"]').forEach((link: any) => {
+              const href = link.href;
+              
+              // Skip navigation/menu links and ensure it's a valid video detail page
+              if (href && 
+                  !href.includes('#from_element') && 
+                  !href.includes('/videos#') &&
+                  href.includes('/free-video/') &&
+                  href.match(/\/free-video\/[^\/]+_\d+/)) { // Must match pattern: /free-video/title_number
+                urls.add(href);
               }
             });
 
             return Array.from(urls);
           });
 
-          console.log(`Found ${detailUrls.length} video URLs:`, detailUrls);
+          console.log(`Found ${detailUrls.length} video detail URLs:`, detailUrls);
 
           if (detailUrls.length === 0) {
             // Try to get more information about the page state
