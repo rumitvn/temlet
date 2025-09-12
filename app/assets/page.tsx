@@ -5,13 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   PlusIcon, 
   MagnifyingGlassIcon, 
-  FunnelIcon
+  FunnelIcon,
+  ChevronUpIcon
 } from "@heroicons/react/24/outline";
 import { 
   PhotoIcon,
-  PencilIcon
-} from "@heroicons/react/24/solid";
-import { 
+  PencilIcon,
   CheckCircleIcon,
   XCircleIcon,
   ExclamationTriangleIcon
@@ -3885,6 +3884,316 @@ export default function AssetsPage() {
     setEditingImage(null);
   };
 
+  const [showCrawlerDialog, setShowCrawlerDialog] = useState(false);
+  const [selectedJsonAsset, setSelectedJsonAsset] = useState<Asset | null>(null);
+  interface CrawlerResource {
+    name: string;
+    path: string;
+    url: string;
+  }
+
+  interface SelectionState {
+    [key: string]: {
+      isSelected: boolean;
+      isLoading: boolean;
+      error?: string;
+    };
+  }
+
+  const [crawlerResources, setCrawlerResources] = useState<{
+    images: CrawlerResource[];
+    videos: CrawlerResource[];
+  }>({ images: [], videos: [] });
+
+  const [selectionState, setSelectionState] = useState<SelectionState>({});
+  
+  const [fullscreenImage, setFullscreenImage] = useState<CrawlerResource | null>(null);
+  const [showQuizOptionMenu, setShowQuizOptionMenu] = useState(false);
+  const [missingQuizOptions, setMissingQuizOptions] = useState<string[]>([]);
+
+  interface CrawlerResourcesByOption {
+    [key: string]: {
+      images: CrawlerResource[];
+      videos: CrawlerResource[];
+    }
+  }
+
+  const [crawlerResourcesByOption, setCrawlerResourcesByOption] = useState<CrawlerResourcesByOption>({});
+
+  const handleFetchCrawlerResources = async (jsonAsset: Asset | null) => {
+    if (!jsonAsset) return;
+    setSelectedJsonAsset(jsonAsset);
+    try {
+      // Get the current quiz3 options and find which ones are missing
+      const pair = assetGroups
+        .find(group => group.key === jsonAsset?.key)
+        ?.assets.jsonAssetPairs
+        .find(p => p.json.id === jsonAsset?.id);
+        
+      if (pair && pair.quiz3ImageOptions) {
+        const missingOpts = pair.quiz3ImageOptions.missingImages;
+        setMissingQuizOptions(missingOpts);
+
+        // Fetch resources for each missing option and main asset
+        const resourcesByOption: CrawlerResourcesByOption = {};
+
+        // Fetch for main asset (hamster)
+        const mainImageResponse = await fetch(`/api/crawlers?mode=resources&type=image&channel=${selectedChannel}&topic=${selectedTopic}&key=${jsonAsset.key}`);
+        const mainVideoResponse = await fetch(`/api/crawlers?mode=resources&type=video&channel=${selectedChannel}&topic=${selectedTopic}&key=${jsonAsset.key}`);
+        
+        const mainImages = await mainImageResponse.json();
+        const mainVideos = await mainVideoResponse.json();
+        
+        setCrawlerResources({
+          images: mainImages.files || [],
+          videos: mainVideos.files || []
+        });
+
+        // Fetch for each missing option (rabbit, dog, etc.)
+        await Promise.all(missingOpts.map(async (option) => {
+          const imageResponse = await fetch(`/api/crawlers?mode=resources&type=image&channel=${selectedChannel}&topic=${selectedTopic}&key=${option}`);
+          const images = await imageResponse.json();
+          
+          resourcesByOption[option] = {
+            images: images.files || [],
+            videos: [] // Quiz options only need images
+          };
+        }));
+
+        setCrawlerResourcesByOption(resourcesByOption);
+      }
+      
+      setShowCrawlerDialog(true);
+    } catch (error) {
+      console.error('Error fetching crawler resources:', error);
+      // Show error toast or notification
+    }
+  };
+
+  interface CopyResponse {
+    success: boolean;
+    error?: string;
+    targetPath: string;
+    filename: string;
+  }
+
+  type ResourceType = 'image' | 'video' | 'quiz3-image';
+  type ApiResourceType = 'image' | 'video';
+  type ResourceTarget = 'main' | 'quiz3';
+  
+  const getSelectionKey = (resource: CrawlerResource, type: ResourceType, target: ResourceTarget, optionName?: string) => {
+    return `${resource.path}_${type}_${target}${optionName ? `_${optionName}` : ''}`;
+  };
+
+  const SelectionButton = ({ 
+    resource, 
+    type, 
+    target, 
+    optionName 
+  }: { 
+    resource: CrawlerResource; 
+    type: ResourceType; 
+    target: ResourceTarget; 
+    optionName?: string;
+  }) => {
+    const selectionKey = getSelectionKey(resource, type, target, optionName);
+    const state = selectionState[selectionKey];
+
+    return (
+      <button
+        onClick={() => handleSelectCrawlerResource(resource.path, type, target, optionName)}
+        className={`relative px-3 py-1.5 rounded text-sm ${
+          state?.isSelected
+            ? 'bg-green-600 hover:bg-green-700'
+            : state?.error
+            ? 'bg-red-600 hover:bg-red-700'
+            : type === 'quiz3-image'
+            ? 'bg-purple-600 hover:bg-purple-700'
+            : 'bg-blue-600 hover:bg-blue-700'
+        } text-white flex items-center gap-2`}
+        disabled={state?.isLoading}
+      >
+        {state?.isLoading ? (
+          <>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            <span>Copying...</span>
+          </>
+        ) : state?.isSelected ? (
+          <>
+            <CheckCircleIcon className="w-4 h-4" />
+            <span>Selected</span>
+          </>
+        ) : state?.error ? (
+          <>
+            <XCircleIcon className="w-4 h-4" />
+            <span>Try Again</span>
+          </>
+        ) : (
+          <>
+            {optionName ? `Select for ${optionName}` : 'Select'}
+          </>
+        )}
+      </button>
+    );
+  };
+
+  // Track which assets have been updated
+  const [updatedAssets, setUpdatedAssets] = useState<Set<string>>(new Set());
+
+  const handleSelectCrawlerResource = async (resourcePath: string, type: ResourceType, target: ResourceTarget, quizOption?: string) => {
+    if (!selectedJsonAsset) return;
+    
+    try {
+      // For quiz3 images, we need to determine which option position this is for
+      let order = selectedJsonAsset.order;
+      let category: ResourceType = type;
+      let optionName: string | undefined = quizOption;
+      
+      if (target === 'quiz3') {
+        // Get the current quiz3 options and find which one is missing
+        const pair = assetGroups
+          .find(group => group.key === selectedJsonAsset?.key)
+          ?.assets.jsonAssetPairs
+          .find(p => p.json.id === selectedJsonAsset?.id);
+          
+        if (pair && pair.quiz3ImageOptions) {
+          const missingOptions = pair.quiz3ImageOptions.missingImages;
+          setMissingQuizOptions(missingOptions);
+          
+          if (missingOptions.length > 0) {
+            category = 'quiz3-image';
+            // If no specific option is provided, show the menu
+            if (!optionName) {
+              setShowQuizOptionMenu(true);
+              return;
+            }
+          }
+        }
+      }
+
+      // For quiz3 images, we need to use the option name as the target filename
+      const payload = {
+        sourcePath: resourcePath,
+        key: selectedJsonAsset.key,
+        order: type === 'quiz3-image' ? undefined : order,
+        type: type, // Send the actual type to the API
+        target: type === 'quiz3-image' ? 'quiz3' : target,
+        optionName: type === 'quiz3-image' ? quizOption : undefined,
+        channel: selectedChannel,
+        topic: selectedTopic
+      };
+
+      console.log('Copying resource:', payload);
+
+      const response = await fetch('/api/crawlers/copy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) throw new Error('Failed to copy resource');
+      
+      const result = await response.json() as CopyResponse;
+      if (!result.success) throw new Error(result.error || 'Failed to copy resource');
+
+      // Update just the specific asset pair
+      // Mark this asset as updated
+      setUpdatedAssets(prev => new Set(prev).add(selectedJsonAsset.id));
+
+      // Scroll to the updated item
+      const itemElement = document.getElementById(`json-pair-${selectedJsonAsset.id}`);
+      if (itemElement) {
+        itemElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } catch (error) {
+      console.error('Error copying crawler resource:', error);
+      // Show error toast or notification
+    }
+  };
+
+  // Fullscreen image viewer component
+  const FullscreenViewer = () => {
+    if (!fullscreenImage) return null;
+
+    return (
+      <div 
+        className="fixed inset-0 bg-black z-[100] flex flex-col"
+        onClick={() => setFullscreenImage(null)}
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center p-4 bg-gray-900">
+          <h3 className="text-xl font-semibold text-white">{fullscreenImage.name}</h3>
+          <button
+            onClick={() => setFullscreenImage(null)}
+            className="text-white hover:text-gray-300"
+          >
+            <XCircleIcon className="w-8 h-8" />
+          </button>
+        </div>
+
+        {/* Main Image */}
+        <div className="flex-1 flex items-center justify-center p-4">
+          <img 
+            src={fullscreenImage.url} 
+            alt={fullscreenImage.name}
+            className="max-w-full max-h-full object-contain"
+          />
+        </div>
+
+        {/* Footer with Actions */}
+        <div className="bg-gray-900 p-4">
+          <div className="flex flex-col gap-4 max-w-2xl mx-auto">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSelectCrawlerResource(fullscreenImage.path, 'image', 'main');
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-lg font-medium transition-colors"
+            >
+              Use as Main Image
+            </button>
+            
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowQuizOptionMenu(!showQuizOptionMenu);
+                }}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg text-lg font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                Use for Quiz Option
+                <ChevronUpIcon className={`w-5 h-5 transition-transform ${showQuizOptionMenu ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {showQuizOptionMenu && (
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+                  {missingQuizOptions.map((option, index) => (
+                    <button
+                      key={index}
+                                             onClick={(e) => {
+                         e.stopPropagation();
+                         setShowQuizOptionMenu(false);
+                         handleSelectCrawlerResource(fullscreenImage.path, 'image', 'quiz3', option);
+                       }}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors flex items-center gap-3"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center font-medium">
+                        {index + 1}
+                      </div>
+                      <span>Use as Quiz Option {index + 1}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
@@ -4486,7 +4795,8 @@ export default function AssetsPage() {
                   {/* JSONs with Voice and Reward Status */}
                   {group.assets.jsonAssetPairs.map((pair, index) => (
                     <div 
-                      key={`${pair.json.id}-${index}`} 
+                      key={`${pair.json.id}-${index}`}
+                      id={`json-pair-${pair.json.id}`}
                       className="bg-gray-700 rounded-lg p-6 border border-gray-600"
                     >
                       <div className="flex items-center gap-4 mb-4">
@@ -4788,6 +5098,12 @@ export default function AssetsPage() {
                             )}
                           </button>
                         )}
+                                                  <button
+                          onClick={() => handleFetchCrawlerResources(pair.json)}
+                          className="flex-1 text-base text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-4 py-2 text-center transition-colors"
+                        >
+                          🖼️ Use Crawled Media
+                        </button>
                         {!pair.hasReward && (
                           <button
                             onClick={() => handleGenerateReward(pair.json)}
@@ -5826,6 +6142,254 @@ export default function AssetsPage() {
               </span>
               <span className="text-sm font-medium">{toast.message}</span>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Fullscreen Image Viewer */}
+      <AnimatePresence>
+        {fullscreenImage && <FullscreenViewer />}
+      </AnimatePresence>
+
+      {/* Crawler Dialog */}
+      <AnimatePresence>
+        {showCrawlerDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+            >
+                            <div className="flex flex-col gap-4 sticky top-0 bg-gray-800 z-10 pb-4">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Crawler Resources</h2>
+                                  <button
+                  onClick={async () => {
+                    setShowCrawlerDialog(false);
+                    if (updatedAssets.size > 0) {
+                      await fetchAssets();
+                      // Scroll to the first updated item
+                      const firstId = Array.from(updatedAssets)[0];
+                      setTimeout(() => {
+                        const itemElement = document.getElementById(`json-pair-${firstId}`);
+                        if (itemElement) {
+                          itemElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }, 100);
+                      // Clear the updated assets set
+                      setUpdatedAssets(new Set());
+                    }
+                  }}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <XCircleIcon className="w-6 h-6" />
+                </button>
+                </div>
+
+                {/* Navigation Shortcuts */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => document.getElementById('crawler-main-image')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium"
+                  >
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-500">1</span>
+                    Main Image
+                  </button>
+                  {missingQuizOptions.length > 0 && (
+                    <button
+                      onClick={() => document.getElementById('crawler-quiz-options')?.scrollIntoView({ behavior: 'smooth' })}
+                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium"
+                    >
+                      <span className="w-6 h-6 flex items-center justify-center rounded-full bg-purple-500">2</span>
+                      Quiz Options ({missingQuizOptions.length})
+                    </button>
+                  )}
+                  <button
+                    onClick={() => document.getElementById('crawler-main-video')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium"
+                  >
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-green-500">3</span>
+                    Main Video
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-8 mt-4">
+                {/* Main Image Section */}
+                <div id="crawler-main-image">
+                  <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                    <span className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 text-white">1</span>
+                    Main Image
+                  </h3>
+                  {crawlerResources.images.length === 0 ? (
+                    <p className="text-gray-400">No images available.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                      {crawlerResources.images.map((image, index) => (
+                        <div key={index} className="relative group cursor-pointer">
+                          <div className="aspect-square overflow-hidden rounded-lg relative group">
+                            <img 
+                              src={image.url}
+                              alt={image.name}
+                              className={`w-full h-full object-cover transform transition-all duration-200 ${
+                                selectionState[getSelectionKey(image, 'image', 'main')]?.isSelected
+                                  ? 'scale-95 brightness-75'
+                                  : 'group-hover:scale-105'
+                              }`}
+                              onClick={() => setFullscreenImage(image)}
+                            />
+                            {/* Loading Overlay */}
+                            {selectionState[getSelectionKey(image, 'image', 'main')]?.isLoading && (
+                              <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-20">
+                                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+                              </div>
+                            )}
+                            {/* Success Overlay */}
+                            {selectionState[getSelectionKey(image, 'image', 'main')]?.isSelected && (
+                              <div className="absolute inset-0 bg-green-500 bg-opacity-10 flex items-center justify-center z-20">
+                                <div className="bg-green-500 bg-opacity-90 rounded-full p-2">
+                                  <CheckCircleIcon className="w-10 h-10 text-white" />
+                                </div>
+                              </div>
+                            )}
+                            {/* Hover Overlay with Button */}
+                            <div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center z-10">
+                              <SelectionButton
+                                resource={image}
+                                type="image"
+                                target="main"
+                              />
+                            </div>
+                          </div>
+                          <p className="mt-2 text-sm text-gray-400 truncate">{image.name}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Quiz 3 Image Options Section */}
+                {missingQuizOptions.length > 0 && (
+                  <div id="crawler-quiz-options">
+                    <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                      <span className="w-8 h-8 flex items-center justify-center rounded-full bg-purple-600 text-white">2</span>
+                      Quiz 3 Image Options
+                    </h3>
+                    <div className="space-y-6">
+                      {missingQuizOptions.map((option, optionIndex) => (
+                        <div key={option} className="bg-gray-800 rounded-lg p-4">
+                          <h4 className="text-base font-medium text-purple-400 mb-3">Missing Option: {option}</h4>
+                          {crawlerResourcesByOption[option]?.images.length > 0 ? (
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                              {crawlerResourcesByOption[option].images.map((image, index) => (
+                                <div key={index} className="relative group cursor-pointer">
+                                                                  <div className="aspect-square overflow-hidden rounded-lg relative group">
+                                  <img 
+                                    src={image.url}
+                                    alt={image.name}
+                                    className={`w-full h-full object-cover transform transition-all duration-200 ${
+                                      selectionState[getSelectionKey(image, 'quiz3-image', 'quiz3', option)]?.isSelected
+                                        ? 'scale-95 brightness-75'
+                                        : 'group-hover:scale-105'
+                                    }`}
+                                    onClick={() => setFullscreenImage(image)}
+                                  />
+                                  {/* Loading Overlay */}
+                                  {selectionState[getSelectionKey(image, 'quiz3-image', 'quiz3', option)]?.isLoading && (
+                                    <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-20">
+                                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+                                    </div>
+                                  )}
+                                  {/* Success Overlay */}
+                                  {selectionState[getSelectionKey(image, 'quiz3-image', 'quiz3', option)]?.isSelected && (
+                                    <div className="absolute inset-0 bg-purple-500 bg-opacity-10 flex items-center justify-center z-20">
+                                      <div className="bg-purple-500 bg-opacity-90 rounded-full p-2">
+                                        <CheckCircleIcon className="w-10 h-10 text-white" />
+                                      </div>
+                                    </div>
+                                  )}
+                                  {/* Hover Overlay with Button */}
+                                  <div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center z-10">
+                                    <SelectionButton
+                                      resource={image}
+                                      type="quiz3-image"
+                                      target="quiz3"
+                                      optionName={option}
+                                    />
+                                  </div>
+                                </div>
+                                  <p className="mt-2 text-sm text-gray-400 truncate">{image.name}</p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-gray-400">No images available for {option}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Videos Section */}
+                <div id="crawler-main-video">
+                  <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                    <span className="w-8 h-8 flex items-center justify-center rounded-full bg-green-600 text-white">3</span>
+                    Main Video
+                  </h3>
+                  {crawlerResources.videos.length === 0 ? (
+                    <p className="text-gray-400">No videos available.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {crawlerResources.videos.map((video, index) => (
+                        <div key={index} className="relative group">
+                          <div className="aspect-video overflow-hidden rounded-lg relative group">
+                            <video 
+                              src={video.url}
+                              className={`w-full h-full object-cover transform transition-all duration-200 ${
+                                selectionState[getSelectionKey(video, 'video', 'main')]?.isSelected
+                                  ? 'scale-95 brightness-75'
+                                  : 'group-hover:scale-105'
+                              }`}
+                              controls
+                            />
+                            {/* Loading Overlay */}
+                            {selectionState[getSelectionKey(video, 'video', 'main')]?.isLoading && (
+                              <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-20">
+                                <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-500 border-t-transparent"></div>
+                              </div>
+                            )}
+                            {/* Success Overlay */}
+                            {selectionState[getSelectionKey(video, 'video', 'main')]?.isSelected && (
+                              <div className="absolute inset-0 bg-green-500 bg-opacity-10 flex items-center justify-center z-20">
+                                <div className="bg-green-500 bg-opacity-90 rounded-full p-2">
+                                  <CheckCircleIcon className="w-10 h-10 text-white" />
+                                </div>
+                              </div>
+                            )}
+                            {/* Hover Overlay with Button */}
+                            <div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center z-10">
+                              <SelectionButton
+                                resource={video}
+                                type="video"
+                                target="main"
+                              />
+                            </div>
+                          </div>
+                          <p className="mt-2 text-sm text-gray-400 truncate">{video.name}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
