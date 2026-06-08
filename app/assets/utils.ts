@@ -381,3 +381,60 @@ export const checkQuiz3ImageOptions = (jsonAsset: Asset, allImages: Asset[], jso
     };
   }
 };
+
+export const getRenderStatusDisplay = (renderStatus: AssetGroup['renderStatus']) => {
+  const statuses = [];
+  if (renderStatus.hasJson) statuses.push(`📄 JSON (${renderStatus.jsonOrders.length})`);
+  if (renderStatus.availableImages > 0) statuses.push(`🖼️ Images (${renderStatus.availableImages}/${renderStatus.requiredImages})`);
+  if (renderStatus.availableVideos > 0) statuses.push(`🎥 Videos (${renderStatus.availableVideos}/${renderStatus.requiredVideos})`);
+  if (renderStatus.hasVoices) statuses.push(`🎵 Voices (${renderStatus.availableVoices}/${renderStatus.requiredVoices})`);
+  if (renderStatus.availableRewards > 0) statuses.push(`🏆 Rewards (${renderStatus.availableRewards}/${renderStatus.requiredRewards})`);
+  if (renderStatus.hasQuiz3Images) statuses.push(`🖼️ Quiz 3 Images (${renderStatus.availableQuiz3Images}/${renderStatus.requiredQuiz3Images})`);
+  
+  // Calculate completion rate based on all requirements
+  const totalRequirements = 5; // JSON, Images, Videos, Voices+Rewards, Quiz 3 Images
+  const metRequirements = [
+    renderStatus.hasJson,
+    renderStatus.availableImages >= renderStatus.requiredImages,
+    renderStatus.availableVideos >= renderStatus.requiredVideos,
+    renderStatus.availableVoices >= renderStatus.requiredVoices && renderStatus.availableRewards >= renderStatus.requiredRewards,
+    renderStatus.availableQuiz3Images >= renderStatus.requiredQuiz3Images
+  ].filter(Boolean).length;
+  
+  const completionRate = Math.round((metRequirements / totalRequirements) * 100);
+  let statusColor = 'text-danger';
+  if (completionRate >= 75) statusColor = 'text-success';
+  else if (completionRate >= 50) statusColor = 'text-warning';
+  
+  // Check for missing orders
+  const missingImageOrders = renderStatus.jsonOrders.filter(order => 
+    !renderStatus.imageOrders.includes(order)
+  );
+  const missingVideoOrders = renderStatus.jsonOrders.filter(order => 
+    !renderStatus.videoOrders.includes(order)
+  );
+  
+  return {
+    statuses,
+    completionRate,
+    statusColor,
+    isComplete: renderStatus.isComplete,
+    jsonCount: renderStatus.jsonOrders.length,
+    voiceProgress: `${renderStatus.availableVoices}/${renderStatus.requiredVoices}`,
+    rewardProgress: `${renderStatus.availableRewards}/${renderStatus.requiredRewards}`,
+    missingVoices: Math.max(0, renderStatus.requiredVoices - renderStatus.availableVoices),
+    missingRewards: Math.max(0, renderStatus.requiredRewards - renderStatus.availableRewards),
+    // Add image and video status
+    hasImage: renderStatus.availableImages >= renderStatus.requiredImages,
+    hasVideos: renderStatus.availableVideos >= renderStatus.requiredVideos,
+    imageStatus: renderStatus.availableImages >= renderStatus.requiredImages ? 'Available' : 'Missing',
+    videoStatus: renderStatus.availableVideos >= renderStatus.requiredVideos ? 'Available' : 'Missing',
+    imageProgress: `${renderStatus.availableImages}/${renderStatus.requiredImages}`,
+    videoProgress: `${renderStatus.availableVideos}/${renderStatus.requiredVideos}`,
+    missingImageOrders,
+    missingVideoOrders,
+    // Add quiz 3 image options status
+    quiz3ImageProgress: `${renderStatus.availableQuiz3Images}/${renderStatus.requiredQuiz3Images}`,
+    missingQuiz3Images: Math.max(0, renderStatus.requiredQuiz3Images - renderStatus.availableQuiz3Images)
+  };
+};
