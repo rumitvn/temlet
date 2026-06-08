@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { logger } from "@/app/lib/logger";
+import { channels, topics } from "@/app/data/filters";
 import {
   PhotoIcon,
   VideoCameraIcon,
@@ -67,27 +69,8 @@ const getAvailableSitesForType = (contentType: 'image' | 'video'): Site[] => {
   );
 };
 
-const defaultChannels = [
-  "MiniMate",
-  "RumitX Studio",
-  "RumitX Shorts",
-  "RumitX Nature",
-  "RumitX Science",
-  "RumitX History"
-];
-
-const defaultTopics = [
-  "Animals",
-  "Plants",
-  "Histories",
-  "Science",
-  "Technology",
-  "Nature",
-  "Space",
-  "Ocean",
-  "Weather",
-  "Geography"
-];
+const defaultChannels = channels;
+const defaultTopics = topics;
 
 export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: CreateCrawlerDialogProps) {
   // Get initial sites based on default type (image)
@@ -225,11 +208,11 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
     setIsSubmitting(true);
     
     try {
-      console.log('Submitting form data:', formData); // Add logging
+      logger.debug('Submitting form data:', formData); // Add logging
       await onSubmit(formData);
       onClose();
     } catch (error) {
-      console.error('Error creating crawler:', error);
+      logger.error('Error creating crawler:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -426,7 +409,7 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
               <button
                 type="button"
                 onClick={() => {
-                  console.log('Setting type to image'); // Add logging
+                  logger.debug('Setting type to image'); // Add logging
                   handleInputChange("type", "image");
                 }}
                 className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
@@ -441,7 +424,7 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
               <button
                 type="button"
                 onClick={() => {
-                  console.log('Setting type to video'); // Add logging
+                  logger.debug('Setting type to video'); // Add logging
                   handleInputChange("type", "video");
                 }}
                 className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${

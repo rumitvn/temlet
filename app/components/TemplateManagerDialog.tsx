@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/solid';
 import { Dialog, IconButton } from '@/app/components/ui';
 import LoadingDialog from './LoadingDialog';
+import { logger } from "@/app/lib/logger";
 
 interface TemplateManagerDialogProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ export default function TemplateManagerDialog({
 
       onTemplatesChange();
     } catch (error) {
-      console.error('Error deleting template:', error);
+      logger.error('Error deleting template:', error);
     } finally {
       setIsLoading(false);
     }

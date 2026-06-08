@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { config } from '@/lib/config';
+import { logger } from "@/app/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
       topic 
     } = body;
 
-    console.log('Copy request:', {
+    logger.debug('Copy request:', {
       sourcePath, 
       key, 
       order, 
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     const targetPath = path.join(targetDir, targetFilename);
 
-    console.log('Copying file:', {
+    logger.debug('Copying file:', {
       from: sourcePath,
       to: targetPath,
       directory: targetDir,
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error copying resource:', error);
+    logger.error('Error copying resource:', error);
     return NextResponse.json({ error: 'Failed to copy resource' }, { status: 500 });
   }
 } 

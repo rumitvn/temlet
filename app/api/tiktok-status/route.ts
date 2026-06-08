@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/app/lib/logger";
 
 export async function GET() {
   try {
@@ -19,7 +20,7 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error('Error checking TikTok status:', error);
+    logger.error('Error checking TikTok status:', error);
     return NextResponse.json({ 
       connected: false, 
       message: "Error checking TikTok connection" 

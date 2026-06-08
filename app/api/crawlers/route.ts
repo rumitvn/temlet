@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { crawlerService } from '@/app/services/crawlerService';
+import { apiError, parsePaginationParams } from '@/app/lib/api-utils';
 import fs from 'fs';
 import path from 'path';
+import { logger } from "@/app/lib/logger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,10 +30,10 @@ export async function GET(request: NextRequest) {
       const crawlerPaths = config.getCrawlerPathsWithKeyword(channel, topic, key);
       const basePath = type === 'image' ? crawlerPaths.image : crawlerPaths.video;
       
-      console.log('Looking for files in:', basePath);
+      logger.debug('Looking for files in:', basePath);
       
       if (!fs.existsSync(basePath)) {
-        console.log('Directory not found:', basePath);
+        logger.debug('Directory not found:', basePath);
         return NextResponse.json({ files: [] });
       }
 
@@ -54,10 +56,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Original job listing logic
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const sortBy = searchParams.get('sortBy') || 'createdAt';
-    const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const { page, limit, sortBy, sortOrder } = parsePaginationParams(searchParams, { limit: 20 });
     const q = searchParams.get('q');
     const type = searchParams.get('type');
     const topic = searchParams.get('topic');
@@ -85,11 +84,8 @@ export async function GET(request: NextRequest) {
       totalJobs: result.totalJobs
     });
   } catch (error) {
-    console.error('Error in crawler API:', error);
-    return NextResponse.json(
-      { error: 'API operation failed' },
-      { status: 500 }
-    );
+    logger.error('Error in crawler API:', error);
+    return apiError('API operation failed');
   }
 }
 
@@ -100,10 +96,7 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!name || !keyword || !site || !type || !channel || !topic) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+      return apiError('Missing required fields', 400);
     }
 
     // Generate output path
@@ -127,10 +120,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(newJob, { status: 201 });
   } catch (error) {
-    console.error('Error creating crawler job:', error);
-    return NextResponse.json(
-      { error: 'Failed to create crawler job' },
-      { status: 500 }
-    );
+    logger.error('Error creating crawler job:', error);
+    return apiError('Failed to create crawler job');
   }
 } 

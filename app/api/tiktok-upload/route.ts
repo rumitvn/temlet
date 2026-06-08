@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { Readable } from "stream";
+import { logger } from "@/app/lib/logger";
 
 export async function POST(req: Request) {
   try {
-    console.log('Starting TikTok upload process...');
+    logger.debug('Starting TikTok upload process...');
     
     const form = await req.formData();
     const mp4File = form.get("mp4") as File;
@@ -15,9 +16,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing mp4 file" }, { status: 400 });
     }
 
-    console.log('Title received:', title);
+    logger.debug('Title received:', title);
     if (!title || !title.trim()) {
-      console.error('Backend: Empty or invalid title received:', title);
+      logger.error('Backend: Empty or invalid title received:', title);
       return NextResponse.json({ error: "Empty or invalid title" }, { status: 400 });
     }
 
@@ -26,11 +27,11 @@ export async function POST(req: Request) {
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
 
-    console.log('Processing video file...');
+    logger.debug('Processing video file...');
     const buffer = Buffer.from(await mp4File.arrayBuffer());
     const stream = Readable.from(buffer);
 
-    console.log('Video file size:', buffer.length, 'bytes');
+    logger.debug('Video file size:', buffer.length, 'bytes');
 
     // TikTok API credentials
     const accessToken = process.env.TIKTOK_ACCESS_TOKEN;
@@ -38,25 +39,25 @@ export async function POST(req: Request) {
     const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
 
     if (!accessToken) {
-      console.error('Missing TikTok access token. Please authenticate with TikTok first.');
+      logger.error('Missing TikTok access token. Please authenticate with TikTok first.');
       return NextResponse.json({ error: "TikTok not authenticated. Please connect your TikTok account first." }, { status: 401 });
     }
 
     if (!clientKey || !clientSecret) {
-      console.error('Missing TikTok API credentials');
+      logger.error('Missing TikTok API credentials');
       return NextResponse.json({ error: "TikTok API credentials not configured" }, { status: 500 });
     }
 
     // Step 1: Initialize upload using the correct endpoint
-    console.log('Initializing TikTok upload...');
-    console.log('Using access token:', accessToken.substring(0, 20) + '...');
+    logger.debug('Initializing TikTok upload...');
+    logger.debug('Using access token:', accessToken.substring(0, 20) + '...');
     
     // TikTok chunk size - try 15MB chunks to get even fewer chunks
     // Your file is ~89MB, so this should give us ~6 chunks
     const CHUNK_SIZE = 15728640; // 15MB chunks (15 * 1024 * 1024)
     const totalChunks = Math.ceil(buffer.length / CHUNK_SIZE) - 1;
     
-    console.log(`File size: ${buffer.length} bytes, Chunk size: ${CHUNK_SIZE} bytes, Total chunks: ${totalChunks}`);
+    logger.debug(`File size: ${buffer.length} bytes, Chunk size: ${CHUNK_SIZE} bytes, Total chunks: ${totalChunks}`);
     
     const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/inbox/video/init/', {
       method: 'POST',
@@ -74,7 +75,7 @@ export async function POST(req: Request) {
       }),
     });
     
-    console.log('Init response status:', initResponse.status);
+    logger.debug('Init response status:', initResponse.status);
 
     if (!initResponse.ok) {
       const text = await initResponse.text();
@@ -84,17 +85,17 @@ export async function POST(req: Request) {
       } catch {
         errorData = { raw: text };
       }
-      console.error('TikTok init error:', errorData);
+      logger.error('TikTok init error:', errorData);
       throw new Error(`TikTok init failed: ${errorData.error?.message || errorData.raw || 'Unknown error'}`);
     }
 
     const initData = await initResponse.json();
     const { upload_url, publish_id } = initData.data;
 
-    console.log('TikTok upload initialized:', { upload_url, publish_id });
+    logger.debug('TikTok upload initialized:', { upload_url, publish_id });
 
     // Step 2: Upload video file in chunks
-    console.log('Uploading video to TikTok in chunks...');
+    logger.debug('Uploading video to TikTok in chunks...');
     
     for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
       const start = chunkIndex * CHUNK_SIZE;
@@ -105,7 +106,7 @@ export async function POST(req: Request) {
       const actualEnd = (chunkIndex === totalChunks - 1) ? buffer.length : end;
       const actualChunk = buffer.slice(start, actualEnd);
       
-      console.log(`Uploading chunk ${chunkIndex + 1}/${totalChunks} (bytes ${start}-${actualEnd - 1}, size: ${actualChunk.length} bytes)`);
+      logger.debug(`Uploading chunk ${chunkIndex + 1}/${totalChunks} (bytes ${start}-${actualEnd - 1}, size: ${actualChunk.length} bytes)`);
       
       const uploadResponse = await fetch(upload_url, {
         method: 'PUT',
@@ -118,24 +119,24 @@ export async function POST(req: Request) {
       
       if (!uploadResponse.ok) {
         const text = await uploadResponse.text();
-        console.log(`Chunk ${chunkIndex + 1} response status: ${uploadResponse.status}, text: ${text}`);
+        logger.debug(`Chunk ${chunkIndex + 1} response status: ${uploadResponse.status}, text: ${text}`);
         let errorData;
         try {
           errorData = JSON.parse(text);
         } catch {
           errorData = { raw: text };
         }
-        console.error(`TikTok upload error for chunk ${chunkIndex + 1}:`, errorData);
+        logger.error(`TikTok upload error for chunk ${chunkIndex + 1}:`, errorData);
         throw new Error(`TikTok upload failed for chunk ${chunkIndex + 1}: ${errorData?.error?.message || errorData?.raw || 'Unknown error'}`);
       }
       
-      console.log(`Chunk ${chunkIndex + 1}/${totalChunks} uploaded successfully`);
+      logger.debug(`Chunk ${chunkIndex + 1}/${totalChunks} uploaded successfully`);
     }
     
-    console.log('All video chunks uploaded successfully to TikTok');
+    logger.debug('All video chunks uploaded successfully to TikTok');
 
     // Step 3: Check upload status (optional - for monitoring)
-    console.log('Checking upload status...');
+    logger.debug('Checking upload status...');
     const statusResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/status/fetch/', {
       method: 'POST',
       headers: {
@@ -149,10 +150,10 @@ export async function POST(req: Request) {
 
     if (statusResponse.ok) {
       const statusData = await statusResponse.json();
-      console.log('Upload status:', statusData);
+      logger.debug('Upload status:', statusData);
     }
 
-    console.log('TikTok video uploaded successfully:', publish_id);
+    logger.debug('TikTok video uploaded successfully:', publish_id);
 
     return NextResponse.json({ 
       success: true, 
@@ -161,7 +162,7 @@ export async function POST(req: Request) {
     });
 
   } catch (err: any) {
-    console.error("TikTok upload error:", err);
+    logger.error("TikTok upload error:", err);
     return NextResponse.json({ 
       error: err.message || "TikTok upload failed",
       details: err.response?.data || err

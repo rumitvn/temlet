@@ -11,6 +11,7 @@ import OutputFolderManagerDialog from './OutputFolderManagerDialog';
 import RenderFormatManagerDialog from './RenderFormatManagerDialog';
 import { generateAssets } from '../services/render';
 import { CreateRenderItemDto, TemplateAeAsset } from '../types/render';
+import { logger } from "@/app/lib/logger";
 
 interface Asset {
   id: string;
@@ -98,7 +99,7 @@ export default function CreateRenderDialog({
     try {
       localStorage.setItem(key, value);
     } catch (error) {
-      console.warn('Failed to save to cache:', error);
+      logger.warn('Failed to save to cache:', error);
     }
   };
 
@@ -106,7 +107,7 @@ export default function CreateRenderDialog({
     try {
       return localStorage.getItem(key) || '';
     } catch (error) {
-      console.warn('Failed to load from cache:', error);
+      logger.warn('Failed to load from cache:', error);
       return '';
     }
   };
@@ -116,9 +117,9 @@ export default function CreateRenderDialog({
       Object.values(CACHE_KEYS).forEach(key => {
         localStorage.removeItem(key);
       });
-      console.log('🔧 Cache cleared');
+      logger.debug('🔧 Cache cleared');
     } catch (error) {
-      console.warn('Failed to clear cache:', error);
+      logger.warn('Failed to clear cache:', error);
     }
   };
 
@@ -172,14 +173,14 @@ export default function CreateRenderDialog({
       const cachedRenderFormat = renderFormats.find(f => f.id === cachedRenderFormatId);
       const cachedTopic = loadFromCache(CACHE_KEYS.LAST_TOPIC);
       
-      console.log('🔧 Loading cached values - cachedChannelId:', cachedChannelId, 'cachedChannel:', cachedChannel?.name, 'cachedTopic:', cachedTopic);
+      logger.debug('🔧 Loading cached values - cachedChannelId:', cachedChannelId, 'cachedChannel:', cachedChannel?.name, 'cachedTopic:', cachedTopic);
       
       // Only load cached values if the form is empty (first time opening)
       setFormData(prev => {
         const shouldLoadCache = !prev.channelName && !prev.topic;
         
         if (shouldLoadCache) {
-          console.log('🔧 Loading from cache (form was empty)');
+          logger.debug('🔧 Loading from cache (form was empty)');
           return {
             ...prev,
             channelId: cachedChannelId,
@@ -196,7 +197,7 @@ export default function CreateRenderDialog({
             } : { id: '', name: '', code: '' },
           };
         } else {
-          console.log('🔧 Not loading from cache (form has values)');
+          logger.debug('🔧 Not loading from cache (form has values)');
           return prev;
         }
       });
@@ -262,7 +263,7 @@ export default function CreateRenderDialog({
       const data = await response.json();
       setRenderableAssets(data.groups || []);
     } catch (error) {
-      console.error('Error fetching renderable assets:', error);
+      logger.error('Error fetching renderable assets:', error);
       setError('Failed to fetch renderable assets');
     } finally {
       setLoadingAssets(false);
@@ -448,7 +449,7 @@ export default function CreateRenderDialog({
         
         onTemplatesChange();
       } catch (error) {
-        console.error('Error uploading template:', error);
+        logger.error('Error uploading template:', error);
         setError('Failed to upload template. Please try again.');
       } finally {
         setIsLoading(false);
@@ -485,7 +486,7 @@ export default function CreateRenderDialog({
         
         onOutputFoldersChange();
       } catch (error) {
-        console.error('Error uploading output folder:', error);
+        logger.error('Error uploading output folder:', error);
         setError('Failed to upload output folder. Please try again.');
       } finally {
         setIsLoading(false);
@@ -512,7 +513,7 @@ export default function CreateRenderDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('🔧 Form submission - formData.channelName:', formData.channelName, 'formData.topic:', formData.topic);
+    logger.debug('🔧 Form submission - formData.channelName:', formData.channelName, 'formData.topic:', formData.topic);
     
     if (useAssetSelection) {
       if (selectedJsonFiles.length === 0) {
@@ -553,11 +554,11 @@ export default function CreateRenderDialog({
               
               if (minimateIndex !== -1 && minimateIndex + 1 < pathParts.length) {
                 detectedTopic = pathParts[minimateIndex + 1];
-                console.log('🔧 Detected topic from JSON path:', detectedTopic);
+                logger.debug('🔧 Detected topic from JSON path:', detectedTopic);
                 
                 // Update form data with detected topic if it's different
                 if (detectedTopic !== formData.topic) {
-                  console.log('🔧 Updating form topic from', formData.topic, 'to', detectedTopic);
+                  logger.debug('🔧 Updating form topic from', formData.topic, 'to', detectedTopic);
                   setFormData(prev => ({
                     ...prev,
                     topic: detectedTopic
@@ -590,7 +591,7 @@ export default function CreateRenderDialog({
               };
 
               // Generate assets using the generateAssets function with detected topic
-              console.log('🔧 generateAssets called with channel:', formData.channelName, 'topic:', detectedTopic);
+              logger.debug('🔧 generateAssets called with channel:', formData.channelName, 'topic:', detectedTopic);
               const templateAeAssets = generateAssets(renderData as any, formData.channelName, detectedTopic);
               renderData.templateAeAssets = templateAeAssets as TemplateAeAsset[];
 
@@ -601,7 +602,7 @@ export default function CreateRenderDialog({
                 _fileIndex: selectedJsonAssets.indexOf(jsonAsset)
               });
             } catch (fileError: any) {
-              console.error('Error processing JSON file:', jsonAsset.name, fileError);
+              logger.error('Error processing JSON file:', jsonAsset.name, fileError);
               
               if (fileError?.type === 'api') {
                 throw fileError;
@@ -634,7 +635,7 @@ export default function CreateRenderDialog({
               type: formData.type as 'short' | 'long',
             };
 
-            console.log('🔧 generateAssets called with channel:', formData.channelName, 'topic:', formData.topic);
+            logger.debug('🔧 generateAssets called with channel:', formData.channelName, 'topic:', formData.topic);
             const templateAeAssets = generateAssets(renderData as any, formData.channelName, formData.topic);
             renderData.templateAeAssets = templateAeAssets as TemplateAeAsset[];
 
@@ -645,7 +646,7 @@ export default function CreateRenderDialog({
               _fileIndex: jsonFiles.indexOf(jsonFile)
             });
           } catch (fileError: any) {
-            console.error('Error processing file:', jsonFile.name, fileError);
+            logger.error('Error processing file:', jsonFile.name, fileError);
             
             if (fileError?.type === 'api') {
               throw fileError;
@@ -667,7 +668,7 @@ export default function CreateRenderDialog({
       setTimeout(() => setSuccessMessage(null), 3000);
       onClose();
     } catch (error: any) {
-      console.error('Error creating render items:', error);
+      logger.error('Error creating render items:', error);
       
       if (error?.type === 'api') {
         setError(error.message);

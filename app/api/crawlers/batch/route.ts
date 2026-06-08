@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { crawlerService } from '@/app/services/crawlerService';
+import { logger } from "@/app/lib/logger";
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting jobs:', error);
+    logger.error('Error deleting jobs:', error);
     return NextResponse.json(
       { error: 'Failed to delete jobs' },
       { status: 500 }

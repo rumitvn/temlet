@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/app/lib/db";
+import { prisma } from "@/lib/prisma";
+import { logger } from "@/app/lib/logger";
 
 // DELETE /api/renders/batch - Delete multiple render items
 export async function DELETE(req: NextRequest) {
@@ -25,7 +26,7 @@ export async function DELETE(req: NextRequest) {
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Error deleting render items:', error);
+        logger.error('Error deleting render items:', error);
         return NextResponse.json(
             { error: 'Failed to delete render items' },
             { status: 500 }
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Error performing batch action:', error);
+        logger.error('Error performing batch action:', error);
         return NextResponse.json(
             { error: 'Failed to perform batch action' },
             { status: 500 }

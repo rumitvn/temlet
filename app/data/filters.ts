@@ -20,4 +20,12 @@ export const channels = [
   "RumitX Nature",
   "RumitX Science",
   "RumitX History"
+] as const;
+
+export const sites = [
+  "Pexels",
+  "Pixabay",
+  "Unsplash",
+  "Pexels Videos",
+  "Pixabay Videos"
 ] as const; 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/app/lib/db";
+import { prisma } from "@/lib/prisma";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
+import { logger } from "@/app/lib/logger";
 
 // GET /api/output-folders - List all output folders
 export async function GET() {
@@ -14,7 +15,7 @@ export async function GET() {
 
         return NextResponse.json(outputFolders);
     } catch (error) {
-        console.error('Error listing output folders:', error);
+        logger.error('Error listing output folders:', error);
         return NextResponse.json(
             { error: 'Failed to list output folders' },
             { status: 500 }
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
         });
         return NextResponse.json(outputFolder);
     } catch (error) {
-        console.error('Error saving output folder:', error);
+        logger.error('Error saving output folder:', error);
         return NextResponse.json(
             { error: 'Failed to save output folder' },
             { status: 500 }
@@ -88,7 +89,7 @@ export async function DELETE(req: NextRequest) {
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Error deleting output folder:', error);
+        logger.error('Error deleting output folder:', error);
         return NextResponse.json(
             { error: 'Failed to delete output folder' },
             { status: 500 }

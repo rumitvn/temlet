@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button, Dialog } from '@/app/components/ui';
+import { logger } from "@/app/lib/logger";
 
 interface TikTokAuthDialogProps {
   isOpen: boolean;
@@ -61,7 +62,7 @@ export default function TikTokAuthDialog({ isOpen, onClose, onSuccess }: TikTokA
         clearInterval(checkClosed);
         setIsLoading(false);
 
-        console.log('Popup closed, checking for token...');
+        logger.debug('Popup closed, checking for token...');
 
         // Wait a bit for localStorage to be updated
         setTimeout(() => {
@@ -69,39 +70,39 @@ export default function TikTokAuthDialog({ isOpen, onClose, onSuccess }: TikTokA
           const token = localStorage.getItem('tiktok_access_token');
           const expiresAt = localStorage.getItem('tiktok_token_expires_at');
 
-          console.log('Token found:', !!token);
-          console.log('Token value:', token ? token.substring(0, 20) + '...' : 'null');
-          console.log('Expires at:', expiresAt);
+          logger.debug('Token found:', !!token);
+          logger.debug('Token value:', token ? token.substring(0, 20) + '...' : 'null');
+          logger.debug('Expires at:', expiresAt);
 
           if (token && expiresAt) {
             const expiryTime = parseInt(expiresAt);
             const now = Date.now();
 
             if (now < expiryTime) {
-              console.log('Token is valid, closing dialog...');
+              logger.debug('Token is valid, closing dialog...');
               setSuccess(true);
               setTimeout(() => {
                 onSuccess();
                 onClose();
               }, 1000);
             } else {
-              console.log('Token has expired');
+              logger.debug('Token has expired');
             }
           } else {
-            console.log('No valid token found');
+            logger.debug('No valid token found');
             // Try to check again after a longer delay
             setTimeout(() => {
               const retryToken = localStorage.getItem('tiktok_access_token');
               const retryExpiresAt = localStorage.getItem('tiktok_token_expires_at');
-              console.log('Retry - Token found:', !!retryToken);
-              console.log('Retry - Expires at:', retryExpiresAt);
+              logger.debug('Retry - Token found:', !!retryToken);
+              logger.debug('Retry - Expires at:', retryExpiresAt);
 
               if (retryToken && retryExpiresAt) {
                 const expiryTime = parseInt(retryExpiresAt);
                 const now = Date.now();
 
                 if (now < expiryTime) {
-                  console.log('Token found on retry, closing dialog...');
+                  logger.debug('Token found on retry, closing dialog...');
                   setSuccess(true);
                   setTimeout(() => {
                     onSuccess();
@@ -119,9 +120,9 @@ export default function TikTokAuthDialog({ isOpen, onClose, onSuccess }: TikTokA
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
 
-      console.log('Received message from popup:', event.data);
-      console.log('Message type:', typeof event.data);
-      console.log('Message keys:', Object.keys(event.data || {}));
+      logger.debug('Received message from popup:', event.data);
+      logger.debug('Message type:', typeof event.data);
+      logger.debug('Message keys:', Object.keys(event.data || {}));
 
       // Check if it's our expected message format
       if (event.data && typeof event.data === 'object' && event.data.type === 'TIKTOK_AUTH_SUCCESS') {
@@ -129,7 +130,7 @@ export default function TikTokAuthDialog({ isOpen, onClose, onSuccess }: TikTokA
         popup.close();
         setIsLoading(false);
         setSuccess(true);
-        console.log('TikTok auth success, closing dialog...');
+        logger.debug('TikTok auth success, closing dialog...');
         // Close immediately instead of waiting
         setTimeout(() => {
           onSuccess();
@@ -194,15 +195,15 @@ export default function TikTokAuthDialog({ isOpen, onClose, onSuccess }: TikTokA
             onClick={() => {
               const token = localStorage.getItem('tiktok_access_token');
               const expiresAt = localStorage.getItem('tiktok_token_expires_at');
-              console.log('Manual check - Token:', !!token);
-              console.log('Manual check - Expires at:', expiresAt);
+              logger.debug('Manual check - Token:', !!token);
+              logger.debug('Manual check - Expires at:', expiresAt);
 
               if (token && expiresAt) {
                 const expiryTime = parseInt(expiresAt);
                 const now = Date.now();
 
                 if (now < expiryTime) {
-                  console.log('Token is valid, closing dialog...');
+                  logger.debug('Token is valid, closing dialog...');
                   setSuccess(true);
                   setTimeout(() => {
                     onSuccess();

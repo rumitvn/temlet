@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { logger } from "@/app/lib/logger";
 
 // Lazily create the OpenAI client so the module can be imported during build
 // without the API key. The key is only required when OpenAI is actually used.
@@ -172,7 +173,7 @@ ${languageConfig.tagsExample}`;
       content = chat.choices[0].message.content || "";
     }
 
-    console.log('Output Content: ', content);
+    logger.debug('Output Content: ', content);
     const parsed = JSON.parse(content);
 
     return NextResponse.json({
@@ -180,8 +181,8 @@ ${languageConfig.tagsExample}`;
       description: parsed.description,
       tags: parsed.tags
     });
-  } catch (err: any) {
-    console.error("Metadata error:", err);
+  } catch (err: unknown) {
+    logger.error("Metadata error:", err);
     return NextResponse.json({ error: "Failed to generate metadata" }, { status: 500 });
   }
 }

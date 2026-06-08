@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 import { config } from "../../../../lib/config";
+import { logger } from "@/app/lib/logger";
 
 export async function POST(req: NextRequest) {
   try {
@@ -121,7 +122,7 @@ export async function POST(req: NextRequest) {
       await fs.writeFile(filePath, buffer);
       uploadedFiles.push(filePath);
       
-      console.log(`Uploaded ${file.name} to ${filePath}`);
+      logger.debug(`Uploaded ${file.name} to ${filePath}`);
     }
 
     return NextResponse.json({
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Upload error:', error);
+    logger.error('Upload error:', error);
     return NextResponse.json(
       { error: 'Failed to upload files' },
       { status: 500 }

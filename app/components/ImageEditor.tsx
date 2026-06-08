@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { CheckIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 import { Button, Select, Label, Dialog } from "@/app/components/ui";
+import { logger } from "@/app/lib/logger";
 
 interface ImageEditorProps {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export default function ImageEditor({
   // Load the original image
   useEffect(() => {
     if (isOpen && imageUrl) {
-      console.log('🖼️ Loading image from URL:', imageUrl);
+      logger.debug('🖼️ Loading image from URL:', imageUrl);
       
       // Create a blob URL from the image data
       fetch(imageUrl)
@@ -60,9 +61,9 @@ export default function ImageEditor({
           return response.blob();
         })
         .then(blob => {
-          console.log('📦 Image blob created:', blob.size, 'bytes');
+          logger.debug('📦 Image blob created:', blob.size, 'bytes');
           const newBlobUrl = URL.createObjectURL(blob);
-          console.log('🔗 Blob URL created:', newBlobUrl);
+          logger.debug('🔗 Blob URL created:', newBlobUrl);
           
           // Clean up previous blob URL
           if (blobUrl) {
@@ -73,19 +74,19 @@ export default function ImageEditor({
           const img = new Image();
           img.crossOrigin = 'anonymous';
           img.onload = () => {
-            console.log('✅ Image loaded successfully:', img.width, 'x', img.height);
+            logger.debug('✅ Image loaded successfully:', img.width, 'x', img.height);
             setOriginalImage(img);
             // Use setTimeout for initial load to ensure container is ready
             setTimeout(() => initializeCropArea(img), 100);
           };
           img.onerror = (error) => {
-            console.error('❌ Failed to load image:', error);
-            console.error('Image URL:', imageUrl);
+            logger.error('❌ Failed to load image:', error);
+            logger.error('Image URL:', imageUrl);
           };
           img.src = newBlobUrl;
         })
         .catch(error => {
-          console.error('❌ Failed to fetch image:', error);
+          logger.error('❌ Failed to fetch image:', error);
         });
     }
   }, [isOpen, imageUrl]);
@@ -100,35 +101,35 @@ export default function ImageEditor({
   }, [blobUrl]);
 
   const initializeCropArea = (img: HTMLImageElement) => {
-    console.log('🔧 Initializing crop area for image:', img.width, 'x', img.height);
+    logger.debug('🔧 Initializing crop area for image:', img.width, 'x', img.height);
     const container = containerRef.current;
     if (!container) {
-      console.log('❌ Container not found');
+      logger.debug('❌ Container not found');
       return;
     }
 
     // Get container dimensions
     const containerRect = container.getBoundingClientRect();
-    console.log('📐 Container rect:', containerRect);
+    logger.debug('📐 Container rect:', containerRect);
     
     // Calculate available space (with padding)
     const padding = 40;
     const availableWidth = containerRect.width - padding;
     const availableHeight = containerRect.height - padding;
     
-    console.log('📐 Available space:', availableWidth, 'x', availableHeight);
+    logger.debug('📐 Available space:', availableWidth, 'x', availableHeight);
     
     // Use a reasonable fallback size if container is too small
     const containerSize = Math.max(400, Math.min(availableWidth, availableHeight));
     
-    console.log('📐 Using container size:', containerSize);
+    logger.debug('📐 Using container size:', containerSize);
     
     // Calculate scale to fit image in container
     const scaleX = containerSize / img.width;
     const scaleY = containerSize / img.height;
     const initialScale = Math.min(scaleX, scaleY);
     
-    console.log('📏 Initial scale:', initialScale);
+    logger.debug('📏 Initial scale:', initialScale);
     
     setScale(initialScale);
     setCanvasSize({ width: containerSize, height: containerSize });
@@ -145,7 +146,7 @@ export default function ImageEditor({
       height: cropSize * initialScale
     };
     
-    console.log('✂️ Crop area:', cropArea);
+    logger.debug('✂️ Crop area:', cropArea);
     setCropArea(cropArea);
   };
 
@@ -184,7 +185,7 @@ export default function ImageEditor({
   };
 
   const resetCrop = () => {
-    console.log('🔄 Resetting crop area');
+    logger.debug('🔄 Resetting crop area');
     if (originalImage) {
       initializeCropArea(originalImage);
     }
@@ -224,7 +225,7 @@ export default function ImageEditor({
         }
       }, 'image/jpeg', 0.9);
     } catch (error) {
-      console.error('Error saving image:', error);
+      logger.error('Error saving image:', error);
     } finally {
       setIsLoading(false);
     }
@@ -331,7 +332,7 @@ export default function ImageEditor({
                   value={currentSize}
                   onChange={(e) => {
                     const newSize = parseInt(e.target.value);
-                    console.log('📏 Size changed to:', newSize);
+                    logger.debug('📏 Size changed to:', newSize);
                     setCurrentSize(newSize);
                     // Reset crop area when size changes
                     if (originalImage) {

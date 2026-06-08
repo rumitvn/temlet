@@ -27,6 +27,8 @@ import TikTokAuthDialog from './components/TikTokAuthDialog';
 import ScheduleUploadDialog, { ScheduleConfig } from './components/ScheduleUploadDialog';
 import { Button, Card, Input, Select, Badge } from "@/app/components/ui";
 import { statusClass } from "@/app/theme/status";
+import { types as filterTypes, topics as filterTopics, channels as filterChannels } from "@/app/data/filters";
+import { YOUTUBE_CATEGORY_ID } from "@/app/lib/constants";
 
 // Custom debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -45,41 +47,10 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-// Default filter values in case imports fail
-const defaultTypes = ["Short", "Long"];
-const defaultTopics = [
-  "Animals",
-  "Plants",
-  "Histories",
-  "Science",
-  "Technology",
-  "Nature",
-  "Space",
-  "Ocean",
-  "Weather",
-  "Geography"
-];
-const defaultChannels = [
-  "RumitX Studio",
-  "RumitX Shorts",
-  "RumitX Nature",
-  "RumitX Science",
-  "RumitX History"
-];
-
-// Try to import from filters file, fallback to defaults if it fails
-let types = defaultTypes;
-let topics = defaultTopics;
-let channels = defaultChannels;
-
-try {
-  const filters = require("@/app/data/filters");
-  types = filters.types || defaultTypes;
-  topics = filters.topics || defaultTopics;
-  channels = filters.channels || defaultChannels;
-} catch (error) {
-  console.warn("Failed to load filters from file, using defaults:", error);
-}
+// Filter option lists (single source of truth: app/data/filters.ts)
+const types = [...filterTypes];
+const topics = [...filterTopics];
+const channels = [...filterChannels];
 
 const statusGroups = {
   render: {
@@ -811,7 +782,7 @@ export default function Page() {
         description: metadataResult.description,
         tags: metadataResult.tags,
         // Preserve other required fields if they exist
-        categoryId: item.youtubeMetadata?.categoryId || "27",
+        categoryId: item.youtubeMetadata?.categoryId || YOUTUBE_CATEGORY_ID,
         defaultLanguage: item.youtubeMetadata?.defaultLanguage || "vi",
         defaultAudioLanguage: item.youtubeMetadata?.defaultAudioLanguage || "vi",
         playlistId: item.youtubeMetadata?.playlistId || "",
@@ -945,7 +916,7 @@ export default function Page() {
       form.append("description", item.youtubeMetadata.description);
       form.append("playlistId", "");
       form.append("tags", item.youtubeMetadata.tags);
-      form.append("categoryId", "27");
+      form.append("categoryId", YOUTUBE_CATEGORY_ID);
       form.append("defaultLanguage", "vi");
       form.append("defaultAudioLanguage", "vi");
       form.append("scheduleDate", scheduleDate);

@@ -3,6 +3,7 @@
 
 import React, { useState } from "react";
 import { Button, Card, Badge } from "@/app/components/ui";
+import { YOUTUBE_CATEGORY_ID } from "@/app/lib/constants";
 
 interface FilePair {
     jsonFile: File;
@@ -105,7 +106,7 @@ export default function RenderYouTubePage() {
             form.append("description", pair.aiResult.description);
             form.append("playlistId", "");
             form.append("tags", pair.aiResult.tags);
-            form.append("categoryId", "27");
+            form.append("categoryId", YOUTUBE_CATEGORY_ID);
             form.append("defaultLanguage", "vi");
             form.append("defaultAudioLanguage", "vi");
             form.append("scheduleDate", "2025-06-08 08:00");

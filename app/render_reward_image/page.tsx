@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import { NEXRENDER_BASE_URL } from "@/app/lib/constants";
 import { config } from "../../lib/config";
+import { logger } from "@/app/lib/logger";
 import {
   Button,
   Card,
@@ -78,7 +80,7 @@ export default function CreateJobPage() {
 
       setTitles(lines);
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       alert("Failed to read the .txt file");
     } finally {
       setLoadingTitles(false);
@@ -179,7 +181,7 @@ export default function CreateJobPage() {
 
       // POST the job
       try {
-        const res = await fetch("http://localhost:3000/api/v1/jobs", {
+        const res = await fetch(`${NEXRENDER_BASE_URL}/api/v1/jobs`, {
           method: "POST",
           headers: {
             "nexrender-secret": "myapisecret",
@@ -198,7 +200,7 @@ export default function CreateJobPage() {
           row.uid = result.uid;
         }
       } catch (err) {
-        console.error(err);
+        logger.error(err);
         row.status = "error";
       }
 

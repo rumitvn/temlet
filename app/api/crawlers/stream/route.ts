@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { crawlerService } from '@/app/services/crawlerService';
+import { logger } from "@/app/lib/logger";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
             }
           }
         } catch (error) {
-          console.error('Error sending job update:', error);
+          logger.error('Error sending job update:', error);
           if (!request.signal.aborted) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: 'Failed to get job update' })}\n\n`));
             clearInterval(interval);

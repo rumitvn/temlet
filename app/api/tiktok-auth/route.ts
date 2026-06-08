@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/app/lib/logger";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error('TikTok token exchange error:', errorText);
+      logger.error('TikTok token exchange error:', errorText);
       return NextResponse.json({ error: 'Failed to exchange code for token' }, { status: 500 });
     }
 
@@ -40,10 +41,10 @@ export async function GET(req: Request) {
     const refreshToken = tokenData.refresh_token;
     const expiresIn = tokenData.expires_in;
 
-    console.log('TikTok access token obtained successfully');
-    console.log('Access Token:', accessToken);
-    console.log('Refresh Token:', refreshToken);
-    console.log('Expires In:', expiresIn);
+    logger.debug('TikTok access token obtained successfully');
+    logger.debug('Access Token:', accessToken);
+    logger.debug('Refresh Token:', refreshToken);
+    logger.debug('Expires In:', expiresIn);
 
     // Store tokens in environment variables (temporary solution for personal use)
     // In a real app, you'd store these in a database
@@ -59,7 +60,7 @@ export async function GET(req: Request) {
     });
 
   } catch (error) {
-    console.error('TikTok auth error:', error);
+    logger.error('TikTok auth error:', error);
     return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
   }
 } 

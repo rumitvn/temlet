@@ -2,28 +2,29 @@
 
 import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { logger } from "@/app/lib/logger";
 
 function Callback() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    console.log('=== TIKTOK CALLBACK PAGE LOADED ===');
-    console.log('URL:', window.location.href);
-    console.log('Search params:', Object.fromEntries(searchParams.entries()));
+    logger.debug('=== TIKTOK CALLBACK PAGE LOADED ===');
+    logger.debug('URL:', window.location.href);
+    logger.debug('Search params:', Object.fromEntries(searchParams.entries()));
     
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
 
     if (error) {
-      console.error('TikTok auth error:', error);
+      logger.error('TikTok auth error:', error);
       alert('TikTok authentication failed: ' + error);
       window.close();
       return;
     }
 
     if (!code) {
-      console.error('No authorization code received');
+      logger.error('No authorization code received');
       alert('No authorization code received');
       window.close();
       return;
@@ -32,19 +33,19 @@ function Callback() {
     // Exchange code for token
     const exchangeToken = async () => {
       try {
-        console.log('Exchanging code for token...');
+        logger.debug('Exchanging code for token...');
         const response = await fetch('/api/tiktok-auth?' + new URLSearchParams({
           code: code,
           state: state || ''
         }));
 
         const data = await response.json();
-        console.log('Token exchange response:', data);
+        logger.debug('Token exchange response:', data);
 
         if (data.success) {
-          console.log('TikTok auth successful, storing token...');
-          console.log('Access token:', data.accessToken ? data.accessToken.substring(0, 20) + '...' : 'null');
-          console.log('Expires in:', data.expiresIn);
+          logger.debug('TikTok auth successful, storing token...');
+          logger.debug('Access token:', data.accessToken ? data.accessToken.substring(0, 20) + '...' : 'null');
+          logger.debug('Expires in:', data.expiresIn);
           
           // Store token and expiry in localStorage
           localStorage.setItem('tiktok_access_token', data.accessToken);
@@ -53,8 +54,8 @@ function Callback() {
           // Verify storage
           const storedToken = localStorage.getItem('tiktok_access_token');
           const storedExpiry = localStorage.getItem('tiktok_token_expires_at');
-          console.log('Stored token:', storedToken ? 'YES' : 'NO');
-          console.log('Stored expiry:', storedExpiry);
+          logger.debug('Stored token:', storedToken ? 'YES' : 'NO');
+          logger.debug('Stored expiry:', storedExpiry);
           
           // Show success message
           alert('TikTok authentication successful! You can now upload videos.');
@@ -62,12 +63,12 @@ function Callback() {
           // Close the popup
           window.close();
         } else {
-          console.error('Token exchange failed:', data.error);
+          logger.error('Token exchange failed:', data.error);
           alert('Token exchange failed: ' + (data.error || 'Unknown error'));
           window.close();
         }
       } catch (error) {
-        console.error('Failed to exchange token:', error);
+        logger.error('Failed to exchange token:', error);
         alert('Failed to exchange token: ' + error);
         window.close();
       }

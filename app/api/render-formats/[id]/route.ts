@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/app/lib/db";
+import { prisma } from "@/lib/prisma";
+import { logger } from "@/app/lib/logger";
 
 // DELETE /api/render-formats/[id] - Delete a render format
 export async function DELETE(
@@ -28,7 +29,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting render format:', error);
+    logger.error('Error deleting render format:', error);
     return NextResponse.json(
       { error: 'Failed to delete render format' },
       { status: 500 }

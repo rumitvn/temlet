@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 import { config } from "../../../../lib/config";
+import { logger } from "@/app/lib/logger";
 
 // POST /api/assets/update - Update JSON file content
 export async function POST(req: NextRequest) {
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error updating JSON file:', error);
+    logger.error('Error updating JSON file:', error);
     return NextResponse.json(
       { error: 'Failed to update JSON file' },
       { status: 500 }

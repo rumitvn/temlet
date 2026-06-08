@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { crawlerService } from '@/app/services/crawlerService';
+import { logger } from "@/app/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
     const { jobIds } = await request.json();
-    console.log('Active-updates API called with job IDs:', jobIds);
+    logger.debug('Active-updates API called with job IDs:', jobIds);
 
     if (!jobIds || !Array.isArray(jobIds)) {
       return NextResponse.json(
@@ -32,17 +33,17 @@ export async function POST(request: NextRequest) {
             error: job.error
           };
           updates.push(update);
-          console.log(`Job ${jobId} update:`, update);
+          logger.debug(`Job ${jobId} update:`, update);
         }
       } catch (error) {
-        console.error(`Error fetching job ${jobId}:`, error);
+        logger.error(`Error fetching job ${jobId}:`, error);
       }
     }
 
-    console.log('Returning updates:', updates);
+    logger.debug('Returning updates:', updates);
     return NextResponse.json(updates);
   } catch (error) {
-    console.error('Error in active-updates API:', error);
+    logger.error('Error in active-updates API:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { PlusIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { Button, Dialog, IconButton, Input } from '@/app/components/ui';
+import { logger } from "@/app/lib/logger";
 
 interface RenderFormat {
   id: string;
@@ -58,7 +59,7 @@ export default function RenderFormatManagerDialog({
       setNewFormatCode('');
       onFormatsChange();
     } catch (error) {
-      console.error('Error creating format:', error);
+      logger.error('Error creating format:', error);
       setError(error instanceof Error ? error.message : 'Failed to create format. Please try again.');
     } finally {
       setIsLoading(false);
@@ -84,7 +85,7 @@ export default function RenderFormatManagerDialog({
 
       onFormatsChange();
     } catch (error) {
-      console.error('Error deleting format:', error);
+      logger.error('Error deleting format:', error);
       setError('Failed to delete format. Please try again.');
     } finally {
       setIsLoading(false);

@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/app/lib/logger";
+import { APP_BASE_URL, YOUTUBE_CATEGORY_ID } from "@/app/lib/constants";
 
 export async function generateMetadata(jsonContent: any) {
   try {
     // Get the base URL from environment variable or use a default
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001';
+    const baseUrl = APP_BASE_URL;
     
     // Call the YouTube metadata API with full URL
     const response = await fetch(`${baseUrl}/api/youtube-metadata`, {
@@ -26,14 +28,14 @@ export async function generateMetadata(jsonContent: any) {
     // Return the metadata with default values for required fields
     return {
       ...metadata,
-      categoryId: metadata.categoryId || "27",
+      categoryId: metadata.categoryId || YOUTUBE_CATEGORY_ID,
       defaultLanguage: metadata.defaultLanguage || "vi",
       defaultAudioLanguage: metadata.defaultAudioLanguage || "vi",
       playlistId: metadata.playlistId || "",
       scheduleDate: metadata.scheduleDate || "",
     };
   } catch (error) {
-    console.error('Error generating metadata:', error);
+    logger.error('Error generating metadata:', error);
     throw error;
   }
 } 

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { NEXRENDER_BASE_URL } from "@/app/lib/constants";
 import JobTable from "../components/JobTable";
 import JobDetail from "../components/JobDetail";
 import { Button } from "@/app/components/ui";
+import { logger } from "@/app/lib/logger";
 
 export default function Page() {
   // List state
@@ -25,14 +27,14 @@ export default function Page() {
   const fetchJobs = useCallback(async () => {
     try {
       setLoadingJobs(true);
-      const res = await fetch("http://localhost:3000/api/v1/jobs");
+      const res = await fetch(`${NEXRENDER_BASE_URL}/api/v1/jobs`);
       if (!res.ok) {
         throw new Error("Failed to fetch jobs");
       }
       const data = await res.json();
       setJobs(data);
     } catch (err) {
-      console.error(err);
+      logger.error(err);
     } finally {
       setLoadingJobs(false);
     }
@@ -62,14 +64,14 @@ export default function Page() {
     async function fetchJobDetail(uid: string) {
       try {
         setLoadingDetail(true);
-        const res = await fetch(`http://localhost:3000/api/v1/jobs/${uid}`);
+        const res = await fetch(`${NEXRENDER_BASE_URL}/api/v1/jobs/${uid}`);
         if (!res.ok) {
           throw new Error("Failed to fetch job detail");
         }
         const data = await res.json();
         setSelectedJob(data);
       } catch (err) {
-        console.error(err);
+        logger.error(err);
       } finally {
         setLoadingDetail(false);
       }
@@ -88,7 +90,7 @@ export default function Page() {
   // Delete one job
   const handleDeleteJob = async (uid: string) => {
     try {
-      const res = await fetch(`http://localhost:3000/api/v1/jobs/${uid}`, {
+      const res = await fetch(`${NEXRENDER_BASE_URL}/api/v1/jobs/${uid}`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -97,7 +99,7 @@ export default function Page() {
       // Refresh job list
       fetchJobs();
     } catch (error) {
-      console.error(error);
+      logger.error(error);
     }
   };
 
@@ -116,7 +118,7 @@ export default function Page() {
       // Fire off all deletion requests in parallel
       await Promise.all(
         jobs.map((job) =>
-          fetch(`http://localhost:3000/api/v1/jobs/${job.uid}`, {
+          fetch(`${NEXRENDER_BASE_URL}/api/v1/jobs/${job.uid}`, {
             method: "DELETE",
           })
         )
@@ -124,7 +126,7 @@ export default function Page() {
       // Refresh the list
       fetchJobs();
     } catch (error) {
-      console.error("Error deleting all jobs:", error);
+      logger.error("Error deleting all jobs:", error);
     }
   };
 

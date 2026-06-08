@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { RenderItem } from '../types/render';
 import { Button, Dialog, Input, Textarea } from '@/app/components/ui';
+import { logger } from "@/app/lib/logger";
 
 interface MetadataDetailsDialogProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ export default function MetadataDetailsDialog({ isOpen, onClose, renderItem, onM
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ youtubeMetadata: updatedMetadata }),
       });
-      console.log('PATCH response', res);
+      logger.debug('PATCH response', res);
       if (res.ok) {
         const updated = await res.json();
         setEditing(false);

@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
-import { config } from "../../../../lib/config";
+import { getAllowedAssetPaths, isPathAllowed } from "@/app/lib/file-utils";
+import { logger } from "@/app/lib/logger";
 
 // Default channel and topic - can be made configurable via API parameters
 const DEFAULT_CHANNEL = "minimate";
 const DEFAULT_TOPIC = "animals";
-
-// Base paths for different asset types - using centralized config
-const getAssetPaths = () => config.getAssetPaths(DEFAULT_CHANNEL, DEFAULT_TOPIC);
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,40 +22,17 @@ export async function GET(req: NextRequest) {
     // Decode the URL-encoded path
     const decodedPath = decodeURIComponent(filePath);
     
-    console.log('Preview API - Original path:', filePath);
-    console.log('Preview API - Decoded path:', decodedPath);
+    logger.debug('Preview API - Original path:', filePath);
+    logger.debug('Preview API - Decoded path:', decodedPath);
 
     // Validate the path is within the allowed directories using same logic as main API
-    const assetPaths = config.getAssetPaths(channel, topic);
-    const allowedPaths = [
-      assetPaths.voice,
-      assetPaths.image,
-      assetPaths.video,
-      assetPaths.json,
-      assetPaths.reward,
-      `${assetPaths.reward}/output`,
-      `${assetPaths.reward}/reward_1`,
-      `${assetPaths.reward}/reward_2`,
-      `${assetPaths.reward}/reward_3`,
-      `${assetPaths.reward}/reward_4`,
-      `${assetPaths.reward}/reward_5`
-    ];
+    const allowedPaths = getAllowedAssetPaths(channel, topic);
 
-    console.log('Preview API - Allowed paths:', allowedPaths);
+    logger.debug('Preview API - Allowed paths:', allowedPaths);
 
-    // Also create backslash versions for Windows paths
-    const allowedPathsBackslash = allowedPaths.map(path => path.replace(/\//g, '\\'));
-
-    // Check if path starts with any allowed directory (including subdirectories)
-    const isAllowed = allowedPaths.some(allowedPath => 
-      decodedPath.startsWith(allowedPath)
-    ) || allowedPathsBackslash.some(allowedPath => 
-      decodedPath.startsWith(allowedPath)
-    );
-
-    if (!isAllowed) {
-      console.log('Preview API - Access denied for path:', decodedPath);
-      console.log('Preview API - Allowed paths:', allowedPaths);
+    if (!isPathAllowed(decodedPath, allowedPaths)) {
+      logger.debug('Preview API - Access denied for path:', decodedPath);
+      logger.debug('Preview API - Allowed paths:', allowedPaths);
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
@@ -65,7 +40,7 @@ export async function GET(req: NextRequest) {
     try {
       await fs.access(decodedPath);
     } catch (error) {
-      console.log('Preview API - File not found:', decodedPath);
+      logger.debug('Preview API - File not found:', decodedPath);
       return NextResponse.json({ error: 'File not found' }, { status: 404 });
     }
 
@@ -73,9 +48,9 @@ export async function GET(req: NextRequest) {
     const fileContent = await fs.readFile(decodedPath);
     const ext = path.extname(decodedPath).toLowerCase();
     
-    console.log('Preview API - File content preview (first 200 chars):', fileContent.toString().substring(0, 200));
-    console.log('Preview API - File extension:', ext);
-    console.log('Preview API - File size:', fileContent.length);
+    logger.debug('Preview API - File content preview (first 200 chars):', fileContent.toString().substring(0, 200));
+    logger.debug('Preview API - File extension:', ext);
+    logger.debug('Preview API - File size:', fileContent.length);
 
     // Determine content type
     let contentType = 'application/octet-stream';
@@ -101,7 +76,7 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Preview API - Error serving file:', error);
+    logger.error('Preview API - Error serving file:', error);
     return NextResponse.json({ error: 'Failed to serve file' }, { status: 500 });
   }
 } 

@@ -12,6 +12,7 @@ import {
   TH,
   TD,
 } from "./ui";
+import { APP_BASE_URL } from "@/app/lib/constants";
 
 type Job = {
   uid: string;
@@ -36,7 +37,7 @@ type JobTableProps = {
   onDeleteJob: (uid: string) => void;
 };
 
-const RENDER_BASE_URL = "http://localhost:3001";
+const RENDER_BASE_URL = APP_BASE_URL;
 
 export default function JobTable({
   jobs,

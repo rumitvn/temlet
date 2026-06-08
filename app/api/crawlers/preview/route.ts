@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { logger } from "@/app/lib/logger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     
     // Allow paths that start with the working directory
     if (!normalizedPath.startsWith(normalizedWorkingDir)) {
-      console.log('Path security check failed:', {
+      logger.debug('Path security check failed:', {
         path: normalizedPath,
         workingDir: normalizedWorkingDir
       });
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error serving preview file:', error);
+    logger.error('Error serving preview file:', error);
     return NextResponse.json({ error: 'Failed to serve file' }, { status: 500 });
   }
 } 
