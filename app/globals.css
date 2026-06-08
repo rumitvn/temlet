@@ -1,31 +1,149 @@
 @import "tailwindcss";
 
-@theme {
+/* dark: variant follows the .dark class (manual toggle), not OS preference */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ----------------------------------------------------------------------------
+   1. RAW SEMANTIC TOKENS
+   :root = LIGHT.  .dark = DARK overrides.  Dark is the app default — the inline
+   script in layout.tsx adds .dark unless localStorage["temlet-theme"] === "light".
+---------------------------------------------------------------------------- */
+:root {
+  /* surfaces & text (LIGHT) */
+  --color-bg: #fafaf7; /* warm off-white, not pure white */
+  --color-surface: #ffffff;
+  --color-surface-raised: #f4f4f0;
+  --color-surface-sunken: #efefea;
+  --color-border: #e2e2dc;
+  --color-border-strong: #c9c9c1;
+  --color-text: #14140f;
+  --color-text-muted: #5b5b53;
+  --color-text-faint: #8a8a80;
+
+  /* brand accent — Amber/Gold (LIGHT: deepened for AA contrast on white) */
+  --color-accent: #e0941a;
+  --color-accent-hover: #c97f12;
+  --color-accent-muted: #fcefd6;
+  --color-accent-fg: #1a1206; /* ink text ON amber */
+  --color-accent-ring: #f5a623;
+
+  /* semantic status hues (LIGHT) — fg = readable text, bg = subtle fill */
+  --color-info: #2563eb;
+  --color-info-bg: #e5edff;
+  --color-success: #15803d;
+  --color-success-bg: #dcfce7;
+  --color-warning: #b45309;
+  --color-warning-bg: #fef0c7;
+  --color-danger: #dc2626;
+  --color-danger-bg: #fee2e2;
+  --color-progress: #7c3aed; /* purple kept ONLY as a status hue */
+  --color-progress-bg: #ede4ff;
+}
+
+.dark {
+  /* surfaces & text (DARK) — ink base */
+  --color-bg: #0b0b0f; /* near-black ink */
+  --color-surface: #15151b;
+  --color-surface-raised: #1e1e26;
+  --color-surface-sunken: #0f0f14;
+  --color-border: #2a2a33;
+  --color-border-strong: #3a3a45;
+  --color-text: #f4f2ed;
+  --color-text-muted: #a7a7a0;
+  --color-text-faint: #6e6e68;
+
+  /* brand accent — full amber on ink */
+  --color-accent: #f5a623;
+  --color-accent-hover: #ffb840;
+  --color-accent-muted: #2a2010;
+  --color-accent-fg: #0b0b0f; /* ink text ON amber */
+  --color-accent-ring: #f5a623;
+
+  /* semantic status hues (DARK) — fg bright, bg = color @ ~16% on ink */
+  --color-info: #60a5fa;
+  --color-info-bg: rgba(59, 130, 246, 0.16);
+  --color-success: #4ade80;
+  --color-success-bg: rgba(34, 197, 94, 0.16);
+  --color-warning: #fbbf24;
+  --color-warning-bg: rgba(245, 158, 11, 0.16);
+  --color-danger: #f87171;
+  --color-danger-bg: rgba(239, 68, 68, 0.16);
+  --color-progress: #c4b5fd;
+  --color-progress-bg: rgba(139, 92, 246, 0.18);
+}
+
+/* ----------------------------------------------------------------------------
+   2. MAP TOKENS INTO TAILWIND
+   @theme inline => utilities reference the live var (var(--color-surface)),
+   so bg-surface / text-accent / border-border flip with .dark automatically.
+---------------------------------------------------------------------------- */
+@theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-surface-sunken: var(--color-surface-sunken);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-faint: var(--color-text-faint);
+
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-muted: var(--color-accent-muted);
+  --color-accent-fg: var(--color-accent-fg);
+  --color-accent-ring: var(--color-accent-ring);
+
+  --color-info: var(--color-info);
+  --color-info-bg: var(--color-info-bg);
+  --color-success: var(--color-success);
+  --color-success-bg: var(--color-success-bg);
+  --color-warning: var(--color-warning);
+  --color-warning-bg: var(--color-warning-bg);
+  --color-danger: var(--color-danger);
+  --color-danger-bg: var(--color-danger-bg);
+  --color-progress: var(--color-progress);
+  --color-progress-bg: var(--color-progress-bg);
+
+  /* radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* shadows (ink-aware) */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.12);
+  --shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-overlay: 0 24px 64px rgba(0, 0, 0, 0.45);
+
+  /* motion */
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
 }
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ----------------------------------------------------------------------------
+   3. BASE
+---------------------------------------------------------------------------- */
+@layer base {
+  html {
+    color-scheme: light dark;
+  }
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+  /* native controls (range sliders, checkboxes, radios) pick up the accent */
+  input[type="range"],
+  input[type="checkbox"],
+  input[type="radio"],
+  progress {
+    accent-color: var(--color-accent);
   }
 }
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 @keyframes loading {
   0% {

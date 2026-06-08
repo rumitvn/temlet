@@ -322,7 +322,7 @@ export default function AssetsPage() {
           type: 'image',
           label: 'Images',
           icon: '🖼️',
-          color: 'bg-red-600',
+          color: 'bg-danger',
           count: missingCount,
           description: `Upload ${missingCount} main images`,
           items: missingImageItems
@@ -353,7 +353,7 @@ export default function AssetsPage() {
           type: 'video',
           label: 'Videos',
           icon: '🎥',
-          color: 'bg-red-600',
+          color: 'bg-danger',
           count: missingCount,
           description: `Upload ${missingCount} videos`,
           items: missingVideoItems
@@ -382,7 +382,7 @@ export default function AssetsPage() {
             type: 'quiz3-image',
             label: 'Quiz 3 Images',
             icon: '🖼️',
-            color: 'bg-blue-600',
+            color: 'bg-info',
             count: missingCount,
             description: `Upload ${missingCount} quiz 3 option images`,
             items: missingQuiz3Items
@@ -414,7 +414,7 @@ export default function AssetsPage() {
           type: 'reward',
           label: 'Rewards',
           icon: '🏆',
-          color: 'bg-yellow-600',
+          color: 'bg-warning',
           count: missingCount,
           description: `Upload ${missingCount} reward videos`,
           items: missingRewardItems
@@ -1740,10 +1740,10 @@ export default function AssetsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'available': return 'text-green-500';
-      case 'missing': return 'text-red-500';
-      case 'processing': return 'text-yellow-500';
-      default: return 'text-gray-500';
+      case 'available': return 'text-success';
+      case 'missing': return 'text-danger';
+      case 'processing': return 'text-warning';
+      default: return 'text-text-muted';
     }
   };
 
@@ -1767,9 +1767,9 @@ export default function AssetsPage() {
     ].filter(Boolean).length;
     
     const completionRate = Math.round((metRequirements / totalRequirements) * 100);
-    let statusColor = 'text-red-400';
-    if (completionRate >= 75) statusColor = 'text-green-400';
-    else if (completionRate >= 50) statusColor = 'text-yellow-400';
+    let statusColor = 'text-danger';
+    if (completionRate >= 75) statusColor = 'text-success';
+    else if (completionRate >= 50) statusColor = 'text-warning';
     
     // Check for missing orders
     const missingImageOrders = renderStatus.jsonOrders.filter(order => 
@@ -2644,7 +2644,7 @@ export default function AssetsPage() {
               <source src={previewUrl} type="audio/mpeg" />
               Your browser does not support the audio element.
             </audio>
-            <p className="text-gray-300">{asset.name}</p>
+            <p className="text-text-muted">{asset.name}</p>
           </div>
         );
       case 'json':
@@ -2652,7 +2652,7 @@ export default function AssetsPage() {
           <JSONPreview asset={asset} initialViewMode={previewVideoMode ? 'video' : 'json'} />
         );
       default:
-        return <div className="text-center text-gray-400">Preview not available</div>;
+        return <div className="text-center text-text-muted">Preview not available</div>;
     }
   };
 
@@ -2939,20 +2939,20 @@ export default function AssetsPage() {
       console.log('VideoPreview - currentSection:', currentSection, 'currentTime:', currentTime, 'content:', content);
 
       return (
-        <div className="bg-gray-800 rounded-lg p-6 space-y-6 min-h-[600px]">
+        <div className="bg-surface rounded-lg p-6 space-y-6 min-h-[600px]">
           {/* Video Player Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="text-2xl">🎬</div>
               <div>
-                <h3 className="text-lg font-semibold text-white">Video Preview</h3>
-                <p className="text-sm text-gray-400">{asset.name}</p>
+                <h3 className="text-lg font-semibold text-text">Video Preview</h3>
+                <p className="text-sm text-text-muted">{asset.name}</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
               <button
                 onClick={handlePlayPause}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium transition-colors"
+                className="px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-accent-fg font-medium transition-colors"
               >
                 {isPlaying ? '⏸️ Pause' : '▶️ Play'}
               </button>
@@ -2961,7 +2961,7 @@ export default function AssetsPage() {
 
           {/* Timeline */}
           <div className="space-y-2">
-            <div className="flex justify-between text-sm text-gray-400">
+            <div className="flex justify-between text-sm text-text-muted">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(totalDuration)}</span>
             </div>
@@ -2972,9 +2972,9 @@ export default function AssetsPage() {
                 max={totalDuration}
                 value={currentTime}
                 onChange={(e) => handleSeek(parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                className="w-full h-2 bg-surface-raised rounded-lg appearance-none cursor-pointer slider"
                 style={{
-                  background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(currentTime / totalDuration) * 100}%, #374151 ${(currentTime / totalDuration) * 100}%, #374151 100%)`
+                  background: `linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${(currentTime / totalDuration) * 100}%, var(--color-surface-sunken) ${(currentTime / totalDuration) * 100}%, var(--color-surface-sunken) 100%)`
                 }}
               />
             </div>
@@ -2994,10 +2994,10 @@ export default function AssetsPage() {
                   onClick={() => handleSeek(sectionStart)}
                   className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
                     isActive 
-                      ? 'bg-purple-600 text-white' 
+                      ? 'bg-accent text-accent-fg' 
                       : isCompleted 
-                        ? 'bg-green-600 text-white' 
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        ? 'bg-success text-white' 
+                        : 'bg-surface-raised text-text-muted hover:bg-surface'
                   }`}
                 >
                   <div className="flex items-center justify-center space-x-1">
@@ -3011,13 +3011,13 @@ export default function AssetsPage() {
 
           {/* Current Section Content */}
           {content && (
-            <div className="bg-gray-700 rounded-lg p-6 space-y-4 min-h-[400px]">
+            <div className="bg-surface-raised rounded-lg p-6 space-y-4 min-h-[400px]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="text-2xl">{sections[currentSection].icon}</div>
-                  <h4 className="text-xl font-semibold text-white">{content.title}</h4>
+                  <h4 className="text-xl font-semibold text-text">{content.title}</h4>
                 </div>
-                <div className="text-sm text-gray-400">
+                <div className="text-sm text-text-muted">
                   Section {currentSection + 1} of {sections.length} • {formatTime(currentTime)} / {formatTime(totalDuration)}
                 </div>
               </div>
@@ -3027,9 +3027,9 @@ export default function AssetsPage() {
                 {currentSection >= 1 && currentSection <= 3 ? (
                   // Quiz Section
                   <div className="space-y-4">
-                    <div className="bg-gray-600 rounded-lg p-4">
-                      <h5 className="text-lg font-medium text-white mb-2">Question:</h5>
-                      <p className="text-gray-200">{content.question}</p>
+                    <div className="bg-surface-raised rounded-lg p-4">
+                      <h5 className="text-lg font-medium text-text mb-2">Question:</h5>
+                      <p className="text-text-muted">{content.question}</p>
                     </div>
                     
                                          <div className="grid grid-cols-2 gap-3">
@@ -3038,8 +3038,8 @@ export default function AssetsPage() {
                            key={index}
                            className={`p-3 rounded-lg text-left transition-all ${
                              index === (content.answer - 1) // Convert 1-based to 0-based
-                               ? 'bg-green-600 text-white border-2 border-green-400'
-                               : 'bg-gray-600 text-gray-200'
+                               ? 'bg-success text-white border-2 border-success'
+                               : 'bg-surface-raised text-text-muted'
                            }`}
                          >
                            <div className="flex items-center space-x-2">
@@ -3048,7 +3048,7 @@ export default function AssetsPage() {
                              </span>
                              <span>{option}</span>
                              {index === (content.answer - 1) && (
-                               <span className="ml-auto text-green-200">✓</span>
+                               <span className="ml-auto text-success">✓</span>
                              )}
                            </div>
                            
@@ -3088,15 +3088,15 @@ export default function AssetsPage() {
                                  ) : (
                    // Non-Quiz Section
                    <div className="space-y-4">
-                     <div className="bg-gray-600 rounded-lg p-4">
-                       <h5 className="text-lg font-medium text-white mb-2">Content:</h5>
-                       <p className="text-gray-200">{content.text}</p>
+                     <div className="bg-surface-raised rounded-lg p-4">
+                       <h5 className="text-lg font-medium text-text mb-2">Content:</h5>
+                       <p className="text-text-muted">{content.text}</p>
                      </div>
                      
                      {/* Show video preview for Lesson and Reward sections */}
                      {(currentSection === 4 || currentSection === 5) && (
-                       <div className="bg-gray-600 rounded-lg p-4">
-                         <h5 className="text-lg font-medium text-white mb-2">Video Preview:</h5>
+                       <div className="bg-surface-raised rounded-lg p-4">
+                         <h5 className="text-lg font-medium text-text mb-2">Video Preview:</h5>
                          <video 
                            ref={videoRef}
                            src={`/api/assets/preview?path=${encodeURIComponent(`${config.workingDirectory}/${selectedChannel}/${selectedTopic}/${currentSection === 5 ? `reward/output/reward_${asset.order}/${asset.key}.mp4` : `video/${asset.key}.mp4`}`)}&channel=${selectedChannel}&topic=${selectedTopic}`}
@@ -3113,10 +3113,10 @@ export default function AssetsPage() {
                              }
                            }}
                          />
-                         <div className="w-full h-32 bg-gray-700 rounded flex items-center justify-center" style={{ display: 'none' }}>
+                         <div className="w-full h-32 bg-surface-raised rounded flex items-center justify-center" style={{ display: 'none' }}>
                            <div className="text-center">
                              <div className="text-3xl mb-2">🎬</div>
-                             <span className="text-sm text-gray-400">
+                             <span className="text-sm text-text-muted">
                                {currentSection === 4 ? 'Lesson video not found' : `Reward video not found (${asset.key}.mp4)`}
                              </span>
                            </div>
@@ -3127,12 +3127,12 @@ export default function AssetsPage() {
                  )}
 
                 {/* Voice Preview */}
-                <div className="bg-blue-600 rounded-lg p-4">
+                <div className="bg-info rounded-lg p-4">
                   <h5 className="text-lg font-medium text-white mb-2">Voice Narration:</h5>
                   <p className="text-white">{content.voice}</p>
                   <div className="mt-2 flex items-center space-x-2">
-                    <span className="text-sm text-blue-200">🎵</span>
-                    <span className="text-sm text-blue-200">Voice file would play here</span>
+                    <span className="text-sm text-white">🎵</span>
+                    <span className="text-sm text-white">Voice file would play here</span>
                   </div>
                 </div>
               </div>
@@ -3143,23 +3143,23 @@ export default function AssetsPage() {
     };
 
     return (
-      <div className="bg-gray-900 rounded-lg p-4 max-h-[80vh] overflow-auto w-full max-w-4xl">
+      <div className="bg-surface-sunken rounded-lg p-4 max-h-[80vh] overflow-auto w-full max-w-4xl">
         {loading ? (
           <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-4">
-                <h4 className="text-lg font-semibold text-purple-400">JSON Content</h4>
+                <h4 className="text-lg font-semibold text-accent">JSON Content</h4>
                 <div className="flex space-x-2">
                   <button
                     onClick={() => setViewMode('json')}
                     className={`px-3 py-1 rounded text-sm transition-colors ${
                       viewMode === 'json' 
-                        ? 'bg-purple-600 text-white' 
-                        : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                        ? 'bg-accent text-accent-fg' 
+                        : 'bg-surface-raised text-text-muted hover:bg-surface'
                     }`}
                   >
                     JSON
@@ -3168,8 +3168,8 @@ export default function AssetsPage() {
                     onClick={() => setViewMode('video')}
                     className={`px-3 py-1 rounded text-sm transition-colors ${
                       viewMode === 'video' 
-                        ? 'bg-purple-600 text-white' 
-                        : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                        ? 'bg-accent text-accent-fg' 
+                        : 'bg-surface-raised text-text-muted hover:bg-surface'
                     }`}
                   >
                     🎬 Video Preview
@@ -3180,7 +3180,7 @@ export default function AssetsPage() {
               {viewMode === 'json' && !isEditing && (
                 <button
                   onClick={handleEdit}
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition-colors"
+                  className="px-3 py-1 bg-info text-white hover:opacity-90 rounded text-sm transition-colors"
                 >
                   Edit
                 </button>
@@ -3191,13 +3191,13 @@ export default function AssetsPage() {
                   <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 rounded text-sm transition-colors"
+                    className="px-3 py-1 bg-success text-white hover:opacity-90 disabled:bg-surface-raised rounded text-sm transition-colors"
                   >
                     {saving ? 'Saving...' : 'Save'}
                   </button>
                   <button
                     onClick={handleCancel}
-                    className="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition-colors"
+                    className="px-3 py-1 bg-surface-raised hover:bg-surface rounded text-sm transition-colors"
                   >
                     Cancel
                   </button>
@@ -3210,11 +3210,11 @@ export default function AssetsPage() {
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className="w-full h-80 bg-gray-800 text-gray-300 text-sm font-mono p-4 rounded border border-gray-600 focus:border-purple-500 focus:outline-none resize-none"
+                  className="w-full h-80 bg-surface text-text-muted text-sm font-mono p-4 rounded border border-border focus:border-accent focus:outline-none resize-none"
                   placeholder="Edit JSON content here..."
                 />
               ) : (
-                <pre className="text-sm text-gray-300 whitespace-pre-wrap">
+                <pre className="text-sm text-text-muted whitespace-pre-wrap">
                   {jsonContent}
                 </pre>
               )
@@ -4004,12 +4004,12 @@ export default function AssetsPage() {
         onClick={() => handleSelectCrawlerResource(resource.path, type, target, optionName)}
         className={`relative px-3 py-1.5 rounded text-sm ${
           state?.isSelected
-            ? 'bg-green-600 hover:bg-green-700'
+            ? 'bg-success hover:opacity-90'
             : state?.error
-            ? 'bg-red-600 hover:bg-red-700'
+            ? 'bg-danger hover:opacity-90'
             : type === 'quiz3-image'
-            ? 'bg-purple-600 hover:bg-purple-700'
-            : 'bg-blue-600 hover:bg-blue-700'
+            ? 'bg-accent hover:bg-accent-hover'
+            : 'bg-info hover:opacity-90'
         } text-white flex items-center gap-2`}
         disabled={state?.isLoading}
       >
@@ -4123,11 +4123,11 @@ export default function AssetsPage() {
         onClick={() => setFullscreenImage(null)}
       >
         {/* Header */}
-        <div className="flex justify-between items-center p-4 bg-gray-900">
-          <h3 className="text-xl font-semibold text-white">{fullscreenImage.name}</h3>
+        <div className="flex justify-between items-center p-4 bg-surface-sunken">
+          <h3 className="text-xl font-semibold text-text">{fullscreenImage.name}</h3>
           <button
             onClick={() => setFullscreenImage(null)}
-            className="text-white hover:text-gray-300"
+            className="text-text-muted hover:text-text"
           >
             <XCircleIcon className="w-8 h-8" />
           </button>
@@ -4143,14 +4143,14 @@ export default function AssetsPage() {
         </div>
 
         {/* Footer with Actions */}
-        <div className="bg-gray-900 p-4">
+        <div className="bg-surface-sunken p-4">
           <div className="flex flex-col gap-4 max-w-2xl mx-auto">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handleSelectCrawlerResource(fullscreenImage.path, 'image', 'main');
               }}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-lg font-medium transition-colors"
+              className="w-full bg-info hover:opacity-90 text-white px-6 py-3 rounded-lg text-lg font-medium transition-colors"
             >
               Use as Main Image
             </button>
@@ -4161,14 +4161,14 @@ export default function AssetsPage() {
                   e.stopPropagation();
                   setShowQuizOptionMenu(!showQuizOptionMenu);
                 }}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg text-lg font-medium transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-accent hover:bg-accent-hover text-accent-fg px-6 py-3 rounded-lg text-lg font-medium transition-colors flex items-center justify-center gap-2"
               >
                 Use for Quiz Option
                 <ChevronUpIcon className={`w-5 h-5 transition-transform ${showQuizOptionMenu ? 'rotate-180' : ''}`} />
               </button>
               
               {showQuizOptionMenu && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-surface rounded-lg shadow-xl overflow-hidden">
                   {missingQuizOptions.map((option, index) => (
                     <button
                       key={index}
@@ -4177,9 +4177,9 @@ export default function AssetsPage() {
                          setShowQuizOptionMenu(false);
                          handleSelectCrawlerResource(fullscreenImage.path, 'image', 'quiz3', option);
                        }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors flex items-center gap-3"
+                      className="w-full px-4 py-3 text-left hover:bg-surface transition-colors flex items-center gap-3"
                     >
-                      <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center font-medium">
+                      <div className="w-8 h-8 rounded-full bg-accent text-accent-fg flex items-center justify-center font-medium">
                         {index + 1}
                       </div>
                       <span>Use as Quiz Option {index + 1}</span>
@@ -4196,43 +4196,43 @@ export default function AssetsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
+      <div className="min-h-screen bg-bg text-text p-8">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-500"></div>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-accent"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
+    <div className="min-h-screen bg-bg text-text p-8">
       <style jsx>{`
         .slider::-webkit-slider-thumb {
           appearance: none;
           height: 20px;
           width: 20px;
           border-radius: 50%;
-          background: #8b5cf6;
+          background: var(--color-accent);
           cursor: pointer;
-          border: 2px solid #ffffff;
+          border: 2px solid var(--color-surface);
         }
         
         .slider::-moz-range-thumb {
           height: 20px;
           width: 20px;
           border-radius: 50%;
-          background: #8b5cf6;
+          background: var(--color-accent);
           cursor: pointer;
-          border: 2px solid #ffffff;
+          border: 2px solid var(--color-surface);
         }
         
         .slider::-ms-thumb {
           height: 20px;
           width: 20px;
           border-radius: 50%;
-          background: #8b5cf6;
+          background: var(--color-accent);
           cursor: pointer;
-          border: 2px solid #ffffff;
+          border: 2px solid var(--color-surface);
         }
       `}</style>
       {/* Header */}
@@ -4242,17 +4242,17 @@ export default function AssetsPage() {
         className="flex justify-between items-center mb-8"
       >
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold text-accent">
             Assets Management
           </h1>
-          <p className="text-gray-400 mt-2">Manage your SK3QLR video assets and generate content</p>
+          <p className="text-text-muted mt-2">Manage your SK3QLR video assets and generate content</p>
         </div>
         
         <div className="flex gap-4">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-accent text-accent-fg hover:bg-accent-hover px-4 py-2 rounded-lg transition-colors"
             onClick={() => setShowAIGenerator(true)}
           >
             <span className="text-xl">✨</span>
@@ -4262,7 +4262,7 @@ export default function AssetsPage() {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-surface-raised text-text border border-border hover:border-border-strong px-4 py-2 rounded-lg transition-colors"
             onClick={() => setShowImageGenerationDialog(true)}
           >
             <PhotoIcon className="w-5 h-5" />
@@ -4272,7 +4272,7 @@ export default function AssetsPage() {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-surface-raised text-text border border-border hover:border-border-strong px-4 py-2 rounded-lg transition-colors"
             onClick={() => setShowUploadDialog(true)}
           >
             <PlusIcon className="w-5 h-5" />
@@ -4285,13 +4285,13 @@ export default function AssetsPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-6 p-4 bg-gray-800 rounded-lg border border-gray-700"
+        className="mb-6 p-4 bg-surface rounded-lg border border-border"
       >
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-purple-400">📊 Overview Status</h2>
+          <h2 className="text-lg font-semibold text-accent">📊 Overview Status</h2>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">Overall Completion:</span>
-            <span className={`text-lg font-bold ${calculateOverviewStatus.completionRate >= 75 ? 'text-green-400' : calculateOverviewStatus.completionRate >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+            <span className="text-sm text-text-muted">Overall Completion:</span>
+            <span className={`text-lg font-bold ${calculateOverviewStatus.completionRate >= 75 ? 'text-success' : calculateOverviewStatus.completionRate >= 50 ? 'text-warning' : 'text-danger'}`}>
               {calculateOverviewStatus.completionRate}%
             </span>
           </div>
@@ -4302,9 +4302,9 @@ export default function AssetsPage() {
           <button
             onClick={() => setStatusFilter('all')}
             className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'all' 
-                ? 'bg-purple-600 border-purple-500 text-white' 
-                : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
+              statusFilter === 'all'
+                ? 'bg-accent border-accent text-accent-fg'
+                : 'bg-surface-raised border-border text-text-muted hover:bg-surface'
             }`}
           >
             <div className="text-center">
@@ -4318,11 +4318,11 @@ export default function AssetsPage() {
           <button
             onClick={() => setStatusFilter(statusFilter === 'complete' ? 'all' : 'complete')}
             className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'complete' 
-                ? 'bg-green-600 border-4 border-green-300 text-white shadow-lg' 
+              statusFilter === 'complete'
+                ? 'bg-success border-4 ring-2 ring-success text-white shadow-lg'
                 : calculateOverviewStatus.completeGroups > 0
-                ? 'bg-green-900 border border-green-600 text-green-300 hover:bg-green-800'
-                : 'bg-gray-700 border border-gray-600 text-gray-500'
+                ? 'bg-success-bg border border-success text-success hover:bg-surface'
+                : 'bg-surface-raised border border-border text-text-muted'
             }`}
           >
             <div className="text-center">
@@ -4337,10 +4337,10 @@ export default function AssetsPage() {
             onClick={() => setStatusFilter(statusFilter === 'missing-json' ? 'all' : 'missing-json')}
             className={`p-3 rounded-lg border transition-all hover:scale-105 ${
               statusFilter === 'missing-json' 
-                ? 'bg-red-600 border-4 border-red-300 text-white shadow-lg' 
+                ? 'bg-danger border-4 ring-2 ring-danger text-white shadow-lg'
                 : calculateOverviewStatus.missingJson > 0
-                ? 'bg-red-900 border border-red-600 text-red-300 hover:bg-red-800'
-                : 'bg-gray-700 border border-gray-600 text-gray-500'
+                ? 'bg-danger-bg border border-danger text-danger hover:bg-surface'
+                : 'bg-surface-raised border border-border text-text-muted'
             }`}
           >
             <div className="text-center">
@@ -4355,10 +4355,10 @@ export default function AssetsPage() {
             onClick={() => setStatusFilter(statusFilter === 'missing-image' ? 'all' : 'missing-image')}
             className={`p-3 rounded-lg border transition-all hover:scale-105 ${
               statusFilter === 'missing-image' 
-                ? 'bg-red-600 border-4 border-red-300 text-white shadow-lg' 
+                ? 'bg-danger border-4 ring-2 ring-danger text-white shadow-lg'
                 : calculateOverviewStatus.missingImage > 0
-                ? 'bg-red-900 border border-red-600 text-red-300 hover:bg-red-800'
-                : 'bg-gray-700 border border-gray-600 text-gray-500'
+                ? 'bg-danger-bg border border-danger text-danger hover:bg-surface'
+                : 'bg-surface-raised border border-border text-text-muted'
             }`}
           >
             <div className="text-center">
@@ -4373,10 +4373,10 @@ export default function AssetsPage() {
             onClick={() => setStatusFilter(statusFilter === 'missing-videos' ? 'all' : 'missing-videos')}
             className={`p-3 rounded-lg border transition-all hover:scale-105 ${
               statusFilter === 'missing-videos' 
-                ? 'bg-red-600 border-4 border-red-300 text-white shadow-lg' 
+                ? 'bg-danger border-4 ring-2 ring-danger text-white shadow-lg'
                 : calculateOverviewStatus.missingVideos > 0
-                ? 'bg-red-900 border border-red-600 text-red-300 hover:bg-red-800'
-                : 'bg-gray-700 border border-gray-600 text-gray-500'
+                ? 'bg-danger-bg border border-danger text-danger hover:bg-surface'
+                : 'bg-surface-raised border border-border text-text-muted'
             }`}
           >
             <div className="text-center">
@@ -4390,11 +4390,11 @@ export default function AssetsPage() {
           <button
             onClick={() => setStatusFilter(statusFilter === 'missing-voices' ? 'all' : 'missing-voices')}
             className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'missing-voices' 
-                ? 'bg-orange-600 border-4 border-orange-300 text-white shadow-lg' 
+              statusFilter === 'missing-voices'
+                ? 'bg-warning border-4 ring-2 ring-warning text-white shadow-lg'
                 : calculateOverviewStatus.missingVoices > 0
-                ? 'bg-orange-900 border border-orange-600 text-orange-300 hover:bg-orange-800'
-                : 'bg-gray-700 border border-gray-600 text-gray-500'
+                ? 'bg-warning-bg border border-warning text-warning hover:bg-surface'
+                : 'bg-surface-raised border border-border text-text-muted'
             }`}
           >
             <div className="text-center">
@@ -4408,11 +4408,11 @@ export default function AssetsPage() {
           <button
             onClick={() => setStatusFilter(statusFilter === 'missing-rewards' ? 'all' : 'missing-rewards')}
             className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'missing-rewards' 
-                ? 'bg-yellow-600 border-4 border-yellow-300 text-white shadow-lg' 
+              statusFilter === 'missing-rewards'
+                ? 'bg-warning border-4 ring-2 ring-warning text-white shadow-lg'
                 : calculateOverviewStatus.missingRewards > 0
-                ? 'bg-yellow-900 border border-yellow-600 text-yellow-300 hover:bg-yellow-800'
-                : 'bg-gray-700 border border-gray-600 text-gray-500'
+                ? 'bg-warning-bg border border-warning text-warning hover:bg-surface'
+                : 'bg-surface-raised border border-border text-text-muted'
             }`}
           >
             <div className="text-center">
@@ -4426,11 +4426,11 @@ export default function AssetsPage() {
           <button
             onClick={() => setStatusFilter(statusFilter === 'missing-quiz3-images' ? 'all' : 'missing-quiz3-images')}
             className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'missing-quiz3-images' 
-                ? 'bg-blue-600 border-4 border-blue-300 text-white shadow-lg' 
+              statusFilter === 'missing-quiz3-images'
+                ? 'bg-info border-4 ring-2 ring-info text-white shadow-lg'
                 : calculateOverviewStatus.missingQuiz3Images > 0
-                ? 'bg-blue-900 border border-blue-600 text-blue-300 hover:bg-blue-800'
-                : 'bg-gray-700 border border-gray-600 text-gray-500'
+                ? 'bg-info-bg border border-info text-info hover:bg-surface'
+                : 'bg-surface-raised border border-border text-text-muted'
             }`}
           >
             <div className="text-center">
@@ -4444,11 +4444,11 @@ export default function AssetsPage() {
           <button
             onClick={() => setStatusFilter(statusFilter === 'incomplete' ? 'all' : 'incomplete')}
             className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'incomplete' 
-                ? 'bg-red-600 border-4 border-red-300 text-white shadow-lg' 
+              statusFilter === 'incomplete'
+                ? 'bg-danger border-4 ring-2 ring-danger text-white shadow-lg'
                 : calculateOverviewStatus.incompleteGroups > 0
-                ? 'bg-red-900 border border-red-600 text-red-300 hover:bg-red-800'
-                : 'bg-gray-700 border border-gray-600 text-gray-500'
+                ? 'bg-danger-bg border border-danger text-danger hover:bg-surface'
+                : 'bg-surface-raised border border-border text-text-muted'
             }`}
           >
             <div className="text-center">
@@ -4471,13 +4471,13 @@ export default function AssetsPage() {
         {/* Search Bar */}
         <div className="flex gap-4">
           <div className="flex-1 relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted w-5 h-5" />
             <input
               type="text"
               placeholder="Search assets..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
+              className="w-full pl-10 pr-4 py-2 bg-surface rounded-lg border border-border focus:border-accent focus:outline-none"
             />
           </div>
           
@@ -4486,13 +4486,13 @@ export default function AssetsPage() {
               <>
                 <button
                   onClick={handleDeleteSelected}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                  className="px-4 py-2 bg-danger text-white hover:opacity-90 rounded-lg transition-colors"
                 >
                   Delete ({selectedAssets.length})
                 </button>
                 <button
                   onClick={handleDeselectAll}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                  className="px-4 py-2 bg-surface-raised hover:bg-surface rounded-lg transition-colors"
                 >
                   Deselect All
                 </button>
@@ -4504,11 +4504,11 @@ export default function AssetsPage() {
         {/* Filter Bar */}
         <div className="flex gap-4 items-center">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-300">Channel:</span>
+            <span className="text-sm font-medium text-text-muted">Channel:</span>
             <select
               value={selectedChannel}
               onChange={(e) => setSelectedChannel(e.target.value)}
-              className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+              className="bg-surface text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none text-sm"
             >
               {channelOptions.map(option => (
                 <option key={option.value} value={option.value}>
@@ -4519,11 +4519,11 @@ export default function AssetsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-300">Topic:</span>
+            <span className="text-sm font-medium text-text-muted">Topic:</span>
             <select
               value={selectedTopic}
               onChange={(e) => setSelectedTopic(e.target.value)}
-              className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+              className="bg-surface text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none text-sm"
             >
               {topicOptions.map(option => (
                 <option key={option.value} value={option.value}>
@@ -4534,11 +4534,11 @@ export default function AssetsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-300">Sort by:</span>
+            <span className="text-sm font-medium text-text-muted">Sort by:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'name' | 'createDate')}
-              className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+              className="bg-surface text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none text-sm"
             >
               <option value="createDate">Creation Date</option>
               <option value="name">Name</option>
@@ -4546,24 +4546,24 @@ export default function AssetsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-300">Order:</span>
+            <span className="text-sm font-medium text-text-muted">Order:</span>
             <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-              className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+              className="bg-surface text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none text-sm"
             >
               <option value="asc">Ascending</option>
               <option value="desc">Descending</option>
             </select>
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-gray-400">
+          <div className="flex items-center gap-2 text-sm text-text-muted">
             <span>📁</span>
             <span>{selectedChannel}/{selectedTopic}</span>
           </div>
 
           {/* Sort indicator */}
-          <div className="flex items-center gap-2 text-sm text-purple-400 bg-purple-900 bg-opacity-20 px-3 py-1 rounded-lg">
+          <div className="flex items-center gap-2 text-sm text-accent bg-accent-muted bg-opacity-20 px-3 py-1 rounded-lg">
             <span>🔄</span>
             <span>
               {sortBy === 'createDate' ? 'Date' : 'Name'} 
@@ -4576,11 +4576,11 @@ export default function AssetsPage() {
       {/* Assets Display */}
       <motion.div layout className="space-y-6">
         {/* Results Summary */}
-        <div className="flex items-center justify-between text-sm text-gray-400">
+        <div className="flex items-center justify-between text-sm text-text-muted">
           <div>
             Showing {paginatedAssetGroups.length} of {filteredAssetGroups.length} groups
             {statusFilter !== 'all' && (
-              <span className="ml-2 text-purple-400">
+              <span className="ml-2 text-accent">
                 (filtered by {statusFilter.replace('-', ' ')})
               </span>
             )}
@@ -4592,8 +4592,8 @@ export default function AssetsPage() {
 
         {searching && (
           <div className="text-center py-4">
-            <div className="inline-flex items-center gap-2 text-gray-400">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
+            <div className="inline-flex items-center gap-2 text-text-muted">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-accent"></div>
               <span>Searching...</span>
             </div>
           </div>
@@ -4607,15 +4607,15 @@ export default function AssetsPage() {
                 layout
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-gray-800 rounded-lg p-6"
+                className="bg-surface rounded-lg p-6"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-4">
-                    <h3 className="text-2xl font-bold text-purple-400">{group.name}</h3>
-                    <div className="flex gap-2 text-sm text-gray-400">
+                    <h3 className="text-2xl font-bold text-accent">{group.name}</h3>
+                    <div className="flex gap-2 text-sm text-text-muted">
                       <span>📄 {group.assets.jsonAssetPairs.length} JSON-Asset Pairs</span>
                       <span>🏆 {group.assets.rewards.length} Rewards</span>
-                      <span className="text-blue-400">
+                      <span className="text-info">
                         📅 {formatDate(getEarliestJsonDate(group))}
                       </span>
                     </div>
@@ -4625,8 +4625,8 @@ export default function AssetsPage() {
                   <div className="flex items-center gap-2">
                     <div className={`px-3 py-1 rounded-full text-sm font-medium ${
                       renderStatus.isComplete 
-                        ? 'bg-green-900 text-green-300 border border-green-600' 
-                        : 'bg-gray-700 text-gray-300 border border-gray-600'
+                        ? 'bg-success-bg text-success border border-success' 
+                        : 'bg-surface-raised text-text-muted border border-border'
                     }`}>
                       {renderStatus.isComplete ? '✅ Ready to Render' : `${renderStatus.completionRate}% Complete`}
                     </div>
@@ -4634,9 +4634,9 @@ export default function AssetsPage() {
                 </div>
                 
                 {/* Render Status Details */}
-                <div className="mb-4 p-3 bg-gray-700 rounded-lg">
+                <div className="mb-4 p-3 bg-surface-raised rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-300">Render Status:</span>
+                    <span className="text-sm font-medium text-text-muted">Render Status:</span>
                     <span className={`text-sm font-bold ${renderStatus.statusColor}`}>
                       {renderStatus.completionRate}% Complete
                     </span>
@@ -4644,137 +4644,137 @@ export default function AssetsPage() {
                   
                   {/* JSON Requirements */}
                   {renderStatus.jsonCount > 0 && (
-                    <div className="mb-3 p-2 bg-gray-800 rounded">
-                      <div className="text-xs font-medium text-purple-400 mb-1">
+                    <div className="mb-3 p-2 bg-surface rounded">
+                      <div className="text-xs font-medium text-accent mb-1">
                         📄 JSON Files: {renderStatus.jsonCount} found
                       </div>
-                      <div className="text-xs text-gray-300">
+                      <div className="text-xs text-text-muted">
                         Orders: {originalRenderStatus.jsonOrders.sort((a: number, b: number) => a - b).join(', ')}
                       </div>
                     </div>
                   )}
                   
                   {/* Image Requirements */}
-                  <div className="mb-3 p-2 bg-gray-800 rounded">
-                    <div className="text-xs font-medium text-blue-400 mb-1">
+                  <div className="mb-3 p-2 bg-surface rounded">
+                    <div className="text-xs font-medium text-info mb-1">
                       🖼️ Images: {renderStatus.imageProgress}
                     </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
+                    <div className="w-full bg-surface-raised rounded-full h-2 mb-1">
                       <div 
                         className={`h-2 rounded-full ${
                           originalRenderStatus.availableImages >= originalRenderStatus.requiredImages 
-                            ? 'bg-green-500' 
-                            : 'bg-red-500'
+                            ? 'bg-success' 
+                            : 'bg-danger'
                         }`}
                         style={{ 
                           width: `${Math.min(100, (originalRenderStatus.availableImages / originalRenderStatus.requiredImages) * 100)}%` 
                         }}
                       ></div>
                     </div>
-                    <div className="text-xs text-gray-300">
+                    <div className="text-xs text-text-muted">
                       Required: {originalRenderStatus.requiredImages} images (1 per JSON with matching order)
                       {renderStatus.missingImageOrders.length > 0 && (
-                        <span className="text-red-400 ml-2">Missing orders: {renderStatus.missingImageOrders.join(', ')}</span>
+                        <span className="text-danger ml-2">Missing orders: {renderStatus.missingImageOrders.join(', ')}</span>
                       )}
                     </div>
                   </div>
                   
                   {/* Video Requirements */}
-                  <div className="mb-3 p-2 bg-gray-800 rounded">
-                    <div className="text-xs font-medium text-cyan-400 mb-1">
+                  <div className="mb-3 p-2 bg-surface rounded">
+                    <div className="text-xs font-medium text-info mb-1">
                       🎥 Videos: {renderStatus.videoProgress}
                     </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
+                    <div className="w-full bg-surface-raised rounded-full h-2 mb-1">
                       <div 
                         className={`h-2 rounded-full ${
                           originalRenderStatus.availableVideos >= originalRenderStatus.requiredVideos 
-                            ? 'bg-green-500' 
-                            : 'bg-red-500'
+                            ? 'bg-success' 
+                            : 'bg-danger'
                         }`}
                         style={{ 
                           width: `${Math.min(100, (originalRenderStatus.availableVideos / originalRenderStatus.requiredVideos) * 100)}%` 
                         }}
                       ></div>
                     </div>
-                    <div className="text-xs text-gray-300">
+                    <div className="text-xs text-text-muted">
                       Required: {originalRenderStatus.requiredVideos} videos (1 per JSON with matching order)
                       {renderStatus.missingVideoOrders.length > 0 && (
-                        <span className="text-red-400 ml-2">Missing orders: {renderStatus.missingVideoOrders.join(', ')}</span>
+                        <span className="text-danger ml-2">Missing orders: {renderStatus.missingVideoOrders.join(', ')}</span>
                       )}
                     </div>
                   </div>
                   
                   {/* Voice Requirements */}
-                  <div className="mb-3 p-2 bg-gray-800 rounded">
-                    <div className="text-xs font-medium text-orange-400 mb-1">
+                  <div className="mb-3 p-2 bg-surface rounded">
+                    <div className="text-xs font-medium text-warning mb-1">
                       🎵 Voice Files: {renderStatus.voiceProgress}
                     </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
+                    <div className="w-full bg-surface-raised rounded-full h-2 mb-1">
                       <div 
                         className={`h-2 rounded-full ${
                           originalRenderStatus.availableVoices >= originalRenderStatus.requiredVoices 
-                            ? 'bg-green-500' 
-                            : 'bg-orange-500'
+                            ? 'bg-success' 
+                            : 'bg-warning'
                         }`}
                         style={{ 
                           width: `${Math.min(100, (originalRenderStatus.availableVoices / originalRenderStatus.requiredVoices) * 100)}%` 
                         }}
                       ></div>
                     </div>
-                    <div className="text-xs text-gray-300">
+                    <div className="text-xs text-text-muted">
                       Required: {originalRenderStatus.requiredVoices} voices ({renderStatus.jsonCount} JSONs × 9 voices each)
                       {renderStatus.missingVoices > 0 && (
-                        <span className="text-red-400 ml-2">Missing: {renderStatus.missingVoices}</span>
+                        <span className="text-danger ml-2">Missing: {renderStatus.missingVoices}</span>
                       )}
                     </div>
                   </div>
                   
                   {/* Reward Requirements */}
-                  <div className="mb-3 p-2 bg-gray-800 rounded">
-                    <div className="text-xs font-medium text-yellow-400 mb-1">
+                  <div className="mb-3 p-2 bg-surface rounded">
+                    <div className="text-xs font-medium text-warning mb-1">
                       🏆 Reward Videos: {renderStatus.rewardProgress}
                     </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
+                    <div className="w-full bg-surface-raised rounded-full h-2 mb-1">
                       <div 
                         className={`h-2 rounded-full ${
                           originalRenderStatus.availableRewards >= originalRenderStatus.requiredRewards 
-                            ? 'bg-green-500' 
-                            : 'bg-yellow-500'
+                            ? 'bg-success' 
+                            : 'bg-warning'
                         }`}
                         style={{ 
                           width: `${Math.min(100, (originalRenderStatus.availableRewards / originalRenderStatus.requiredRewards) * 100)}%` 
                         }}
                       ></div>
                     </div>
-                    <div className="text-xs text-gray-300">
+                    <div className="text-xs text-text-muted">
                       Required: {originalRenderStatus.requiredRewards} rewards (1 per JSON)
                       {renderStatus.missingRewards > 0 && (
-                        <span className="text-red-400 ml-2">Missing: {renderStatus.missingRewards}</span>
+                        <span className="text-danger ml-2">Missing: {renderStatus.missingRewards}</span>
                       )}
                     </div>
                   </div>
                   
                   {/* Quiz 3 Image Options Requirements */}
-                  <div className="mb-3 p-2 bg-gray-800 rounded">
-                    <div className="text-xs font-medium text-purple-400 mb-1">
+                  <div className="mb-3 p-2 bg-surface rounded">
+                    <div className="text-xs font-medium text-accent mb-1">
                       🖼️ Quiz 3 Image Options: {renderStatus.quiz3ImageProgress}
                     </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
+                    <div className="w-full bg-surface-raised rounded-full h-2 mb-1">
                       <div 
                         className={`h-2 rounded-full ${
                           originalRenderStatus.availableQuiz3Images >= originalRenderStatus.requiredQuiz3Images 
-                            ? 'bg-green-500' 
-                            : 'bg-purple-500'
+                            ? 'bg-success' 
+                            : 'bg-accent'
                         }`}
                         style={{ 
                           width: `${Math.min(100, (originalRenderStatus.availableQuiz3Images / originalRenderStatus.requiredQuiz3Images) * 100)}%` 
                         }}
                       ></div>
                     </div>
-                    <div className="text-xs text-gray-300">
+                    <div className="text-xs text-text-muted">
                       Required: {originalRenderStatus.requiredQuiz3Images} images ({renderStatus.jsonCount} JSONs × 4 images each)
                       {renderStatus.missingQuiz3Images > 0 && (
-                        <span className="text-red-400 ml-2">Missing: {renderStatus.missingQuiz3Images}</span>
+                        <span className="text-danger ml-2">Missing: {renderStatus.missingQuiz3Images}</span>
                       )}
                     </div>
                   </div>
@@ -4782,7 +4782,7 @@ export default function AssetsPage() {
                   {/* Asset Status Tags */}
                   <div className="flex flex-wrap gap-2">
                     {renderStatus.statuses.map((status, index) => (
-                      <span key={index} className="text-xs bg-gray-600 text-gray-200 px-2 py-1 rounded">
+                      <span key={index} className="text-xs bg-surface-raised text-text-muted px-2 py-1 rounded">
                         {status}
                       </span>
                     ))}
@@ -4797,33 +4797,33 @@ export default function AssetsPage() {
                     <div 
                       key={`${pair.json.id}-${index}`}
                       id={`json-pair-${pair.json.id}`}
-                      className="bg-gray-700 rounded-lg p-6 border border-gray-600"
+                      className="bg-surface-raised rounded-lg p-6 border border-border"
                     >
                       <div className="flex items-center gap-4 mb-4">
                         <span className="text-4xl">📄</span>
                         <div className="flex-1">
-                          <span className="text-lg font-semibold text-green-400">JSON {pair.json.order || index + 1}</span>
+                          <span className="text-lg font-semibold text-success">JSON {pair.json.order || index + 1}</span>
                           <div className="flex items-center gap-2 mt-1">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               pair.hasAllVoices 
-                                ? 'bg-green-900 text-green-300 border border-green-600' 
-                                : 'bg-orange-900 text-orange-300 border border-orange-600'
+                                ? 'bg-success-bg text-success border border-success' 
+                                : 'bg-warning-bg text-warning border border-warning'
                             }`}>
                               {pair.hasAllVoices ? '✅ All Voices' : `🎵 ${pair.voices.length}/9 Voices`}
                             </span>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               pair.hasReward 
-                                ? 'bg-green-900 text-green-300 border border-green-600' 
-                                : 'bg-yellow-900 text-yellow-300 border border-yellow-600'
+                                ? 'bg-success-bg text-success border border-success' 
+                                : 'bg-warning-bg text-warning border border-warning'
                             }`}>
                               {pair.hasReward ? '🏆 Has Reward' : '🏆 No Reward'}
                             </span>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               pair.quiz3ImageOptions.options.length === 0
-                                ? 'bg-gray-900 text-gray-300 border border-gray-600'
+                                ? 'bg-surface-sunken text-text-muted border border-border'
                                 : pair.quiz3ImageOptions.hasAllImages 
-                                  ? 'bg-green-900 text-green-300 border border-green-600' 
-                                  : 'bg-red-900 text-red-300 border border-red-600'
+                                  ? 'bg-success-bg text-success border border-success' 
+                                  : 'bg-danger-bg text-danger border border-danger'
                             }`}>
                               {pair.quiz3ImageOptions.options.length === 0 
                                 ? '🖼️ No Options'
@@ -4836,46 +4836,46 @@ export default function AssetsPage() {
                         </div>
                       </div>
                       
-                      <p className="text-base text-gray-200 truncate mb-3 font-medium">{pair.json.name}</p>
-                      <p className="text-base text-gray-400 mb-4">{formatFileSize(pair.json.size || 0)}</p>
+                      <p className="text-base text-text-muted truncate mb-3 font-medium">{pair.json.name}</p>
+                      <p className="text-base text-text-muted mb-4">{formatFileSize(pair.json.size || 0)}</p>
                       
                       {/* Voice Status Details */}
-                      <div className="mb-4 p-3 bg-gray-800 rounded-lg">
-                        <div className="text-sm font-medium text-gray-300 mb-2">Voice Files:</div>
+                      <div className="mb-4 p-3 bg-surface rounded-lg">
+                        <div className="text-sm font-medium text-text-muted mb-2">Voice Files:</div>
                         <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className={`flex items-center gap-1 ${pair.voiceTypes.intro ? 'text-green-400' : 'text-red-400'}`}>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.intro ? 'text-success' : 'text-danger'}`}>
                             <span>{pair.voiceTypes.intro ? '✅' : '❌'}</span>
                             <span>Intro</span>
                           </div>
-                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz1_question ? 'text-green-400' : 'text-red-400'}`}>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz1_question ? 'text-success' : 'text-danger'}`}>
                             <span>{pair.voiceTypes.quiz1_question ? '✅' : '❌'}</span>
                             <span>Quiz 1 Q</span>
                           </div>
-                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz1_answer ? 'text-green-400' : 'text-red-400'}`}>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz1_answer ? 'text-success' : 'text-danger'}`}>
                             <span>{pair.voiceTypes.quiz1_answer ? '✅' : '❌'}</span>
                             <span>Quiz 1 A</span>
                           </div>
-                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz2_question ? 'text-green-400' : 'text-red-400'}`}>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz2_question ? 'text-success' : 'text-danger'}`}>
                             <span>{pair.voiceTypes.quiz2_question ? '✅' : '❌'}</span>
                             <span>Quiz 2 Q</span>
                           </div>
-                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz2_answer ? 'text-green-400' : 'text-red-400'}`}>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz2_answer ? 'text-success' : 'text-danger'}`}>
                             <span>{pair.voiceTypes.quiz2_answer ? '✅' : '❌'}</span>
                             <span>Quiz 2 A</span>
                           </div>
-                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz3_question ? 'text-green-400' : 'text-red-400'}`}>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz3_question ? 'text-success' : 'text-danger'}`}>
                             <span>{pair.voiceTypes.quiz3_question ? '✅' : '❌'}</span>
                             <span>Quiz 3 Q</span>
                           </div>
-                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz3_answer ? 'text-green-400' : 'text-red-400'}`}>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.quiz3_answer ? 'text-success' : 'text-danger'}`}>
                             <span>{pair.voiceTypes.quiz3_answer ? '✅' : '❌'}</span>
                             <span>Quiz 3 A</span>
                           </div>
-                          <div className={`flex items-center gap-1 ${pair.voiceTypes.lesson ? 'text-green-400' : 'text-red-400'}`}>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.lesson ? 'text-success' : 'text-danger'}`}>
                             <span>{pair.voiceTypes.lesson ? '✅' : '❌'}</span>
                             <span>Lesson</span>
                           </div>
-                          <div className={`flex items-center gap-1 ${pair.voiceTypes.reward ? 'text-green-400' : 'text-red-400'}`}>
+                          <div className={`flex items-center gap-1 ${pair.voiceTypes.reward ? 'text-success' : 'text-danger'}`}>
                             <span>{pair.voiceTypes.reward ? '✅' : '❌'}</span>
                             <span>Reward</span>
                           </div>
@@ -4883,13 +4883,13 @@ export default function AssetsPage() {
                       </div>
                       
                       {/* Reward Status */}
-                      <div className="mb-4 p-3 bg-gray-800 rounded-lg">
-                        <div className="text-sm font-medium text-gray-300 mb-2">Reward Video:</div>
+                      <div className="mb-4 p-3 bg-surface rounded-lg">
+                        <div className="text-sm font-medium text-text-muted mb-2">Reward Video:</div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-lg ${pair.hasReward ? 'text-green-400' : 'text-red-400'}`}>
+                          <span className={`text-lg ${pair.hasReward ? 'text-success' : 'text-danger'}`}>
                             {pair.hasReward ? '✅' : '❌'}
                           </span>
-                          <span className="text-sm text-gray-300">
+                          <span className="text-sm text-text-muted">
                             {pair.hasReward 
                               ? `Reward video available (${pair.reward?.name || 'Unknown'})`
                               : 'No reward video found'
@@ -4899,13 +4899,13 @@ export default function AssetsPage() {
                       </div>
                       
                       {/* Quiz 3 Image Options Status */}
-                      <div className="mb-4 p-3 bg-gray-800 rounded-lg">
-                        <div className="text-sm font-medium text-gray-300 mb-2">Quiz 3 Image Options:</div>
+                      <div className="mb-4 p-3 bg-surface rounded-lg">
+                        <div className="text-sm font-medium text-text-muted mb-2">Quiz 3 Image Options:</div>
                         <div className="flex items-center gap-2 mb-2">
-                          <span className={`text-lg ${pair.quiz3ImageOptions.hasAllImages ? 'text-green-400' : 'text-red-400'}`}>
+                          <span className={`text-lg ${pair.quiz3ImageOptions.hasAllImages ? 'text-success' : 'text-danger'}`}>
                             {pair.quiz3ImageOptions.hasAllImages ? '✅' : '❌'}
                           </span>
-                          <span className="text-sm text-gray-300">
+                          <span className="text-sm text-text-muted">
                             {pair.quiz3ImageOptions.options.length === 0 
                               ? 'No quiz 3 options found'
                               : pair.quiz3ImageOptions.hasAllImages 
@@ -4916,12 +4916,12 @@ export default function AssetsPage() {
                         </div>
                         
                         {/* Progress bar */}
-                        <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+                        <div className="w-full bg-surface-raised rounded-full h-2 mb-2">
                           <div 
                             className={`h-2 rounded-full ${
                               pair.quiz3ImageOptions.hasAllImages 
-                                ? 'bg-green-500' 
-                                : 'bg-red-500'
+                                ? 'bg-success' 
+                                : 'bg-danger'
                             }`}
                             style={{ 
                               width: `${pair.quiz3ImageOptions.completionRate}%` 
@@ -4930,13 +4930,13 @@ export default function AssetsPage() {
                         </div>
                         
                         {/* Options list */}
-                        <div className="text-xs text-gray-300 mb-2">
+                        <div className="text-xs text-text-muted mb-2">
                           {pair.quiz3ImageOptions.options.length === 0 
                             ? 'No quiz 3 options found in JSON'
                             : `Required: ${pair.quiz3ImageOptions.options.length} images for quiz 3 options`
                           }
                           {pair.quiz3ImageOptions.missingImages.length > 0 && (
-                            <span className="text-red-400 ml-2">Missing: {pair.quiz3ImageOptions.missingImages.join(', ')}</span>
+                            <span className="text-danger ml-2">Missing: {pair.quiz3ImageOptions.missingImages.join(', ')}</span>
                           )}
                         </div>
                         
@@ -4955,8 +4955,8 @@ export default function AssetsPage() {
                                 key={idx}
                                 className={`flex items-center justify-between ${
                                   isAvailable 
-                                    ? 'text-green-400' 
-                                    : 'text-red-400'
+                                    ? 'text-success' 
+                                    : 'text-danger'
                                 }`}
                               >
                                 <div className="flex items-center gap-1">
@@ -4968,7 +4968,7 @@ export default function AssetsPage() {
                                 {isAvailable && matchingImage && (
                                   <button
                                     onClick={() => handleEditImage(matchingImage, 'quiz3')}
-                                    className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/30 hover:bg-blue-900/50 rounded px-1 py-0.5 transition-colors"
+                                    className="flex items-center gap-1 text-xs text-info hover:text-info bg-info-bg/30 hover:bg-surface/50 rounded px-1 py-0.5 transition-colors"
                                   >
                                     <PencilIcon className="w-2 h-2" />
                                   </button>
@@ -4983,7 +4983,7 @@ export default function AssetsPage() {
                           <button
                             onClick={() => showProviderSelectionForMissingImages(pair)}
                             disabled={imageGeneratingStates[`${pair.json.key}_${pair.json.order}`]}
-                            className="w-full mt-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:text-gray-400 rounded-lg px-3 py-2 text-center transition-colors"
+                            className="w-full mt-2 text-sm text-white bg-info hover:opacity-90 disabled:bg-surface-raised disabled:text-text-muted rounded-lg px-3 py-2 text-center transition-colors"
                           >
                             {imageGeneratingStates[`${pair.json.key}_${pair.json.order}`] ? (
                               <div className="flex items-center justify-center gap-2">
@@ -4998,21 +4998,21 @@ export default function AssetsPage() {
                       </div>
                       
                       {/* Image Status */}
-                      <div className="mb-4 p-3 bg-gray-800 rounded-lg">
-                        <div className="text-sm font-medium text-gray-300 mb-2">Main Image:</div>
+                      <div className="mb-4 p-3 bg-surface rounded-lg">
+                        <div className="text-sm font-medium text-text-muted mb-2">Main Image:</div>
                         {(() => {
                           const matchingImage = group.assets.images.find(img => img.order === pair.json.order);
                           return matchingImage ? (
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <span className="text-lg text-green-400">✅</span>
-                                <span className="text-sm text-gray-300">
+                                <span className="text-lg text-success">✅</span>
+                                <span className="text-sm text-text-muted">
                                   Image available ({matchingImage.name})
                                 </span>
                               </div>
                               <button
                                 onClick={() => handleEditImage(matchingImage, 'main')}
-                                className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/30 hover:bg-blue-900/50 rounded px-2 py-1 transition-colors"
+                                className="flex items-center gap-1 text-xs text-info hover:text-info bg-info-bg/30 hover:bg-surface/50 rounded px-2 py-1 transition-colors"
                               >
                                 <PencilIcon className="w-3 h-3" />
                                 Edit
@@ -5021,15 +5021,15 @@ export default function AssetsPage() {
                           ) : (
                             <div className="flex flex-col gap-2">
                               <div className="flex items-center gap-2">
-                                <span className="text-lg text-red-400">❌</span>
-                                <span className="text-sm text-gray-300">
+                                <span className="text-lg text-danger">❌</span>
+                                <span className="text-sm text-text-muted">
                                   No image found for order {pair.json.order}
                                 </span>
                               </div>
                               <button
                                 onClick={() => showProviderSelectionForMainImage(pair.json)}
                                 disabled={imageGeneratingStates[`${pair.json.key}_${pair.json.order}`]}
-                                className="text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:text-gray-400 rounded px-3 py-1 transition-colors"
+                                className="text-sm text-white bg-info hover:opacity-90 disabled:bg-surface-raised disabled:text-text-muted rounded px-3 py-1 transition-colors"
                               >
                                 {imageGeneratingStates[`${pair.json.key}_${pair.json.order}`] ? (
                                   <div className="flex items-center justify-center gap-2">
@@ -5046,21 +5046,21 @@ export default function AssetsPage() {
                       </div>
                       
                       {/* Video Status */}
-                      <div className="mb-4 p-3 bg-gray-800 rounded-lg">
-                        <div className="text-sm font-medium text-gray-300 mb-2">Main Video:</div>
+                      <div className="mb-4 p-3 bg-surface rounded-lg">
+                        <div className="text-sm font-medium text-text-muted mb-2">Main Video:</div>
                         {(() => {
                           const matchingVideo = group.assets.videos.find(vid => vid.order === pair.json.order);
                           return matchingVideo ? (
                             <div className="flex items-center gap-2">
-                              <span className="text-lg text-green-400">✅</span>
-                              <span className="text-sm text-gray-300">
+                              <span className="text-lg text-success">✅</span>
+                              <span className="text-sm text-text-muted">
                                 Video available ({matchingVideo.name})
                               </span>
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <span className="text-lg text-red-400">❌</span>
-                              <span className="text-sm text-gray-300">
+                              <span className="text-lg text-danger">❌</span>
+                              <span className="text-sm text-text-muted">
                                 No video found for order {pair.json.order}
                               </span>
                             </div>
@@ -5072,13 +5072,13 @@ export default function AssetsPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handlePreviewAsset(pair.json)}
-                          className="flex-1 text-base text-gray-300 bg-gray-800 rounded-lg px-4 py-2 text-center hover:bg-gray-700 transition-colors"
+                          className="flex-1 text-base text-text-muted bg-surface rounded-lg px-4 py-2 text-center hover:bg-surface transition-colors"
                         >
                           View JSON
                         </button>
                         <button
                           onClick={() => handlePreviewAsset(pair.json, true)}
-                          className="flex-1 text-base text-purple-300 bg-purple-800 rounded-lg px-4 py-2 text-center hover:bg-purple-700 transition-colors"
+                          className="flex-1 text-base text-accent bg-accent-muted rounded-lg px-4 py-2 text-center hover:bg-accent-hover transition-colors"
                         >
                           🎬 Preview Video
                         </button>
@@ -5086,7 +5086,7 @@ export default function AssetsPage() {
                           <button
                             onClick={() => handleGenerateVoice(pair.json)}
                             disabled={voiceGeneratingStates[`${pair.json.key}_${pair.json.order}`]}
-                            className="flex-1 text-base text-white bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:text-gray-400 rounded-lg px-4 py-2 text-center transition-colors"
+                            className="flex-1 text-base text-white bg-warning hover:opacity-90 disabled:bg-surface-raised disabled:text-text-muted rounded-lg px-4 py-2 text-center transition-colors"
                           >
                             {voiceGeneratingStates[`${pair.json.key}_${pair.json.order}`] ? (
                               <div className="flex items-center justify-center gap-2">
@@ -5100,14 +5100,14 @@ export default function AssetsPage() {
                         )}
                                                   <button
                           onClick={() => handleFetchCrawlerResources(pair.json)}
-                          className="flex-1 text-base text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-4 py-2 text-center transition-colors"
+                          className="flex-1 text-base text-white bg-info hover:opacity-90 rounded-lg px-4 py-2 text-center transition-colors"
                         >
                           🖼️ Use Crawled Media
                         </button>
                         {!pair.hasReward && (
                           <button
                             onClick={() => handleGenerateReward(pair.json)}
-                            className="flex-1 text-base text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg px-4 py-2 text-center transition-colors"
+                            className="flex-1 text-base text-white bg-warning hover:opacity-90 rounded-lg px-4 py-2 text-center transition-colors"
                           >
                             Generate Reward
                           </button>
@@ -5120,16 +5120,16 @@ export default function AssetsPage() {
                   {group.assets.rewards.map((reward, index) => (
                     <div 
                       key={`${reward.id}-${index}`} 
-                      className="bg-gray-700 rounded-lg p-6 cursor-pointer hover:bg-gray-600 transition-colors border border-gray-600 hover:border-purple-500"
+                      className="bg-surface-raised rounded-lg p-6 cursor-pointer hover:bg-surface transition-colors border border-border hover:border-accent"
                       onClick={() => handlePreviewAsset(reward)}
                     >
                       <div className="flex items-center gap-4 mb-4">
                         <span className="text-4xl">🏆</span>
-                        <span className="text-lg font-semibold text-yellow-400">Reward {index + 1}</span>
+                        <span className="text-lg font-semibold text-warning">Reward {index + 1}</span>
                       </div>
-                      <p className="text-base text-gray-200 truncate mb-3 font-medium">{reward.name}</p>
-                      <p className="text-base text-gray-400 mb-4">{formatFileSize(reward.size || 0)}</p>
-                      <div className="text-base text-gray-300 bg-gray-800 rounded-lg px-4 py-2 text-center hover:bg-gray-700 transition-colors">Click to play</div>
+                      <p className="text-base text-text-muted truncate mb-3 font-medium">{reward.name}</p>
+                      <p className="text-base text-text-muted mb-4">{formatFileSize(reward.size || 0)}</p>
+                      <div className="text-base text-text-muted bg-surface rounded-lg px-4 py-2 text-center hover:bg-surface transition-colors">Click to play</div>
                     </div>
                   ))}
                 </div>
@@ -5144,33 +5144,33 @@ export default function AssetsPage() {
                   });
                   
                   return orphanedVoices.length > 0 ? (
-                    <div className="mt-6 bg-gray-700 rounded-lg p-6">
+                    <div className="mt-6 bg-surface-raised rounded-lg p-6">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
                           <span className="text-3xl">🎵</span>
-                          <span className="text-xl font-semibold text-orange-400">Orphaned Voice Files ({orphanedVoices.length})</span>
+                          <span className="text-xl font-semibold text-warning">Orphaned Voice Files ({orphanedVoices.length})</span>
                         </div>
                         <button
                           onClick={() => {
                             setPreviewAsset(orphanedVoices[0]);
                             setShowPreview(true);
                           }}
-                          className="text-sm bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg transition-colors"
+                          className="text-sm bg-warning text-white hover:opacity-90 px-4 py-2 rounded-lg transition-colors"
                         >
                           Preview Sample
                         </button>
                       </div>
-                      <div className="text-base text-gray-300 mb-3">
+                      <div className="text-base text-text-muted mb-3">
                         {orphanedVoices.length} voice files not associated with any JSON file
                       </div>
-                      <div className="text-sm text-gray-500 mb-4">
+                      <div className="text-sm text-text-muted mb-4">
                         These voices may need to be manually organized or deleted
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                         {orphanedVoices.slice(0, 12).map((voice, index) => (
                           <div 
                             key={`${voice.id}-${index}`} 
-                            className="text-sm text-gray-400 truncate cursor-pointer hover:text-orange-400 transition-colors p-2 bg-gray-800 rounded hover:bg-gray-700"
+                            className="text-sm text-text-muted truncate cursor-pointer hover:text-warning transition-colors p-2 bg-surface rounded hover:bg-surface"
                             onClick={() => handlePreviewAsset(voice)}
                             title={voice.name}
                           >
@@ -5178,7 +5178,7 @@ export default function AssetsPage() {
                           </div>
                         ))}
                         {orphanedVoices.length > 12 && (
-                          <div className="text-sm text-gray-500 p-2 bg-gray-800 rounded">
+                          <div className="text-sm text-text-muted p-2 bg-surface rounded">
                             +{orphanedVoices.length - 12} more...
                           </div>
                         )}
@@ -5201,7 +5201,7 @@ export default function AssetsPage() {
           <button
             onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 rounded-lg transition-colors"
+            className="px-4 py-2 bg-surface-raised hover:bg-surface disabled:bg-surface disabled:text-text-muted rounded-lg transition-colors"
           >
             ← Previous
           </button>
@@ -5225,8 +5225,8 @@ export default function AssetsPage() {
                   onClick={() => setCurrentPage(pageNum)}
                   className={`px-3 py-2 rounded-lg transition-colors ${
                     currentPage === pageNum
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                      ? 'bg-accent text-accent-fg'
+                      : 'bg-surface-raised hover:bg-surface text-text-muted'
                   }`}
                 >
                   {pageNum}
@@ -5238,12 +5238,12 @@ export default function AssetsPage() {
           <button
             onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
             disabled={currentPage === totalPages}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 rounded-lg transition-colors"
+            className="px-4 py-2 bg-surface-raised hover:bg-surface disabled:bg-surface disabled:text-text-muted rounded-lg transition-colors"
           >
             Next →
           </button>
           
-          <span className="text-sm text-gray-400 ml-4">
+          <span className="text-sm text-text-muted ml-4">
             Page {currentPage} of {totalPages} ({filteredAssetGroups.length} total)
           </span>
         </motion.div>
@@ -5264,13 +5264,13 @@ export default function AssetsPage() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+              className="bg-surface rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
             >
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold">AI Content Generator</h2>
                 <button
                   onClick={() => setShowAIGenerator(false)}
-                  className="text-gray-400 hover:text-white"
+                  className="text-text-muted hover:text-text"
                 >
                   <XCircleIcon className="w-6 h-6" />
                 </button>
@@ -5280,7 +5280,7 @@ export default function AssetsPage() {
                 {/* Input Section */}
                 <div className="space-y-4">
                   {/* Generation Mode Tabs */}
-                  <div className="flex bg-gray-700 rounded-lg p-1">
+                  <div className="flex bg-surface-raised rounded-lg p-1">
                     <button
                       onClick={() => {
                         setAiPrompt("");
@@ -5289,7 +5289,7 @@ export default function AssetsPage() {
                         setIsBatchMode(false);
                       }}
                       className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-                        !isBatchMode ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
+                        !isBatchMode ? 'bg-accent text-accent-fg' : 'text-text-muted hover:text-text'
                       }`}
                     >
                       Single Subject
@@ -5302,7 +5302,7 @@ export default function AssetsPage() {
                         setIsBatchMode(true);
                       }}
                       className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-                        isBatchMode ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
+                        isBatchMode ? 'bg-accent text-accent-fg' : 'text-text-muted hover:text-text'
                       }`}
                     >
                       Batch Generation
@@ -5313,7 +5313,7 @@ export default function AssetsPage() {
                   {!isBatchMode && (
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                        <label className="block text-sm font-medium text-text-muted mb-2">
                           Subject
                         </label>
                         <input
@@ -5321,10 +5321,10 @@ export default function AssetsPage() {
                           value={aiPrompt}
                           onChange={(e) => handleSubjectChange(e.target.value)}
                           placeholder="e.g., capybara, lion, tiger"
-                          className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                          className="w-full bg-surface-raised text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none"
                         />
                         {existingOrders.length > 0 && (
-                          <p className="text-sm text-blue-400 mt-1">
+                          <p className="text-sm text-info mt-1">
                             ℹ️ Existing orders: {existingOrders.join(', ')} → Next: {Math.max(...existingOrders) + 1}
                           </p>
                         )}
@@ -5333,7 +5333,7 @@ export default function AssetsPage() {
                       <button
                         onClick={generateAIContent}
                         disabled={aiGenerating || !aiPrompt.trim()}
-                        className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+                        className="w-full flex items-center justify-center gap-2 bg-accent text-accent-fg hover:bg-accent-hover disabled:bg-surface-raised px-4 py-2 rounded-lg transition-colors"
                       >
                         {aiGenerating ? (
                           <>
@@ -5354,7 +5354,7 @@ export default function AssetsPage() {
                   {isBatchMode && (
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                        <label className="block text-sm font-medium text-text-muted mb-2">
                           Subjects List (one per line, comma, or semicolon)
                         </label>
                         <textarea
@@ -5362,27 +5362,27 @@ export default function AssetsPage() {
                           onChange={(e) => setSubjectsList(e.target.value)}
                           placeholder="capybara&#10;lion&#10;tiger&#10;elephant"
                           rows={4}
-                          className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none resize-none"
+                          className="w-full bg-surface-raised text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none resize-none"
                         />
                         {(() => {
                           const subjects = parseSubjectsList(subjectsList);
                           const existingOrdersMap = getExistingOrdersForSubjects(subjects);
                           return subjects.length > 0 ? (
                             <div className="mt-2 space-y-1">
-                              <p className="text-sm text-blue-400">
+                              <p className="text-sm text-info">
                                 📋 {subjects.length} subjects detected
                               </p>
                               {subjects.slice(0, 3).map((subject, index) => {
                                 const normalizedSubject = subject.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
                                 const orders = existingOrdersMap[normalizedSubject] || [];
                                 return (
-                                  <p key={index} className="text-xs text-gray-400">
+                                  <p key={index} className="text-xs text-text-muted">
                                     • {subject}: {orders.length > 0 ? `Orders ${orders.join(', ')}` : 'No existing orders'}
                                   </p>
                                 );
                               })}
                               {subjects.length > 3 && (
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-text-muted">
                                   ... and {subjects.length - 3} more subjects
                                 </p>
                               )}
@@ -5392,7 +5392,7 @@ export default function AssetsPage() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                        <label className="block text-sm font-medium text-text-muted mb-2">
                           Content per Subject
                         </label>
                         <input
@@ -5401,26 +5401,26 @@ export default function AssetsPage() {
                           max="10"
                           value={batchSize}
                           onChange={(e) => setBatchSize(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                          className="w-full bg-surface-raised text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-text-muted mt-1">
                           Will generate {batchSize} content item(s) for each subject
                         </p>
                       </div>
 
                       {batchGenerating && batchProgress && (
                         <div className="mb-3">
-                          <div className="flex justify-between text-xs text-gray-400 mb-1">
+                          <div className="flex justify-between text-xs text-text-muted mb-1">
                             <span>Progress: {batchProgress.current}/{batchProgress.total}</span>
                             <span>{Math.round((batchProgress.current / batchProgress.total) * 100)}%</span>
                           </div>
-                          <div className="w-full bg-gray-700 rounded-full h-2">
+                          <div className="w-full bg-surface-raised rounded-full h-2">
                             <div 
-                              className="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                              className="bg-accent h-2 rounded-full transition-all duration-300"
                               style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
                             ></div>
                           </div>
-                          <p className="text-xs text-gray-400 mt-1">
+                          <p className="text-xs text-text-muted mt-1">
                             Currently generating: {batchProgress.subject}
                           </p>
                         </div>
@@ -5429,7 +5429,7 @@ export default function AssetsPage() {
                       <button
                         onClick={generateBatchAIContent}
                         disabled={batchGenerating || parseSubjectsList(subjectsList).length === 0}
-                        className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+                        className="w-full flex items-center justify-center gap-2 bg-accent text-accent-fg hover:bg-accent-hover disabled:bg-surface-raised px-4 py-2 rounded-lg transition-colors"
                       >
                         {batchGenerating ? (
                           <>
@@ -5448,7 +5448,7 @@ export default function AssetsPage() {
 
                   {/* Common Settings */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                    <label className="block text-sm font-medium text-text-muted mb-2">
                       Description
                     </label>
                     <textarea
@@ -5456,19 +5456,19 @@ export default function AssetsPage() {
                       onChange={(e) => setAiDescription(e.target.value)}
                       placeholder="Provide more details about the subject for better content generation..."
                       rows={3}
-                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none resize-none"
+                      className="w-full bg-surface-raised text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none resize-none"
                     />
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">
+                      <label className="block text-sm font-medium text-text-muted mb-2">
                         Language
                       </label>
                       <select
                         value={aiLanguage}
                         onChange={(e) => setAiLanguage(e.target.value)}
-                        className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                        className="w-full bg-surface-raised text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none"
                       >
                         <option value="vietnamese">Vietnamese</option>
                         <option value="english">English</option>
@@ -5476,13 +5476,13 @@ export default function AssetsPage() {
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">
+                      <label className="block text-sm font-medium text-text-muted mb-2">
                         AI Provider
                       </label>
                       <select
                         value={aiProvider}
                         onChange={(e) => setAiProvider(e.target.value)}
-                        className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                        className="w-full bg-surface-raised text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none"
                       >
                         <option value="grok">Grok (xAI)</option>
                         <option value="openai">OpenAI (GPT-4)</option>
@@ -5490,12 +5490,12 @@ export default function AssetsPage() {
                     </div>
                   </div>
                   
-                  <div className="text-sm text-gray-400 bg-gray-700 rounded-lg p-3">
+                  <div className="text-sm text-text-muted bg-surface-raised rounded-lg p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-purple-400">📁</span>
+                      <span className="text-accent">📁</span>
                       <span>Target: {selectedChannel}/{selectedTopic}</span>
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-text-muted">
                       Content will be generated for the current channel and topic selection.
                     </div>
                   </div>
@@ -5508,7 +5508,7 @@ export default function AssetsPage() {
                     {previewItems.length > 0 && (
                       <button
                         onClick={clearAllPreviews}
-                        className="text-sm text-red-400 hover:text-red-300"
+                        className="text-sm text-danger hover:text-danger"
                       >
                         Clear All
                       </button>
@@ -5516,8 +5516,8 @@ export default function AssetsPage() {
                   </div>
                   
                   {previewItems.length === 0 ? (
-                    <div className="bg-gray-700 rounded-lg p-4 space-y-4 max-h-96 overflow-y-auto">
-                      <div className="text-center text-gray-400 py-8">
+                    <div className="bg-surface-raised rounded-lg p-4 space-y-4 max-h-96 overflow-y-auto">
+                      <div className="text-center text-text-muted py-8">
                         <div className="text-4xl mb-2">📝</div>
                         <p>No preview items yet</p>
                         <p className="text-sm">Generate content to see previews here</p>
@@ -5537,9 +5537,9 @@ export default function AssetsPage() {
                         }, {} as { [key: string]: SK3QLRContent[] });
 
                         return Object.entries(groupedItems).map(([subject, items]) => (
-                          <div key={subject} className="bg-gray-700 rounded-lg p-4">
+                          <div key={subject} className="bg-surface-raised rounded-lg p-4">
                             <div className="flex items-center justify-between mb-3">
-                              <h4 className="font-medium text-purple-400 text-lg">
+                              <h4 className="font-medium text-accent text-lg">
                                 📁 {subject} ({items.length} items)
                               </h4>
                               <div className="flex gap-2">
@@ -5548,7 +5548,7 @@ export default function AssetsPage() {
                                     // Remove all items for this subject
                                     setPreviewItems(prev => prev.filter(item => item.key !== subject));
                                   }}
-                                  className="text-red-400 hover:text-red-300 text-sm"
+                                  className="text-danger hover:text-danger text-sm"
                                 >
                                   Remove All
                                 </button>
@@ -5557,14 +5557,14 @@ export default function AssetsPage() {
                             
                             <div className="space-y-3">
                               {items.sort((a, b) => (a.order || 0) - (b.order || 0)).map((item, index) => (
-                                <div key={item.id} className="bg-gray-800 rounded-lg p-3">
+                                <div key={item.id} className="bg-surface rounded-lg p-3">
                                   <div className="flex items-center justify-between mb-2">
-                                    <h5 className="font-medium text-blue-400 text-sm">
+                                    <h5 className="font-medium text-info text-sm">
                                       Order {item.order}
                                     </h5>
                                     <button
                                       onClick={() => removePreviewItem(previewItems.findIndex(p => p.id === item.id))}
-                                      className="text-red-400 hover:text-red-300 text-xs"
+                                      className="text-danger hover:text-danger text-xs"
                                     >
                                       Remove
                                     </button>
@@ -5572,20 +5572,20 @@ export default function AssetsPage() {
                                   
                                   <div className="space-y-2 text-xs">
                                     <div>
-                                      <span className="text-gray-400">Intro:</span>
-                                      <p className="text-gray-300 truncate">{item.intro.text}</p>
+                                      <span className="text-text-muted">Intro:</span>
+                                      <p className="text-text-muted truncate">{item.intro.text}</p>
                                     </div>
                                     <div>
-                                      <span className="text-gray-400">Quiz 1:</span>
-                                      <p className="text-gray-300 truncate">{item.quiz_1.question.text}</p>
+                                      <span className="text-text-muted">Quiz 1:</span>
+                                      <p className="text-text-muted truncate">{item.quiz_1.question.text}</p>
                                     </div>
                                     <div>
-                                      <span className="text-gray-400">Quiz 2:</span>
-                                      <p className="text-gray-300 truncate">{item.quiz_2.question.text}</p>
+                                      <span className="text-text-muted">Quiz 2:</span>
+                                      <p className="text-text-muted truncate">{item.quiz_2.question.text}</p>
                                     </div>
                                     <div>
-                                      <span className="text-gray-400">Quiz 3:</span>
-                                      <p className="text-gray-300 truncate">{item.quiz_3.question.text}</p>
+                                      <span className="text-text-muted">Quiz 3:</span>
+                                      <p className="text-text-muted truncate">{item.quiz_3.question.text}</p>
                                     </div>
                                   </div>
                                 </div>
@@ -5600,7 +5600,7 @@ export default function AssetsPage() {
                   <button
                     onClick={approveGeneratedContent}
                     disabled={previewItems.length === 0}
-                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+                    className="w-full bg-success text-white hover:opacity-90 disabled:bg-surface-raised px-4 py-2 rounded-lg transition-colors"
                   >
                     Approve & Create {previewItems.length} Render File{previewItems.length !== 1 ? 's' : ''}
                   </button>
@@ -5625,19 +5625,19 @@ export default function AssetsPage() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-gray-800 rounded-lg p-6 w-full max-w-6xl max-h-[95vh] overflow-y-auto"
+              className="bg-surface rounded-lg p-6 w-full max-w-6xl max-h-[95vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-white">{previewAsset.name}</h3>
-                  <p className="text-sm text-gray-400">
+                  <h3 className="text-xl font-bold text-text">{previewAsset.name}</h3>
+                  <p className="text-sm text-text-muted">
                     {previewAsset.type.toUpperCase()} • {formatFileSize(previewAsset.size || 0)}
                   </p>
                 </div>
                 <button
                   onClick={handleClosePreview}
-                  className="text-gray-400 hover:text-white"
+                  className="text-text-muted hover:text-text"
                 >
                   <XCircleIcon className="w-6 h-6" />
                 </button>
@@ -5656,7 +5656,7 @@ export default function AssetsPage() {
                     link.download = previewAsset.name;
                     link.click();
                   }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+                  className="px-4 py-2 bg-info text-white hover:opacity-90 rounded transition-colors"
                 >
                   Download
                 </button>
@@ -5689,13 +5689,13 @@ export default function AssetsPage() {
                       }
                     }
                   }}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition-colors"
+                  className="px-4 py-2 bg-danger text-white hover:opacity-90 rounded transition-colors"
                 >
                   Delete
                 </button>
                 <button
                   onClick={handleClosePreview}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                  className="px-4 py-2 bg-surface-raised hover:bg-surface rounded transition-colors"
                 >
                   Close
                 </button>
@@ -5718,15 +5718,15 @@ export default function AssetsPage() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-gray-800 rounded-lg p-6 w-full max-w-md"
+              className="bg-surface rounded-lg p-6 w-full max-w-md"
             >
               <div className="text-center">
                 <div className="text-6xl mb-4">✅</div>
-                <h3 className="text-xl font-bold text-green-400 mb-2">Success!</h3>
-                <p className="text-gray-300 mb-6">{successMessage}</p>
+                <h3 className="text-xl font-bold text-success mb-2">Success!</h3>
+                <p className="text-text-muted mb-6">{successMessage}</p>
                 <button
                   onClick={() => setShowSuccessDialog(false)}
-                  className="w-full bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
+                  className="w-full bg-accent text-accent-fg hover:bg-accent-hover px-4 py-2 rounded-lg transition-colors"
                 >
                   Close
                 </button>
@@ -5749,19 +5749,19 @@ export default function AssetsPage() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-gray-800 rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col"
+              className="bg-surface rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col"
             >
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">📤 Upload Missing Assets</h2>
-                  <p className="text-sm text-gray-400 mt-1">
+                  <h2 className="text-2xl font-bold text-text">📤 Upload Missing Assets</h2>
+                  <p className="text-sm text-text-muted mt-1">
                     {baseMissingResources.length} groups with missing assets • {baseMissingResources.reduce((sum, group) => sum + group.missingResources.reduce((s, r) => s + r.count, 0), 0)} total items to upload
                   </p>
                 </div>
                 <button
                   onClick={() => setShowUploadDialog(false)}
-                  className="text-gray-400 hover:text-white transition-colors"
+                  className="text-text-muted hover:text-text transition-colors"
                 >
                   <XCircleIcon className="w-6 h-6" />
                 </button>
@@ -5771,10 +5771,10 @@ export default function AssetsPage() {
               <div className="mb-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {[
-                    { type: 'image', icon: '🖼️', label: 'Images', color: 'bg-red-600' },
-                    { type: 'video', icon: '🎥', label: 'Videos', color: 'bg-red-600' },
-                    { type: 'quiz3-image', icon: '🖼️', label: 'Quiz 3 Images', color: 'bg-blue-600' },
-                    { type: 'reward', icon: '🏆', label: 'Rewards', color: 'bg-yellow-600' }
+                    { type: 'image', icon: '🖼️', label: 'Images', color: 'bg-danger' },
+                    { type: 'video', icon: '🎥', label: 'Videos', color: 'bg-danger' },
+                    { type: 'quiz3-image', icon: '🖼️', label: 'Quiz 3 Images', color: 'bg-info' },
+                    { type: 'reward', icon: '🏆', label: 'Rewards', color: 'bg-warning' }
                   ].map(({ type, icon, label, color }) => {
                     const count = baseMissingResources.reduce((sum, group) => 
                       sum + group.missingResources.filter(r => r.type === type).reduce((s, r) => s + r.count, 0), 0
@@ -5799,11 +5799,11 @@ export default function AssetsPage() {
                 <div className="flex flex-wrap gap-4 items-center">
                   {/* Simple Group Selection */}
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-300">Group:</label>
+                    <label className="text-sm font-medium text-text-muted">Group:</label>
                     <select
                       value={uploadSearchQuery}
                       onChange={(e) => setUploadSearchQuery(e.target.value)}
-                      className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-1 bg-surface-raised border border-border rounded text-sm text-text focus:outline-none focus:ring-2 focus:ring-info"
                     >
                       <option value="">All Groups</option>
                       {baseMissingResources.map(group => (
@@ -5815,11 +5815,11 @@ export default function AssetsPage() {
                   </div>
                   {/* Resource Type Filter */}
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-300">Filter:</label>
+                    <label className="text-sm font-medium text-text-muted">Filter:</label>
                     <select
                       value={uploadResourceFilter}
                       onChange={(e) => setUploadResourceFilter(e.target.value as any)}
-                      className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-1 bg-surface-raised border border-border rounded text-sm text-text focus:outline-none focus:ring-2 focus:ring-info"
                     >
                       <option value="all">All Resources</option>
                       <option value="image">🖼️ Images</option>
@@ -5831,11 +5831,11 @@ export default function AssetsPage() {
 
                   {/* Sort By */}
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-300">Sort by:</label>
+                    <label className="text-sm font-medium text-text-muted">Sort by:</label>
                     <select
                       value={uploadSortBy}
                       onChange={(e) => setUploadSortBy(e.target.value as any)}
-                      className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-1 bg-surface-raised border border-border rounded text-sm text-text focus:outline-none focus:ring-2 focus:ring-info"
                     >
                       <option value="priority">Priority</option>
                       <option value="name">Name</option>
@@ -5845,10 +5845,10 @@ export default function AssetsPage() {
 
                   {/* Sort Order */}
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-300">Order:</label>
+                    <label className="text-sm font-medium text-text-muted">Order:</label>
                     <button
                       onClick={() => setUploadSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                      className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-1 bg-surface-raised border border-border rounded text-sm text-text hover:bg-surface focus:outline-none focus:ring-2 focus:ring-info"
                     >
                       {uploadSortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
                     </button>
@@ -5861,14 +5861,14 @@ export default function AssetsPage() {
                         setUploadSearchQuery("");
                         setUploadResourceFilter('all');
                       }}
-                      className="px-3 py-1 bg-gray-600 border border-gray-500 rounded text-sm text-white hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-1 bg-surface-raised border border-border rounded text-sm text-text hover:bg-surface focus:outline-none focus:ring-2 focus:ring-info"
                     >
                       Clear Filters
                     </button>
                   )}
 
                   {/* Results Count */}
-                  <div className="ml-auto text-sm text-gray-400">
+                  <div className="ml-auto text-sm text-text-muted">
                     {filteredMissingResources.length} of {baseMissingResources.length} groups
                   </div>
                 </div>
@@ -5881,29 +5881,29 @@ export default function AssetsPage() {
                     {baseMissingResources.length === 0 ? (
                       <>
                         <div className="text-6xl mb-4">🎉</div>
-                        <h3 className="text-xl font-bold text-green-400 mb-2">All Assets Complete!</h3>
-                        <p className="text-gray-300">No missing assets found. All groups are ready for rendering.</p>
+                        <h3 className="text-xl font-bold text-success mb-2">All Assets Complete!</h3>
+                        <p className="text-text-muted">No missing assets found. All groups are ready for rendering.</p>
                       </>
                     ) : (
                       <>
                         <div className="text-6xl mb-4">🔍</div>
-                        <h3 className="text-xl font-bold text-gray-400 mb-2">No Results Found</h3>
-                        <p className="text-gray-300">Try adjusting your search or filter criteria.</p>
+                        <h3 className="text-xl font-bold text-text-muted mb-2">No Results Found</h3>
+                        <p className="text-text-muted">Try adjusting your search or filter criteria.</p>
                       </>
                     )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {filteredMissingResources.map((group) => (
-                      <div key={group.key} className="bg-gray-700 rounded-lg p-4 border border-gray-600 hover:border-gray-500 transition-colors">
+                      <div key={group.key} className="bg-surface-raised rounded-lg p-4 border border-border hover:border-border-strong transition-colors">
                         {/* Group Header */}
                         <div className="flex items-center justify-between mb-3">
-                          <h3 className="text-lg font-semibold text-white capitalize">
+                          <h3 className="text-lg font-semibold text-text capitalize">
                             {group.name}
                           </h3>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-400">Priority:</span>
-                            <span className="px-2 py-1 bg-purple-600 text-white text-xs rounded font-medium">
+                            <span className="text-xs text-text-muted">Priority:</span>
+                            <span className="px-2 py-1 bg-accent text-accent-fg text-xs rounded font-medium">
                               {group.priority}
                             </span>
                           </div>
@@ -5911,10 +5911,10 @@ export default function AssetsPage() {
 
                         {/* Missing Resources Count */}
                         <div className="mb-3">
-                          <div className="flex items-center gap-2 text-sm text-gray-300">
+                          <div className="flex items-center gap-2 text-sm text-text-muted">
                             <span>📦</span>
                             <span>{group.missingResources.length} resource{group.missingResources.length !== 1 ? 's' : ''} missing</span>
-                            <span className="text-gray-500">•</span>
+                            <span className="text-text-muted">•</span>
                             <span>{group.missingResources.reduce((sum, resource) => sum + resource.count, 0)} total items</span>
                           </div>
                         </div>
@@ -5924,19 +5924,19 @@ export default function AssetsPage() {
                           {group.missingResources.map((resource, index) => (
                             <div
                               key={`${group.key}-${resource.type}-${index}`}
-                              className="bg-gray-600 rounded-lg p-3 border border-gray-500 hover:border-gray-400 transition-colors"
+                              className="bg-surface-raised rounded-lg p-3 border border-border hover:border-border-strong transition-colors"
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
                                   <span className="text-xl">{resource.icon}</span>
-                                  <span className="font-medium text-white text-sm">{resource.label}</span>
+                                  <span className="font-medium text-text text-sm">{resource.label}</span>
                                 </div>
                                 <span className={`px-2 py-1 text-xs rounded text-white font-medium ${resource.color}`}>
                                   {resource.count}
                                 </span>
                               </div>
                               
-                              <p className="text-xs text-gray-300 mb-3 leading-relaxed">
+                              <p className="text-xs text-text-muted mb-3 leading-relaxed">
                                 {resource.description}
                               </p>
 
@@ -5946,10 +5946,10 @@ export default function AssetsPage() {
                                   {resource.items.map((item, itemIndex) => (
                                     <div
                                       key={`${group.key}-${resource.type}-${item.key}-${itemIndex}`}
-                                      className="bg-gray-700 rounded p-2 border border-gray-600 hover:border-gray-500 transition-colors"
+                                      className="bg-surface-raised rounded p-2 border border-border hover:border-border-strong transition-colors"
                                     >
                                       <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs font-medium text-white truncate">
+                                        <span className="text-xs font-medium text-text truncate">
                                           {item.name}
                                         </span>
                                         <button
@@ -5988,8 +5988,8 @@ export default function AssetsPage() {
                                           disabled={uploadingStates[getUploadKey(group.key, resource.type, item.jsonOrder)]}
                                           className={`px-2 py-1 rounded text-xs transition-colors flex items-center gap-1 ${
                                             uploadingStates[getUploadKey(group.key, resource.type, item.jsonOrder)]
-                                              ? 'bg-gray-500 cursor-not-allowed text-gray-300' 
-                                              : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                              ? 'bg-surface-raised cursor-not-allowed text-text-muted' 
+                                              : 'bg-info hover:opacity-90 text-white'
                                           }`}
                                         >
                                           {uploadingStates[getUploadKey(group.key, resource.type, item.jsonOrder)] ? (
@@ -6005,7 +6005,7 @@ export default function AssetsPage() {
                                           )}
                                         </button>
                                       </div>
-                                      <p className="text-xs text-gray-400 leading-tight">
+                                      <p className="text-xs text-text-muted leading-tight">
                                         {item.description}
                                       </p>
                                     </div>
@@ -6048,8 +6048,8 @@ export default function AssetsPage() {
                                   disabled={uploadingStates[getUploadKey(group.key, resource.type)]}
                                   className={`w-full px-3 py-2 rounded transition-colors flex items-center justify-center gap-2 text-sm ${
                                     uploadingStates[getUploadKey(group.key, resource.type)]
-                                      ? 'bg-gray-500 cursor-not-allowed' 
-                                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                      ? 'bg-surface-raised cursor-not-allowed' 
+                                      : 'bg-info hover:opacity-90 text-white'
                                   }`}
                                 >
                                   {uploadingStates[getUploadKey(group.key, resource.type)] ? (
@@ -6075,10 +6075,10 @@ export default function AssetsPage() {
               </div>
 
               {/* Footer */}
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-600">
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
                 <button
                   onClick={() => setShowUploadDialog(false)}
-                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded transition-colors"
+                  className="px-4 py-2 bg-surface-raised hover:bg-surface rounded transition-colors"
                 >
                   Close
                 </button>
@@ -6130,10 +6130,10 @@ export default function AssetsPage() {
             exit={{ opacity: 0, y: -50, scale: 0.9 }}
             className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg max-w-md ${
               toast.type === 'success' 
-                ? 'bg-green-600 text-white' 
+                ? 'bg-success text-white' 
                 : toast.type === 'error' 
-                ? 'bg-red-600 text-white' 
-                : 'bg-blue-600 text-white'
+                ? 'bg-danger text-white' 
+                : 'bg-info text-white'
             }`}
           >
             <div className="flex items-center gap-3">
@@ -6164,9 +6164,9 @@ export default function AssetsPage() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+              className="bg-surface rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
             >
-                            <div className="flex flex-col gap-4 sticky top-0 bg-gray-800 z-10 pb-4">
+                            <div className="flex flex-col gap-4 sticky top-0 bg-surface z-10 pb-4">
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">Crawler Resources</h2>
                                   <button
@@ -6186,7 +6186,7 @@ export default function AssetsPage() {
                       setUpdatedAssets(new Set());
                     }
                   }}
-                  className="text-gray-400 hover:text-white"
+                  className="text-text-muted hover:text-text"
                 >
                   <XCircleIcon className="w-6 h-6" />
                 </button>
@@ -6196,25 +6196,25 @@ export default function AssetsPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => document.getElementById('crawler-main-image')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium"
+                    className="flex items-center gap-2 px-4 py-2 bg-info text-white hover:opacity-90 rounded-lg text-sm font-medium"
                   >
-                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-500">1</span>
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-info text-white">1</span>
                     Main Image
                   </button>
                   {missingQuizOptions.length > 0 && (
                     <button
                       onClick={() => document.getElementById('crawler-quiz-options')?.scrollIntoView({ behavior: 'smooth' })}
-                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium"
+                      className="flex items-center gap-2 px-4 py-2 bg-accent text-accent-fg hover:bg-accent-hover rounded-lg text-sm font-medium"
                     >
-                      <span className="w-6 h-6 flex items-center justify-center rounded-full bg-purple-500">2</span>
+                      <span className="w-6 h-6 flex items-center justify-center rounded-full bg-accent text-accent-fg">2</span>
                       Quiz Options ({missingQuizOptions.length})
                     </button>
                   )}
                   <button
                     onClick={() => document.getElementById('crawler-main-video')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium"
+                    className="flex items-center gap-2 px-4 py-2 bg-success text-white hover:opacity-90 rounded-lg text-sm font-medium"
                   >
-                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-green-500">3</span>
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-success text-white">3</span>
                     Main Video
                   </button>
                 </div>
@@ -6224,11 +6224,11 @@ export default function AssetsPage() {
                 {/* Main Image Section */}
                 <div id="crawler-main-image">
                   <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                    <span className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 text-white">1</span>
+                    <span className="w-8 h-8 flex items-center justify-center rounded-full bg-info text-white">1</span>
                     Main Image
                   </h3>
                   {crawlerResources.images.length === 0 ? (
-                    <p className="text-gray-400">No images available.</p>
+                    <p className="text-text-muted">No images available.</p>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                       {crawlerResources.images.map((image, index) => (
@@ -6247,13 +6247,13 @@ export default function AssetsPage() {
                             {/* Loading Overlay */}
                             {selectionState[getSelectionKey(image, 'image', 'main')]?.isLoading && (
                               <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-20">
-                                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+                                <div className="animate-spin rounded-full h-12 w-12 border-4 border-info border-t-transparent"></div>
                               </div>
                             )}
                             {/* Success Overlay */}
                             {selectionState[getSelectionKey(image, 'image', 'main')]?.isSelected && (
-                              <div className="absolute inset-0 bg-green-500 bg-opacity-10 flex items-center justify-center z-20">
-                                <div className="bg-green-500 bg-opacity-90 rounded-full p-2">
+                              <div className="absolute inset-0 bg-success bg-opacity-10 flex items-center justify-center z-20">
+                                <div className="bg-success bg-opacity-90 rounded-full p-2">
                                   <CheckCircleIcon className="w-10 h-10 text-white" />
                                 </div>
                               </div>
@@ -6267,7 +6267,7 @@ export default function AssetsPage() {
                               />
                             </div>
                           </div>
-                          <p className="mt-2 text-sm text-gray-400 truncate">{image.name}</p>
+                          <p className="mt-2 text-sm text-text-muted truncate">{image.name}</p>
                         </div>
                       ))}
                     </div>
@@ -6278,13 +6278,13 @@ export default function AssetsPage() {
                 {missingQuizOptions.length > 0 && (
                   <div id="crawler-quiz-options">
                     <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                      <span className="w-8 h-8 flex items-center justify-center rounded-full bg-purple-600 text-white">2</span>
+                      <span className="w-8 h-8 flex items-center justify-center rounded-full bg-accent text-accent-fg">2</span>
                       Quiz 3 Image Options
                     </h3>
                     <div className="space-y-6">
                       {missingQuizOptions.map((option, optionIndex) => (
-                        <div key={option} className="bg-gray-800 rounded-lg p-4">
-                          <h4 className="text-base font-medium text-purple-400 mb-3">Missing Option: {option}</h4>
+                        <div key={option} className="bg-surface rounded-lg p-4">
+                          <h4 className="text-base font-medium text-accent mb-3">Missing Option: {option}</h4>
                           {crawlerResourcesByOption[option]?.images.length > 0 ? (
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                               {crawlerResourcesByOption[option].images.map((image, index) => (
@@ -6303,13 +6303,13 @@ export default function AssetsPage() {
                                   {/* Loading Overlay */}
                                   {selectionState[getSelectionKey(image, 'quiz3-image', 'quiz3', option)]?.isLoading && (
                                     <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-20">
-                                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+                                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-accent border-t-transparent"></div>
                                     </div>
                                   )}
                                   {/* Success Overlay */}
                                   {selectionState[getSelectionKey(image, 'quiz3-image', 'quiz3', option)]?.isSelected && (
-                                    <div className="absolute inset-0 bg-purple-500 bg-opacity-10 flex items-center justify-center z-20">
-                                      <div className="bg-purple-500 bg-opacity-90 rounded-full p-2">
+                                    <div className="absolute inset-0 bg-accent bg-opacity-10 flex items-center justify-center z-20">
+                                      <div className="bg-accent bg-opacity-90 rounded-full p-2">
                                         <CheckCircleIcon className="w-10 h-10 text-white" />
                                       </div>
                                     </div>
@@ -6324,12 +6324,12 @@ export default function AssetsPage() {
                                     />
                                   </div>
                                 </div>
-                                  <p className="mt-2 text-sm text-gray-400 truncate">{image.name}</p>
+                                  <p className="mt-2 text-sm text-text-muted truncate">{image.name}</p>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <p className="text-gray-400">No images available for {option}</p>
+                            <p className="text-text-muted">No images available for {option}</p>
                           )}
                         </div>
                       ))}
@@ -6340,11 +6340,11 @@ export default function AssetsPage() {
                 {/* Videos Section */}
                 <div id="crawler-main-video">
                   <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                    <span className="w-8 h-8 flex items-center justify-center rounded-full bg-green-600 text-white">3</span>
+                    <span className="w-8 h-8 flex items-center justify-center rounded-full bg-success text-white">3</span>
                     Main Video
                   </h3>
                   {crawlerResources.videos.length === 0 ? (
-                    <p className="text-gray-400">No videos available.</p>
+                    <p className="text-text-muted">No videos available.</p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {crawlerResources.videos.map((video, index) => (
@@ -6362,13 +6362,13 @@ export default function AssetsPage() {
                             {/* Loading Overlay */}
                             {selectionState[getSelectionKey(video, 'video', 'main')]?.isLoading && (
                               <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-20">
-                                <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-500 border-t-transparent"></div>
+                                <div className="animate-spin rounded-full h-12 w-12 border-4 border-success border-t-transparent"></div>
                               </div>
                             )}
                             {/* Success Overlay */}
                             {selectionState[getSelectionKey(video, 'video', 'main')]?.isSelected && (
-                              <div className="absolute inset-0 bg-green-500 bg-opacity-10 flex items-center justify-center z-20">
-                                <div className="bg-green-500 bg-opacity-90 rounded-full p-2">
+                              <div className="absolute inset-0 bg-success bg-opacity-10 flex items-center justify-center z-20">
+                                <div className="bg-success bg-opacity-90 rounded-full p-2">
                                   <CheckCircleIcon className="w-10 h-10 text-white" />
                                 </div>
                               </div>
@@ -6382,7 +6382,7 @@ export default function AssetsPage() {
                               />
                             </div>
                           </div>
-                          <p className="mt-2 text-sm text-gray-400 truncate">{video.name}</p>
+                          <p className="mt-2 text-sm text-text-muted truncate">{video.name}</p>
                         </div>
                       ))}
                     </div>

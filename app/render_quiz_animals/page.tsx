@@ -2,6 +2,19 @@
 
 import React, { useState } from "react";
 import { config } from "../../lib/config";
+import {
+  Button,
+  Card,
+  Input,
+  Label,
+  Badge,
+  Table,
+  THead,
+  TBody,
+  TR,
+  TH,
+  TD,
+} from "@/app/components/ui";
 
 type QuizResult = {
   fileName: string;   // e.g. "alligator_1.json"
@@ -333,132 +346,105 @@ export default function RenderQuizAnimalsPage() {
   }
 
   return (
-    <div style={{ padding: "1rem" }}>
-      <h1>Batch Render Quiz Animals</h1>
+    <div className="p-4 bg-bg text-text min-h-screen">
+      <h1 className="text-2xl font-bold text-accent mb-4">
+        Batch Render Quiz Animals
+      </h1>
 
-      {/* Template Source, Composition, Output Folder */}
-      <div style={styles.field}>
-        <label style={styles.label}>Template Source (AEP path):</label>
-        <input
-          style={styles.input}
-          type="text"
-          value={templateSrc}
-          onChange={(e) => setTemplateSrc(e.target.value)}
-        />
-      </div>
-      <div style={styles.field}>
-        <label style={styles.label}>Composition:</label>
-        <input
-          style={styles.input}
-          type="text"
-          value={composition}
-          onChange={(e) => setComposition(e.target.value)}
-        />
-      </div>
-      <div style={styles.field}>
-        <label style={styles.label}>Output Folder (e.g. D:/nexrender-output/quiz_animals):</label>
-        <input
-          style={styles.input}
-          type="text"
-          value={outputFolder}
-          onChange={(e) => setOutputFolder(e.target.value)}
-        />
-      </div>
+      <Card className="p-4 space-y-4">
+        {/* Template Source, Composition, Output Folder */}
+        <div className="space-y-1">
+          <Label htmlFor="templateSrc">Template Source (AEP path):</Label>
+          <Input
+            id="templateSrc"
+            type="text"
+            value={templateSrc}
+            onChange={(e) => setTemplateSrc(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="composition">Composition:</Label>
+          <Input
+            id="composition"
+            type="text"
+            value={composition}
+            onChange={(e) => setComposition(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="outputFolder">
+            Output Folder (e.g. D:/nexrender-output/quiz_animals):
+          </Label>
+          <Input
+            id="outputFolder"
+            type="text"
+            value={outputFolder}
+            onChange={(e) => setOutputFolder(e.target.value)}
+          />
+        </div>
 
-      <hr style={{ margin: "1rem 0" }} />
+        <hr className="border-border" />
 
-      {/* Select multiple .json files */}
-      <div style={styles.field}>
-        <label style={styles.label}>Select Multiple Quiz JSON Files:</label>
-        <input
-          type="file"
-          accept=".json"
-          multiple
-          onChange={handleJsonFilesChange}
-          disabled={loadingFiles || creatingAll}
-        />
-        {!!jsonFiles.length && (
-          <p style={{ marginTop: "0.5rem" }}>Selected {jsonFiles.length} JSON file(s)</p>
-        )}
-      </div>
+        {/* Select multiple .json files */}
+        <div className="space-y-1">
+          <Label htmlFor="jsonFiles">Select Multiple Quiz JSON Files:</Label>
+          <input
+            id="jsonFiles"
+            type="file"
+            accept=".json"
+            multiple
+            onChange={handleJsonFilesChange}
+            disabled={loadingFiles || creatingAll}
+            className="block w-full text-sm text-text-muted file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-2 file:text-accent-fg hover:file:bg-accent-hover"
+          />
+          {!!jsonFiles.length && (
+            <p className="mt-2 text-text-muted">
+              Selected {jsonFiles.length} JSON file(s)
+            </p>
+          )}
+        </div>
 
-      {/* Create All Jobs Button */}
-      <button style={styles.button} onClick={handleCreateAllJobs} disabled={!jsonFiles.length || creatingAll}>
-        {creatingAll ? "Creating Jobs..." : "Create All Jobs"}
-      </button>
+        {/* Create All Jobs Button */}
+        <Button
+          variant="primary"
+          onClick={handleCreateAllJobs}
+          loading={creatingAll}
+          disabled={!jsonFiles.length || creatingAll}
+        >
+          {creatingAll ? "Creating Jobs..." : "Create All Jobs"}
+        </Button>
+      </Card>
 
       {/* Table of results */}
       {!!quizResults.length && (
-        <div style={{ marginTop: "2rem" }}>
-          <h2>Job Creation Results</h2>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>File</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>UID</th>
-                <th style={styles.th}>Error</th>
-              </tr>
-            </thead>
-            <tbody>
-              {quizResults.map((res, index) => (
-                <tr key={index}>
-                  <td style={styles.td}>{res.fileName}</td>
-                  <td style={styles.td}>{res.status}</td>
-                  <td style={styles.td}>{res.uid || "-"}</td>
-                  <td style={styles.td}>{res.error || "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-3">Job Creation Results</h2>
+          <Card>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>File</TH>
+                  <TH>Status</TH>
+                  <TH>UID</TH>
+                  <TH>Error</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {quizResults.map((res, index) => (
+                  <TR key={index}>
+                    <TD>{res.fileName}</TD>
+                    <TD>
+                      <Badge status={res.status}>{res.status}</Badge>
+                    </TD>
+                    <TD>{res.uid || "-"}</TD>
+                    <TD>{res.error || "-"}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </Card>
         </div>
       )}
     </div>
   );
 }
-
-// Inline styles
-const styles = {
-  field: {
-    marginBottom: "1rem",
-  },
-  label: {
-    display: "block",
-    marginBottom: "0.25rem",
-    fontWeight: "bold" as const,
-  },
-  input: {
-    width: "100%",
-    padding: "0.5rem",
-    fontSize: "1rem",
-    backgroundColor: "var(--background)",
-    color: "var(--foreground)",
-    border: "1px solid var(--foreground)",
-    borderRadius: "4px",
-  },
-  button: {
-    padding: "0.75rem 1.5rem",
-    fontSize: "1rem",
-    border: "none",
-    cursor: "pointer" as const,
-    borderRadius: "4px",
-    backgroundColor: "#007bff",
-    color: "#fff",
-    fontWeight: 500,
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse" as const,
-  },
-  th: {
-    border: "1px solid #fff",
-    padding: "8px",
-    backgroundColor: "#222",
-    color: "#fff",
-    textAlign: "left" as const,
-  },
-  td: {
-    border: "1px solid #ccc",
-    padding: "8px",
-  },
-};

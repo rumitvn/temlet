@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Button, Card, Badge } from "@/app/components/ui";
 
 interface FilePair {
     jsonFile: File;
@@ -149,121 +150,92 @@ export default function RenderYouTubePage() {
     };
 
     return (
-        <div style={{ padding: 20, maxWidth: 800 }}>
-            <h1>🎬 Upload Multiple Quiz Videos</h1>
+        <div className="p-5 max-w-3xl bg-bg text-text min-h-screen">
+            <h1 className="text-2xl font-bold text-accent mb-5">🎬 Upload Multiple Quiz Videos</h1>
 
-            <div style={{ marginBottom: 20 }}>
-                <label>📄 Select JSON and MP4 Files:</label>
-                <input 
-                    type="file" 
-                    accept=".json,.mp4" 
+            <div className="mb-5 space-y-2">
+                <label className="block text-sm font-medium text-text-muted">📄 Select JSON and MP4 Files:</label>
+                <input
+                    type="file"
+                    accept=".json,.mp4"
                     onChange={handleFilesChange}
-                    multiple 
+                    multiple
+                    className="block w-full text-sm text-text-muted file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-2 file:text-accent-fg hover:file:bg-accent-hover"
                 />
             </div>
 
             {filePairs.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                    <button 
-                        style={styles.button} 
-                        onClick={handleGenerateAllMetadata} 
+                <div className="mb-5 flex flex-wrap gap-3">
+                    <Button
+                        variant="primary"
+                        onClick={handleGenerateAllMetadata}
+                        loading={loading}
                         disabled={loading}
                     >
                         {loading ? "Generating All..." : "Generate All Metadata"}
-                    </button>
-                    <button 
-                        style={styles.button} 
-                        onClick={handleUploadAll} 
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={handleUploadAll}
+                        loading={uploading}
                         disabled={uploading}
                     >
                         {uploading ? "Uploading All..." : "Upload All to YouTube"}
-                    </button>
+                    </Button>
                 </div>
             )}
 
             {filePairs.map((pair, index) => (
-                <div key={index} style={styles.filePair}>
-                    <h3>File Pair {index + 1}</h3>
-                    <p>JSON: {pair.jsonFile.name}</p>
-                    <p>MP4: {pair.mp4File.name}</p>
-                    <p>Status: {pair.status}</p>
+                <Card key={index} className="p-5 mb-5 space-y-2">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">File Pair {index + 1}</h3>
+                        <Badge status={pair.status}>{pair.status}</Badge>
+                    </div>
+                    <p className="text-text-muted">JSON: {pair.jsonFile.name}</p>
+                    <p className="text-text-muted">MP4: {pair.mp4File.name}</p>
 
                     {pair.videoData && !pair.aiResult && (
-                        <button 
-                            style={styles.button} 
-                            onClick={() => handleGenerateMetadata(index)} 
+                        <Button
+                            variant="primary"
+                            onClick={() => handleGenerateMetadata(index)}
+                            loading={pair.status === 'processing'}
                             disabled={pair.status === 'processing'}
                         >
                             {pair.status === 'processing' ? "Generating..." : "Generate Metadata"}
-                        </button>
+                        </Button>
                     )}
 
                     {pair.aiResult && (
-                        <div>
-                            <h4>📝 AI Result:</h4>
+                        <div className="space-y-2">
+                            <h4 className="font-semibold">📝 AI Result:</h4>
                             <p><strong>Title:</strong> {pair.aiResult.title}</p>
                             <p><strong>Description:</strong><br />{pair.aiResult.description}</p>
                             <p><strong>Tags:</strong><br />{pair.aiResult.tags}</p>
-                            <button 
-                                onClick={() => handleGenerateMetadata(index)} 
-                                style={{ marginRight: 10 }}
-                            >
-                                🔁 Retry
-                            </button>
-                            <button 
-                                style={styles.button} 
-                                onClick={() => handleUpload(index)} 
-                                disabled={pair.status === 'uploading'}
-                            >
-                                📤 Upload to YouTube
-                            </button>
+                            <div className="flex flex-wrap gap-3">
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => handleGenerateMetadata(index)}
+                                >
+                                    🔁 Retry
+                                </Button>
+                                <Button
+                                    variant="primary"
+                                    onClick={() => handleUpload(index)}
+                                    loading={pair.status === 'uploading'}
+                                    disabled={pair.status === 'uploading'}
+                                >
+                                    📤 Upload to YouTube
+                                </Button>
+                            </div>
                         </div>
                     )}
 
                     {pair.uploadResult && (
-                        <p style={{ color: 'green' }}>{pair.uploadResult}</p>
+                        <p className="text-success">{pair.uploadResult}</p>
                     )}
-                </div>
+                </Card>
             ))}
         </div>
     );
 }
-
-// Inline styles
-const styles = {
-    field: {
-        marginBottom: "1rem",
-    },
-    label: {
-        display: "block",
-        marginBottom: "0.25rem",
-        fontWeight: "bold" as const,
-    },
-    input: {
-        width: "100%",
-        padding: "0.5rem",
-        fontSize: "1rem",
-        backgroundColor: "var(--background)",
-        color: "var(--foreground)",
-        border: "1px solid var(--foreground)",
-        borderRadius: "4px",
-    },
-    button: {
-        padding: "0.75rem 1.5rem",
-        fontSize: "1rem",
-        border: "none",
-        cursor: "pointer" as const,
-        borderRadius: "4px",
-        backgroundColor: "#007bff",
-        color: "#fff",
-        fontWeight: 500,
-        marginRight: "10px",
-    },
-    filePair: {
-        border: "1px solid #ccc",
-        padding: "20px",
-        marginBottom: "20px",
-        borderRadius: "4px",
-    },
-};
 

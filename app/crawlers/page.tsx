@@ -25,6 +25,20 @@ import {
   PauseIcon
 } from "@heroicons/react/24/solid";
 import CreateCrawlerDialog from "../components/CreateCrawlerDialog";
+import {
+  Button,
+  Card,
+  Input,
+  Label,
+  Badge,
+  Table,
+  THead,
+  TBody,
+  TR,
+  TH,
+  TD,
+} from "@/app/components/ui";
+import { statusClass } from "@/app/theme/status";
 
 // Custom debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -89,30 +103,8 @@ try {
   console.warn("Failed to load filters from file, using defaults:", error);
 }
 
-const statusColors = {
-  pending: "bg-blue-500/20 text-blue-400",
-  crawling: "bg-orange-500/20 text-orange-400",
-  downloading: "bg-yellow-500/20 text-yellow-400",
-  completed: "bg-green-500/20 text-green-400",
-  failed: "bg-red-500/20 text-red-400",
-  paused: "bg-gray-500/20 text-gray-400"
-};
-
-const getProgressBarColor = (status: CrawlerJob['status']) => {
-  switch (status) {
-    case 'crawling':
-      return 'bg-orange-500';
-    case 'downloading':
-      return 'bg-yellow-500';
-    case 'completed':
-      return 'bg-green-500';
-    case 'failed':
-      return 'bg-red-500';
-    case 'paused':
-      return 'bg-gray-500';
-    default:
-      return 'bg-purple-500';
-  }
+const getProgressBarColor = (_status: CrawlerJob['status']) => {
+  return 'bg-accent';
 };
 
 const statusGroups = {
@@ -758,12 +750,12 @@ export default function CrawlersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
+    <div className="min-h-screen bg-bg text-text p-8">
       {/* Header - Sticky */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex justify-between items-center mb-8 h-24 sticky top-0 z-40 bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-95 backdrop-blur"
+        className="flex justify-between items-center mb-8 h-24 sticky top-0 z-40 bg-bg/95 backdrop-blur"
         style={{ backdropFilter: 'blur(8px)' }}
       >
         <div>
@@ -771,7 +763,7 @@ export default function CrawlersPage() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
-            className="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 bg-clip-text text-transparent"
+            className="text-5xl font-bold text-accent"
           >
             Web Crawlers
           </motion.h1>
@@ -781,41 +773,41 @@ export default function CrawlersPage() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="flex items-center gap-2 mt-1"
           >
-            <span className="text-gray-400">Download images and videos from websites</span>
+            <span className="text-text-muted">Download images and videos from websites</span>
           </motion.div>
         </div>
 
         {/* Navigation Buttons */}
         <div className="flex gap-4">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
-            onClick={() => window.location.href = '/'}
-          >
-            <DocumentTextIcon className="w-5 h-5" />
-            <span>Renders</span>
-          </motion.button>
-          
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
-            onClick={() => window.location.href = '/assets'}
-          >
-            <DocumentTextIcon className="w-5 h-5" />
-            <span>Assets</span>
-          </motion.button>
-          
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
-            onClick={() => setIsCreateDialogOpen(true)}
-          >
-            <PlusIcon className="w-5 h-5" />
-            <span>Create Crawler</span>
-          </motion.button>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              variant="secondary"
+              leftIcon={<DocumentTextIcon className="w-5 h-5" />}
+              onClick={() => window.location.href = '/'}
+            >
+              Renders
+            </Button>
+          </motion.div>
+
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              variant="secondary"
+              leftIcon={<DocumentTextIcon className="w-5 h-5" />}
+              onClick={() => window.location.href = '/assets'}
+            >
+              Assets
+            </Button>
+          </motion.div>
+
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              variant="primary"
+              leftIcon={<PlusIcon className="w-5 h-5" />}
+              onClick={() => setIsCreateDialogOpen(true)}
+            >
+              Create Crawler
+            </Button>
+          </motion.div>
         </div>
       </motion.div>
 
@@ -826,37 +818,37 @@ export default function CrawlersPage() {
         className="mb-6"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-gray-800/50 rounded-xl p-4">
+          <Card className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <GlobeAltIcon className="w-6 h-6 text-blue-400" />
-              <h3 className="text-lg font-medium text-gray-200">Total Jobs</h3>
+              <GlobeAltIcon className="w-6 h-6 text-info" />
+              <h3 className="text-lg font-medium text-text-muted">Total Jobs</h3>
             </div>
-            <p className="text-3xl font-bold text-blue-400">{stats.totalJobs}</p>
-          </div>
-          
-          <div className="bg-gray-800/50 rounded-xl p-4">
+            <p className="text-3xl font-bold text-info">{stats.totalJobs}</p>
+          </Card>
+
+          <Card className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <PlayIcon className="w-6 h-6 text-orange-400" />
-              <h3 className="text-lg font-medium text-gray-200">Active Jobs</h3>
+              <PlayIcon className="w-6 h-6 text-warning" />
+              <h3 className="text-lg font-medium text-text-muted">Active Jobs</h3>
             </div>
-            <p className="text-3xl font-bold text-orange-400">{stats.activeJobs}</p>
-          </div>
-          
-          <div className="bg-gray-800/50 rounded-xl p-4">
+            <p className="text-3xl font-bold text-warning">{stats.activeJobs}</p>
+          </Card>
+
+          <Card className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <CheckCircleIcon className="w-6 h-6 text-green-400" />
-              <h3 className="text-lg font-medium text-gray-200">Completed</h3>
+              <CheckCircleIcon className="w-6 h-6 text-success" />
+              <h3 className="text-lg font-medium text-text-muted">Completed</h3>
             </div>
-            <p className="text-3xl font-bold text-green-400">{stats.completedJobs}</p>
-          </div>
-          
-          <div className="bg-gray-800/50 rounded-xl p-4">
+            <p className="text-3xl font-bold text-success">{stats.completedJobs}</p>
+          </Card>
+
+          <Card className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <ArrowUpTrayIcon className="w-6 h-6 text-purple-400" />
-              <h3 className="text-lg font-medium text-gray-200">Downloaded</h3>
+              <ArrowUpTrayIcon className="w-6 h-6 text-accent" />
+              <h3 className="text-lg font-medium text-text-muted">Downloaded</h3>
             </div>
-            <p className="text-3xl font-bold text-purple-400">{stats.totalDownloaded}</p>
-          </div>
+            <p className="text-3xl font-bold text-accent">{stats.totalDownloaded}</p>
+          </Card>
         </div>
       </motion.div>
 
@@ -868,13 +860,13 @@ export default function CrawlersPage() {
       >
         <div className="flex flex-col lg:flex-row gap-4">
           {Object.entries(statusGroups).map(([groupKey, group]) => (
-            <div key={groupKey} className="flex-1 bg-gray-800/50 rounded-xl p-3 mb-4 lg:mb-0">
+            <Card key={groupKey} className="flex-1 p-3 mb-4 lg:mb-0">
               <div className="flex items-center gap-2 mb-2">
-                <group.icon className="w-6 h-6 text-purple-400" />
-                <h3 className="text-2xl font-bold text-gray-200 flex items-center">
+                <group.icon className="w-6 h-6 text-accent" />
+                <h3 className="text-2xl font-bold text-text-muted flex items-center">
                   {group.title}
                   {loadingCounts && (
-                    <svg className="animate-spin ml-2 h-4 w-4 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin ml-2 h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
                     </svg>
@@ -883,7 +875,7 @@ export default function CrawlersPage() {
                 {selectedStatus && (
                   <button
                     onClick={() => setSelectedStatus(null)}
-                    className="ml-4 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded text-gray-200"
+                    className="ml-4 px-2 py-1 text-xs bg-surface-raised hover:bg-surface-sunken rounded text-text-muted"
                   >
                     Clear Status Filter
                   </button>
@@ -900,8 +892,8 @@ export default function CrawlersPage() {
                       whileTap={{ scale: 0.98 }}
                       onClick={() => handleStatusClick(status)}
                       className={`flex items-center justify-between p-2 rounded-lg text-lg font-medium transition-all ${
-                        statusColors[status]
-                      } ${selectedStatus === status ? 'ring-2 ring-white' : ''}`}
+                        statusClass(status)
+                      } ${selectedStatus === status ? 'ring-2 ring-accent-ring' : ''}`}
                     >
                       <div className="flex items-center gap-2">
                         <Icon className="w-5 h-5" />
@@ -912,7 +904,7 @@ export default function CrawlersPage() {
                   );
                 })}
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       </motion.div>
@@ -924,48 +916,41 @@ export default function CrawlersPage() {
         className="flex justify-between gap-2 mb-6"
       >
         <div className="flex gap-2">
-          <button
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={<ArrowPathIcon className="w-4 h-4" />}
             onClick={() => {
               fetchJobs();
               fetchStatusCounts();
               fetchStats();
             }}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
           >
-            <ArrowPathIcon className="w-4 h-4 inline mr-2" />
             Refresh
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => {
               console.log('Current jobs state:', jobs);
               console.log('Active jobs:', jobs.filter(job => ['pending', 'crawling', 'downloading'].includes(job.status)));
             }}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-600 text-white hover:bg-gray-700 transition-colors"
           >
             Debug Jobs
-          </button>
+          </Button>
         </div>
-        
+
         {selectedItems.length > 0 && (
           <div className="flex gap-2">
-            <button
-              onClick={handleDeleteSelected}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
-            >
+            <Button variant="danger" size="sm" onClick={handleDeleteSelected}>
               Delete ({selectedItems.length})
-            </button>
-            <button
-              onClick={() => handleActionClick('pause')}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-yellow-600 text-white hover:bg-yellow-700 transition-colors"
-            >
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleActionClick('pause')}>
               Pause ({selectedItems.length})
-            </button>
-            <button
-              onClick={() => handleActionClick('resume')}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
-            >
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleActionClick('resume')}>
               Resume ({selectedItems.length})
-            </button>
+            </Button>
           </div>
         )}
       </motion.div>
@@ -978,13 +963,13 @@ export default function CrawlersPage() {
       >
         <div className="flex gap-4">
           <div className="flex-1 relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-faint w-5 h-5 z-10" />
+            <Input
               type="text"
               placeholder="Search crawler jobs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
+              className="pl-10"
             />
           </div>
           <motion.button
@@ -992,13 +977,13 @@ export default function CrawlersPage() {
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              showFilters ? "bg-purple-600" : "bg-gray-800 hover:bg-gray-700"
+              showFilters ? "bg-accent text-accent-fg hover:bg-accent-hover" : "bg-surface hover:bg-surface-raised text-text"
             }`}
           >
             <FunnelIcon className="w-5 h-5" />
             <span>Filters</span>
             {getActiveFiltersCount() > 0 && (
-              <span className="bg-purple-500 text-white px-2 py-0.5 rounded-full text-sm">
+              <span className="bg-accent text-accent-fg px-2 py-0.5 rounded-full text-sm">
                 {getActiveFiltersCount()}
               </span>
             )}
@@ -1011,8 +996,8 @@ export default function CrawlersPage() {
             onClick={() => handleSort("createdAt")}
             className={`px-3 py-1 rounded-lg text-sm transition-colors ${
               sortBy === "createdAt"
-                ? "bg-purple-600 text-white"
-                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                ? "bg-accent text-accent-fg hover:bg-accent-hover"
+                : "bg-surface text-text-muted hover:bg-surface-raised"
             }`}
           >
             Date
@@ -1026,8 +1011,8 @@ export default function CrawlersPage() {
             onClick={() => handleSort("name")}
             className={`px-3 py-1 rounded-lg text-sm transition-colors ${
               sortBy === "name"
-                ? "bg-purple-600 text-white"
-                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                ? "bg-accent text-accent-fg hover:bg-accent-hover"
+                : "bg-surface text-text-muted hover:bg-surface-raised"
             }`}
           >
             Name
@@ -1041,8 +1026,8 @@ export default function CrawlersPage() {
             onClick={() => handleSort("type")}
             className={`px-3 py-1 rounded-lg text-sm transition-colors ${
               sortBy === "type"
-                ? "bg-purple-600 text-white"
-                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                ? "bg-accent text-accent-fg hover:bg-accent-hover"
+                : "bg-surface text-text-muted hover:bg-surface-raised"
             }`}
           >
             Type
@@ -1056,8 +1041,8 @@ export default function CrawlersPage() {
             onClick={() => handleSort("status")}
             className={`px-3 py-1 rounded-lg text-sm transition-colors ${
               sortBy === "status"
-                ? "bg-purple-600 text-white"
-                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                ? "bg-accent text-accent-fg hover:bg-accent-hover"
+                : "bg-surface text-text-muted hover:bg-surface-raised"
             }`}
           >
             Status
@@ -1075,13 +1060,13 @@ export default function CrawlersPage() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="bg-gray-800 rounded-lg p-4 space-y-4"
+              className="bg-surface border border-border rounded-lg p-4 space-y-4"
             >
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Filters</h3>
+                <h3 className="text-lg font-medium text-text">Filters</h3>
                 <button
                   onClick={clearFilters}
-                  className="text-gray-400 hover:text-gray-300"
+                  className="text-text-muted hover:text-text"
                 >
                   Clear All
                 </button>
@@ -1090,9 +1075,7 @@ export default function CrawlersPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Type Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">
-                    Type
-                  </label>
+                  <Label className="mb-2">Type</Label>
                   <div className="flex flex-wrap gap-2">
                     {types.map((type) => (
                       <button
@@ -1100,8 +1083,8 @@ export default function CrawlersPage() {
                         onClick={() => setSelectedType(selectedType === type ? null : type)}
                         className={`px-3 py-1 rounded-full text-sm transition-colors ${
                           selectedType === type
-                            ? "bg-purple-600 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            ? "bg-accent text-accent-fg hover:bg-accent-hover"
+                            : "bg-surface-raised text-text-muted hover:bg-surface-sunken"
                         }`}
                       >
                         {type}
@@ -1112,9 +1095,7 @@ export default function CrawlersPage() {
 
                 {/* Topic Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">
-                    Topic
-                  </label>
+                  <Label className="mb-2">Topic</Label>
                   <div className="flex flex-wrap gap-2">
                     {topics.map((topic) => (
                       <button
@@ -1122,8 +1103,8 @@ export default function CrawlersPage() {
                         onClick={() => setSelectedTopic(selectedTopic === topic ? null : topic)}
                         className={`px-3 py-1 rounded-full text-sm transition-colors ${
                           selectedTopic === topic
-                            ? "bg-purple-600 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            ? "bg-accent text-accent-fg hover:bg-accent-hover"
+                            : "bg-surface-raised text-text-muted hover:bg-surface-sunken"
                         }`}
                       >
                         {topic}
@@ -1134,9 +1115,7 @@ export default function CrawlersPage() {
 
                 {/* Channel Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">
-                    Channel
-                  </label>
+                  <Label className="mb-2">Channel</Label>
                   <div className="flex flex-wrap gap-2">
                     {channels.map((channel) => (
                       <button
@@ -1144,8 +1123,8 @@ export default function CrawlersPage() {
                         onClick={() => setSelectedChannel(selectedChannel === channel ? null : channel)}
                         className={`px-3 py-1 rounded-full text-sm transition-colors ${
                           selectedChannel === channel
-                            ? "bg-purple-600 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            ? "bg-accent text-accent-fg hover:bg-accent-hover"
+                            : "bg-surface-raised text-text-muted hover:bg-surface-sunken"
                         }`}
                       >
                         {channel}
@@ -1156,9 +1135,7 @@ export default function CrawlersPage() {
 
                 {/* Site Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">
-                    Site
-                  </label>
+                  <Label className="mb-2">Site</Label>
                   <div className="flex flex-wrap gap-2">
                     {sites.map((site) => (
                       <button
@@ -1166,8 +1143,8 @@ export default function CrawlersPage() {
                         onClick={() => setSelectedSite(selectedSite === site ? null : site)}
                         className={`px-3 py-1 rounded-full text-sm transition-colors ${
                           selectedSite === site
-                            ? "bg-purple-600 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            ? "bg-accent text-accent-fg hover:bg-accent-hover"
+                            : "bg-surface-raised text-text-muted hover:bg-surface-sunken"
                         }`}
                       >
                         {site}
@@ -1185,74 +1162,68 @@ export default function CrawlersPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gray-800/50 rounded-xl overflow-hidden"
+        className="bg-surface border border-border rounded-xl overflow-hidden shadow-card"
       >
-        <div className="p-4 border-b border-gray-700">
+        <div className="p-4 border-b border-border">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Crawler Jobs</h2>
+            <h2 className="text-xl font-semibold text-text">Crawler Jobs</h2>
             <div className="flex gap-2">
-              <button
-                onClick={handleSelectAll}
-                className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded transition-colors"
-              >
+              <Button variant="secondary" size="sm" onClick={handleSelectAll}>
                 Select All
-              </button>
-              <button
-                onClick={handleDeselectAll}
-                className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded transition-colors"
-              >
+              </Button>
+              <Button variant="secondary" size="sm" onClick={handleDeselectAll}>
                 Deselect All
-              </button>
+              </Button>
             </div>
           </div>
         </div>
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400 mx-auto"></div>
-            <p className="mt-2 text-gray-400">Loading crawler jobs...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto"></div>
+            <p className="mt-2 text-text-muted">Loading crawler jobs...</p>
           </div>
         ) : error ? (
           <div className="p-8 text-center">
-            <p className="text-red-400">{error}</p>
+            <p className="text-danger">{error}</p>
           </div>
         ) : jobs.length === 0 ? (
           <div className="p-8 text-center">
-            <GlobeAltIcon className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400">No crawler jobs found</p>
-            <button
+            <GlobeAltIcon className="w-12 h-12 text-text-faint mx-auto mb-4" />
+            <p className="text-text-muted">No crawler jobs found</p>
+            <Button
+              variant="primary"
+              className="mt-4"
               onClick={() => setIsCreateDialogOpen(true)}
-              className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
             >
               Create Your First Crawler
-            </button>
+            </Button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-700/50">
+          <Table>
+              <THead>
                 <tr>
-                  <th className="px-4 py-3 text-left">
+                  <TH>
                     <input
                       type="checkbox"
                       checked={selectedItems.length === jobs.length && jobs.length > 0}
                       onChange={(e) => e.target.checked ? handleSelectAll() : handleDeselectAll()}
-                      className="rounded border-gray-600 bg-gray-700"
+                      className="rounded border-border bg-surface-sunken accent-accent"
                     />
-                  </th>
-                  <th className="px-4 py-3 text-left">Name</th>
-                  <th className="px-4 py-3 text-left">Keyword</th>
-                  <th className="px-4 py-3 text-left">Site</th>
-                  <th className="px-4 py-3 text-left">Type</th>
-                  <th className="px-4 py-3 text-left">Status</th>
-                  <th className="px-4 py-3 text-left">Progress</th>
-                  <th className="px-4 py-3 text-left">Channel</th>
-                  <th className="px-4 py-3 text-left">Topic</th>
-                  <th className="px-4 py-3 text-left">Created</th>
-                  <th className="px-4 py-3 text-left">Actions</th>
+                  </TH>
+                  <TH>Name</TH>
+                  <TH>Keyword</TH>
+                  <TH>Site</TH>
+                  <TH>Type</TH>
+                  <TH>Status</TH>
+                  <TH>Progress</TH>
+                  <TH>Channel</TH>
+                  <TH>Topic</TH>
+                  <TH>Created</TH>
+                  <TH>Actions</TH>
                 </tr>
-              </thead>
-              <tbody>
+              </THead>
+              <TBody>
                 {jobs.map((job) => {
                   const StatusIcon = getStatusIcon(job.status);
                   const isSelected = selectedItems.includes(job.id);
@@ -1262,132 +1233,134 @@ export default function CrawlersPage() {
                       key={job.id}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className={`border-b border-gray-700 hover:bg-gray-700/30 transition-colors ${
-                        isSelected ? 'bg-purple-600/20' : ''
+                      className={`border-b border-border hover:bg-surface-raised/50 transition-colors ${
+                        isSelected ? 'bg-accent-muted' : ''
                       } cursor-pointer`}
                       onClick={(e) => handleItemSelect(job.id, e)}
                     >
-                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                      <TD onClick={e => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={(e) => handleCheckboxChange(job.id, e.target.checked, e)}
-                          className="rounded border-gray-600 bg-gray-700"
+                          className="rounded border-border bg-surface-sunken accent-accent"
                         />
-                      </td>
-                      <td className="px-4 py-3">
+                      </TD>
+                      <TD>
                         <div className="flex items-center gap-2">
                           {job.type === 'image' ? (
-                            <PhotoIcon className="w-5 h-5 text-blue-400" />
+                            <PhotoIcon className="w-5 h-5 text-info" />
                           ) : (
-                            <VideoCameraIcon className="w-5 h-5 text-red-400" />
+                            <VideoCameraIcon className="w-5 h-5 text-danger" />
                           )}
                           <span className="font-medium">{job.name}</span>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-300">{job.keyword}</td>
-                      <td className="px-4 py-3 text-gray-300">{job.site}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          job.type === 'image' 
-                            ? 'bg-blue-500/20 text-blue-400' 
-                            : job.type === 'video'
-                              ? 'bg-red-500/20 text-red-400'
-                              : 'bg-gray-500/20 text-gray-400'
-                        }`}>
+                      </TD>
+                      <TD className="text-text-muted">{job.keyword}</TD>
+                      <TD className="text-text-muted">{job.site}</TD>
+                      <TD>
+                        <Badge
+                          tone={job.type === 'image' ? 'info' : job.type === 'video' ? 'danger' : 'neutral'}
+                          className="text-xs"
+                        >
                           {job.type === 'image' ? 'Image' : job.type === 'video' ? 'Video' : 'Unknown'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
+                        </Badge>
+                      </TD>
+                      <TD>
                         <div className="flex items-center gap-2">
                           <StatusIcon className={`w-4 h-4 ${isActiveStatus(job.status) ? 'animate-pulse' : ''}`} />
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            statusColors[job.status]
-                          } ${isActiveStatus(job.status) ? 'animate-pulse' : ''}`}>
+                          <Badge
+                            status={job.status}
+                            className={`text-xs ${isActiveStatus(job.status) ? 'animate-pulse' : ''}`}
+                          >
                             {job.status}
-                          </span>
+                          </Badge>
                         </div>
-                      </td>
-                      <td className="px-4 py-3">
+                      </TD>
+                      <TD>
                         <div className="flex items-center gap-2">
-                          <div className="w-20 bg-gray-700 rounded-full h-2">
-                            <div 
+                          <div className="w-20 bg-surface-sunken rounded-full h-2">
+                            <div
                               className={`${getProgressBarColor(job.status)} h-2 rounded-full transition-all duration-300`}
                               style={{ width: `${job.progress}%` }}
                             ></div>
                           </div>
-                          <span className="text-sm text-gray-400">
+                          <span className="text-sm text-text-muted">
                             {job.downloadedItems}/{job.totalItems}
                           </span>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-300">{job.channel}</td>
-                      <td className="px-4 py-3 text-gray-300">{job.topic}</td>
-                      <td className="px-4 py-3 text-gray-300">{formatDate(job.createdAt)}</td>
-                      <td className="px-4 py-3">
+                      </TD>
+                      <TD className="text-text-muted">{job.channel}</TD>
+                      <TD className="text-text-muted">{job.topic}</TD>
+                      <TD className="text-text-muted">{formatDate(job.createdAt)}</TD>
+                      <TD>
                         <div className="flex gap-2">
                           {/* No longer needed as SSE handles updates */}
                           {job.status === 'pending' && (
-                            <button
+                            <Button
+                              variant="primary"
+                              size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleActionClick('start', job.id);
                               }}
-                              className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 rounded transition-colors"
                             >
                               Start
-                            </button>
+                            </Button>
                           )}
                           {(job.status === 'crawling' || job.status === 'downloading') && (
-                            <button
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleActionClick('pause', job.id);
                               }}
-                              className="px-2 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 rounded transition-colors"
                             >
                               Pause
-                            </button>
+                            </Button>
                           )}
                           {job.status === 'paused' && (
-                            <button
+                            <Button
+                              variant="primary"
+                              size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleActionClick('resume', job.id);
                               }}
-                              className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 rounded transition-colors"
                             >
                               Resume
-                            </button>
+                            </Button>
                           )}
                           {job.status === 'failed' && (
-                            <button
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleActionClick('start', job.id);
                               }}
-                              className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded transition-colors"
                             >
                               Retry
-                            </button>
+                            </Button>
                           )}
-                          <button
+                          <Button
+                            variant="danger"
+                            size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleActionClick('delete', job.id);
                             }}
-                            className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 rounded transition-colors"
                           >
                             Delete
-                          </button>
+                          </Button>
                         </div>
-                      </td>
+                      </TD>
                     </motion.tr>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </TBody>
+            </Table>
         )}
       </motion.div>
 
@@ -1398,25 +1371,25 @@ export default function CrawlersPage() {
           animate={{ opacity: 1, y: 0 }}
           className="flex justify-center items-center gap-2 mt-6"
         >
-          <button
+          <Button
+            variant="secondary"
             onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
-            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-800 disabled:text-gray-600 rounded-lg transition-colors"
           >
             Previous
-          </button>
-          
-          <span className="px-3 py-2 text-gray-300">
+          </Button>
+
+          <span className="px-3 py-2 text-text-muted">
             Page {currentPage} of {totalPages}
           </span>
-          
-          <button
+
+          <Button
+            variant="secondary"
             onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
             disabled={currentPage === totalPages}
-            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-800 disabled:text-gray-600 rounded-lg transition-colors"
           >
             Next
-          </button>
+          </Button>
         </motion.div>
       )}
 

@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { Badge, Button, Card } from "@/app/components/ui";
 
 type JobDetailProps = {
   uid: string;          // the job UID
@@ -21,15 +22,15 @@ export default function JobDetail({
   }
 
   return (
-    <div style={{ marginTop: "2rem", padding: "1rem", border: "1px solid #aaa" }}>
-      <h2>Job Detail for UID: {uid}</h2>
+    <Card className="mt-8 p-4">
+      <h2 className="text-lg font-semibold text-text">Job Detail for UID: {uid}</h2>
 
-      {loading && <p>Loading detail...</p>}
+      {loading && <p className="mt-2 text-text-muted">Loading detail...</p>}
 
       {!loading && job && (
-        <div>
+        <div className="mt-2 space-y-1 text-text">
           <p>
-            <strong>State:</strong> {job.state}
+            <strong>State:</strong> <Badge status={job.state}>{job.state}</Badge>
           </p>
           <p>
             <strong>Render Progress:</strong> {job.renderProgress}%
@@ -61,14 +62,14 @@ export default function JobDetail({
           </p>
 
           {job.error && (
-            <p style={{ color: "red" }}>
+            <p className="text-danger">
               <strong>Error:</strong> {job.error}
             </p>
           )}
 
-          <h3>Assets</h3>
+          <h3 className="mt-4 text-base font-semibold text-text">Assets</h3>
           {job.assets && job.assets.length > 0 ? (
-            <ul>
+            <ul className="list-disc pl-5 text-text">
               {job.assets.map((asset: any, index: number) => (
                 <li key={index}>
                   <strong>Type:</strong> {asset.type},{" "}
@@ -80,12 +81,12 @@ export default function JobDetail({
               ))}
             </ul>
           ) : (
-            <p>No assets found.</p>
+            <p className="text-text-muted">No assets found.</p>
           )}
 
-          <h3>Postrender Actions</h3>
+          <h3 className="mt-4 text-base font-semibold text-text">Postrender Actions</h3>
           {job.actions?.postrender && job.actions?.postrender.length > 0 ? (
-            <ul>
+            <ul className="list-disc pl-5 text-text">
               {job.actions.postrender.map((action: any, idx: number) => (
                 <li key={idx}>
                   <p>
@@ -101,14 +102,14 @@ export default function JobDetail({
               ))}
             </ul>
           ) : (
-            <p>No postrender actions.</p>
+            <p className="text-text-muted">No postrender actions.</p>
           )}
         </div>
       )}
 
-      <button onClick={onClose} style={{ marginTop: "1rem" }}>
+      <Button variant="secondary" onClick={onClose} className="mt-4">
         Close Detail
-      </button>
-    </div>
+      </Button>
+    </Card>
   );
 }

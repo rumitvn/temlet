@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { PlusIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/solid';
+import { CheckIcon } from '@heroicons/react/24/solid';
+import { Button, Input, Select, Label, Dialog } from "@/app/components/ui";
 import TemplateManagerDialog from './TemplateManagerDialog';
 import LoadingDialog from './LoadingDialog';
 import ErrorDialog from './ErrorDialog';
@@ -686,148 +686,118 @@ export default function CreateRenderDialog({
 
   return (
     <>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-gray-800 rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">Create New Render</h2>
+      <Dialog
+        isOpen={isOpen}
+        onClose={onClose}
+        size="3xl"
+        title="Create New Render"
+      >
+        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-8">
+          {/* Left Column - Basic Settings */}
+          <div className="space-y-4">
+            {/* Channel Selection */}
+            <div>
+              <Label className="mb-2">Channel</Label>
+              <Select
+                name="channelId"
+                value={formData.channelId}
+                onChange={handleChannelChange}
+                required
+              >
+                <option value="">Select a channel</option>
+                {channels.map(channel => (
+                  <option key={channel.id} value={channel.id}>
+                    {channel.name}
+                  </option>
+                ))}
+              </Select>
+              <div className="text-xs text-text-faint mt-1">
+                Debug: channelName="{formData.channelName}", topic="{formData.topic}"
                 <button
-                  onClick={onClose}
-                  className="text-gray-400 hover:text-white"
+                  type="button"
+                  onClick={clearCache}
+                  className="ml-2 text-info hover:text-text"
                 >
-                  <XMarkIcon className="w-6 h-6" />
+                  Clear Cache
                 </button>
               </div>
+            </div>
 
-              <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-8">
-                {/* Left Column - Basic Settings */}
-                <div className="space-y-4">
-                  {/* Channel Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
-                      Channel
-                    </label>
-                    <select
-                      name="channelId"
-                      value={formData.channelId}
-                      onChange={handleChannelChange}
-                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
-                      required
-                    >
-                      <option value="">Select a channel</option>
-                      {channels.map(channel => (
-                        <option key={channel.id} value={channel.id}>
-                          {channel.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Debug: channelName="{formData.channelName}", topic="{formData.topic}"
-                      <button 
-                        type="button" 
-                        onClick={clearCache}
-                        className="ml-2 text-blue-400 hover:text-blue-300"
-                      >
-                        Clear Cache
-                      </button>
-                    </div>
-                  </div>
+            {/* Topic Selection */}
+            <div>
+              <Label className="mb-2">Topic</Label>
+              <Select
+                name="topic"
+                value={formData.topic}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">Select a topic</option>
+                {topics.map(topic => (
+                  <option key={topic} value={topic}>
+                    {topic}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
-                  {/* Topic Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
-                      Topic
-                    </label>
-                    <select
-                      name="topic"
-                      value={formData.topic}
-                      onChange={handleInputChange}
-                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
-                      required
-                    >
-                      <option value="">Select a topic</option>
-                      {topics.map(topic => (
-                        <option key={topic} value={topic}>
-                          {topic}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+            {/* Type Selection */}
+            <div>
+              <Label className="mb-2">Type</Label>
+              <Select
+                name="type"
+                value={formData.type}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">Select a type</option>
+                {types.map(type => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
-                  {/* Type Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
-                      Type
-                    </label>
-                    <select
-                      name="type"
-                      value={formData.type}
-                      onChange={handleInputChange}
-                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
-                      required
-                    >
-                      <option value="">Select a type</option>
-                      {types.map(type => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Output Folder */}
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="block text-sm font-medium text-gray-400">
-                        Render Output Folder
-                      </label>
-                      <button
-                        onClick={() => setIsOutputFolderManagerOpen(true)}
-                        className="text-purple-400 hover:text-purple-300 text-sm"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                    <select
-                      name="outputFolderPath"
-                      value={formData.outputFolderPath}
-                      onChange={handleInputChange}
-                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
-                      required
-                    >
-                      <option value="">Select an output folder</option>
-                      {outputFolders.map(folder => (
-                        <option key={folder.id} value={folder.path}>
-                          {folder.path.split('/').pop()}
-                        </option>
-                      ))}
-                      <option value="custom">Enter new folder path...</option>
-                    </select>
-                    {formData.outputFolderPath === 'custom' && (
-                      <div className="flex gap-2 mt-2">
-                        <input
-                          type="text"
-                          placeholder="Enter or paste folder path"
-                          value={formData.outputFolderPathValue || ''}
-                          onChange={e => setFormData(prev => ({ ...prev, outputFolderPathValue: e.target.value }))}
-                          className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
-                          required
-                        />
-                        <button
-                          type="button"
-                          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"
-                          onClick={async () => {
+            {/* Output Folder */}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <Label>Render Output Folder</Label>
+                <button
+                  onClick={() => setIsOutputFolderManagerOpen(true)}
+                  className="text-accent hover:text-accent-hover text-sm"
+                >
+                  Edit
+                </button>
+              </div>
+              <Select
+                name="outputFolderPath"
+                value={formData.outputFolderPath}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">Select an output folder</option>
+                {outputFolders.map(folder => (
+                  <option key={folder.id} value={folder.path}>
+                    {folder.path.split('/').pop()}
+                  </option>
+                ))}
+                <option value="custom">Enter new folder path...</option>
+              </Select>
+              {formData.outputFolderPath === 'custom' && (
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    type="text"
+                    placeholder="Enter or paste folder path"
+                    value={formData.outputFolderPathValue || ''}
+                    onChange={e => setFormData(prev => ({ ...prev, outputFolderPathValue: e.target.value }))}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="primary"
+                    className="whitespace-nowrap"
+                    onClick={async () => {
                             if (!formData.outputFolderPathValue) return;
                             try {
                               setIsLoading(true);
@@ -849,16 +819,14 @@ export default function CreateRenderDialog({
                           }}
                         >
                           Save
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
 
                   {/* Asset Selection Method */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
-                      Asset Selection Method
-                    </label>
+                    <Label className="mb-2">Asset Selection Method</Label>
                     <div className="flex gap-4">
                       <label className="flex items-center">
                         <input
@@ -868,7 +836,7 @@ export default function CreateRenderDialog({
                           onChange={() => setUseAssetSelection(true)}
                           className="mr-2"
                         />
-                        <span className="text-gray-300">Select from Assets</span>
+                        <span className="text-text-muted">Select from Assets</span>
                       </label>
                       <label className="flex items-center">
                         <input
@@ -878,7 +846,7 @@ export default function CreateRenderDialog({
                           onChange={() => setUseAssetSelection(false)}
                           className="mr-2"
                         />
-                        <span className="text-gray-300">Upload JSON Files</span>
+                        <span className="text-text-muted">Upload JSON Files</span>
                       </label>
                     </div>
                   </div>
@@ -886,19 +854,16 @@ export default function CreateRenderDialog({
                   {/* Render JSONs (only show when not using asset selection) */}
                   {!useAssetSelection && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">
-                        Render JSONs
-                      </label>
-                      <input
+                      <Label className="mb-2">Render JSONs</Label>
+                      <Input
                         type="file"
                         accept=".json"
                         multiple
                         onChange={handleJsonFilesChange}
-                        className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
                         required={!useAssetSelection}
                       />
                       {jsonFiles.length > 0 && (
-                        <p className="mt-2 text-sm text-gray-400">
+                        <p className="mt-2 text-sm text-text-muted">
                           Selected {jsonFiles.length} file(s)
                         </p>
                       )}
@@ -912,29 +877,27 @@ export default function CreateRenderDialog({
                   {useAssetSelection && formData.channelName && formData.topic && (
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="block text-sm font-medium text-gray-400">
-                          Select Renderable Assets
-                        </label>
+                        <Label>Select Renderable Assets</Label>
                         <div className="flex gap-2">
                           <button
                             type="button"
                             onClick={fetchRenderableAssets}
                             disabled={loadingAssets}
-                            className="text-sm text-blue-400 hover:text-blue-300 disabled:text-gray-500"
+                            className="text-sm text-info hover:text-text disabled:text-text-faint"
                           >
                             🔄 Refresh
                           </button>
                           <button
                             type="button"
                             onClick={handleSelectAllAssets}
-                            className="text-sm text-purple-400 hover:text-purple-300"
+                            className="text-sm text-accent hover:text-accent-hover"
                           >
                             Select All
                           </button>
                           <button
                             type="button"
                             onClick={handleDeselectAllAssets}
-                            className="text-sm text-purple-400 hover:text-purple-300"
+                            className="text-sm text-accent hover:text-accent-hover"
                           >
                             Deselect All
                           </button>
@@ -944,48 +907,48 @@ export default function CreateRenderDialog({
                       {/* Search and Sort Controls */}
                       <div className="flex gap-4 mb-4">
                         <div className="flex-1">
-                          <input
+                          <Input
                             type="text"
                             placeholder="Search by group name or JSON file..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-sm"
+                            className="text-sm"
                           />
                         </div>
                         <div>
-                          <select
+                          <Select
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value as 'date' | 'unrendered')}
-                            className="bg-gray-700 text-white rounded-lg px-3 py-2 text-sm"
+                            className="text-sm"
                           >
                             <option value="unrendered">Sort by Unrendered Count</option>
                             <option value="date">Sort by Latest Date</option>
-                          </select>
+                          </Select>
                         </div>
                       </div>
-                      
+
                       {loadingAssets ? (
-                        <div className="bg-gray-700 rounded-lg p-4 text-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400 mx-auto"></div>
-                          <p className="text-gray-400 mt-2">Loading renderable assets...</p>
+                        <div className="bg-surface-raised rounded-lg p-4 text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto"></div>
+                          <p className="text-text-muted mt-2">Loading renderable assets...</p>
                         </div>
                       ) : filteredAndSortedAssets.length === 0 ? (
-                        <div className="bg-gray-700 rounded-lg p-4 text-center">
-                          <p className="text-gray-400">
+                        <div className="bg-surface-raised rounded-lg p-4 text-center">
+                          <p className="text-text-muted">
                             {searchTerm ? 'No assets found matching your search.' : 'No renderable assets found for this channel and topic.'}
                           </p>
                         </div>
                       ) : (
                         <div className="space-y-4 max-h-64 overflow-y-auto">
                           {filteredAndSortedAssets.map((group) => (
-                            <div key={group.key} className="border border-gray-600 rounded-lg p-4">
-                              <div 
-                                className="flex items-center justify-between mb-3 cursor-pointer hover:bg-gray-700/50 p-2 rounded transition-colors"
+                            <div key={group.key} className="border border-border rounded-lg p-4">
+                              <div
+                                className="flex items-center justify-between mb-3 cursor-pointer hover:bg-surface-raised p-2 rounded transition-colors"
                                 onClick={() => handleSelectGroupUnrendered(group)}
                                 title={getUnrenderedCount(group) > 0 ? `Click to select all ${getUnrenderedCount(group)} unrendered items` : 'No unrendered items to select'}
                               >
-                                <h4 className="font-medium text-white">{group.name}</h4>
-                                <div className="text-xs text-gray-500">
+                                <h4 className="font-medium text-text">{group.name}</h4>
+                                <div className="text-xs text-text-faint">
                                   <span>📄 JSON: {group.renderStatus.jsonOrders.length}</span>
                                   <span className="ml-2">🖼️ Image: {group.renderStatus.hasImage ? 'Yes' : 'No'}</span>
                                   <span className="ml-2">🎥 Videos: {group.assets.videos.length}</span>
@@ -993,26 +956,26 @@ export default function CreateRenderDialog({
                                   <span className="ml-2">🏆 Rewards: {group.renderStatus.availableRewards}/{group.renderStatus.requiredRewards}</span>
                                 </div>
                               </div>
-                              
+
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                 {group.assets.jsons.map((json) => (
                                   <div
                                     key={json.id}
                                     className={`p-2 rounded border-2 cursor-pointer transition-all text-sm ${
                                       json.rendered
-                                        ? 'border-gray-500 bg-gray-600 text-gray-400 cursor-not-allowed'
+                                        ? 'border-border bg-surface-raised text-text-muted cursor-not-allowed'
                                         : selectedJsonFiles.includes(json.id)
-                                        ? 'border-purple-500 bg-purple-500/10 text-white'
-                                        : 'border-gray-600 bg-gray-700 hover:border-gray-500 text-white'
+                                        ? 'border-accent bg-accent-muted text-text'
+                                        : 'border-border bg-surface-raised hover:border-border-strong text-text'
                                     }`}
                                     onClick={() => !json.rendered && handleJsonFileSelect(json.id)}
                                   >
                                     <div className="flex items-center justify-between">
                                       <span>{json.name.replace('.json', '')}</span>
                                       {json.rendered ? (
-                                        <span className="text-green-400 text-xs">✅ Rendered</span>
+                                        <span className="text-success text-xs">✅ Rendered</span>
                                       ) : selectedJsonFiles.includes(json.id) ? (
-                                        <CheckIcon className="w-4 h-4 text-purple-400" />
+                                        <CheckIcon className="w-4 h-4 text-accent" />
                                       ) : null}
                                     </div>
                                   </div>
@@ -1022,11 +985,11 @@ export default function CreateRenderDialog({
                           ))}
                         </div>
                       )}
-                      
+
                       {selectedJsonFiles.length > 0 && (
-                        <div className="mt-2 text-sm text-gray-400">
+                        <div className="mt-2 text-sm text-text-muted">
                           <p>Selected {selectedJsonFiles.length} JSON file{selectedJsonFiles.length !== 1 ? 's' : ''}</p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-text-faint mt-1">
                             From {new Set(selectedJsonFiles.map(id => {
                               const group = renderableAssets.find(g => 
                                 g.assets.jsons.some(json => json.id === id)
@@ -1047,22 +1010,19 @@ export default function CreateRenderDialog({
                   {/* Template After Effects Render Format */}
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <label className="block text-sm font-medium text-gray-400">
-                        Template After Effects Render Format
-                      </label>
+                      <Label>Template After Effects Render Format</Label>
                       <button
                         type="button"
                         onClick={() => setIsRenderFormatManagerOpen(true)}
-                        className="text-purple-400 hover:text-purple-300 text-sm"
+                        className="text-accent hover:text-accent-hover text-sm"
                       >
                         Edit
                       </button>
                     </div>
-                    <select
+                    <Select
                       name="templateAeRenderFormat"
                       value={formData.templateAeRenderFormat.id}
                       onChange={handleRenderFormatChange}
-                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
                       required
                     >
                       <option value="">Select a render format</option>
@@ -1071,28 +1031,25 @@ export default function CreateRenderDialog({
                           {format.code ? `${format.code}: ${format.name}` : format.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   {/* Template After Effects */}
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <label className="block text-sm font-medium text-gray-400">
-                        Template After Effects File
-                      </label>
+                      <Label>Template After Effects File</Label>
                       <button
                         type="button"
                         onClick={() => setIsTemplateManagerOpen(true)}
-                        className="text-purple-400 hover:text-purple-300 text-sm"
+                        className="text-accent hover:text-accent-hover text-sm"
                       >
                         Edit
                       </button>
                     </div>
-                    <select
+                    <Select
                       name="templateAeUrl"
                       value={formData.templateAeUrl}
                       onChange={handleInputChange}
-                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
                       required
                     >
                       <option value="">Select a template</option>
@@ -1102,20 +1059,20 @@ export default function CreateRenderDialog({
                         </option>
                       ))}
                       <option value="custom">Enter full template path...</option>
-                    </select>
+                    </Select>
                     {formData.templateAeUrl === 'custom' && (
                       <div className="flex gap-2 mt-2">
-                        <input
+                        <Input
                           type="text"
                           placeholder="Enter or paste full template path"
                           value={formData.templateAeUrlValue || ''}
                           onChange={e => setFormData(prev => ({ ...prev, templateAeUrlValue: e.target.value }))}
-                          className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
                           required
                         />
-                        <button
+                        <Button
                           type="button"
-                          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"
+                          variant="primary"
+                          className="whitespace-nowrap"
                           onClick={async () => {
                             if (!formData.templateAeUrlValue) return;
                             try {
@@ -1138,22 +1095,19 @@ export default function CreateRenderDialog({
                           }}
                         >
                           Save
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
 
                   {/* Composition After Effects */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
-                      Composition After Effects
-                    </label>
-                    <input
+                    <Label className="mb-2">Composition After Effects</Label>
+                    <Input
                       type="text"
                       name="templateAeComposition"
                       value={formData.templateAeComposition}
                       onChange={handleInputChange}
-                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
                       required
                     />
                   </div>
@@ -1166,9 +1120,9 @@ export default function CreateRenderDialog({
                         name="autoRender"
                         checked={formData.autoRender}
                         onChange={handleInputChange}
-                        className="mr-2"
+                        className="mr-2 accent-accent"
                       />
-                      <label className="text-gray-400">Auto Render</label>
+                      <label className="text-text-muted">Auto Render</label>
                     </div>
 
                     <div className="flex items-center">
@@ -1177,9 +1131,9 @@ export default function CreateRenderDialog({
                         name="autoCreateMetadata"
                         checked={formData.autoCreateMetadata}
                         onChange={handleInputChange}
-                        className="mr-2"
+                        className="mr-2 accent-accent"
                       />
-                      <label className="text-gray-400">Auto Create Metadata</label>
+                      <label className="text-text-muted">Auto Create Metadata</label>
                     </div>
 
                     <div className="flex items-center">
@@ -1188,88 +1142,73 @@ export default function CreateRenderDialog({
                         name="autoUpload"
                         checked={formData.autoUpload}
                         onChange={handleInputChange}
-                        className="mr-2"
+                        className="mr-2 accent-accent"
                       />
-                      <label className="text-gray-400">Auto Upload</label>
+                      <label className="text-text-muted">Auto Upload</label>
                     </div>
                   </div>
 
                   {/* YouTube Config */}
                   {formData.autoUpload && (
-                    <div className="space-y-4 border-t border-gray-700 pt-4 mt-4">
-                      <h3 className="text-lg font-medium">YouTube Config</h3>
-                      
+                    <div className="space-y-4 border-t border-border pt-4 mt-4">
+                      <h3 className="text-lg font-medium text-text">YouTube Config</h3>
+
                       {/* Playlist */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
-                          Playlist
-                        </label>
-                        <input
+                        <Label className="mb-2">Playlist</Label>
+                        <Input
                           type="text"
                           name="youtubeMetadata.playlistId"
                           value={formData.youtubeMetadata.playlistId}
                           onChange={handleInputChange}
-                          className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
                         />
                       </div>
 
                       {/* Category */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
-                          Category
-                        </label>
-                        <input
+                        <Label className="mb-2">Category</Label>
+                        <Input
                           type="text"
                           name="youtubeMetadata.categoryId"
                           value={formData.youtubeMetadata.categoryId}
                           onChange={handleInputChange}
-                          className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
                         />
                       </div>
 
                       {/* Language */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
-                          Language
-                        </label>
-                        <select
+                        <Label className="mb-2">Language</Label>
+                        <Select
                           name="youtubeMetadata.defaultLanguage"
                           value={formData.youtubeMetadata.defaultLanguage}
                           onChange={handleInputChange}
-                          className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
                         >
                           <option value="vi">Vietnamese</option>
                           <option value="en">English</option>
-                        </select>
+                        </Select>
                       </div>
 
                       {/* Audio Language */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
-                          Audio Language
-                        </label>
-                        <select
+                        <Label className="mb-2">Audio Language</Label>
+                        <Select
                           name="youtubeMetadata.defaultAudioLanguage"
                           value={formData.youtubeMetadata.defaultAudioLanguage}
                           onChange={handleInputChange}
-                          className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
                         >
                           <option value="vi">Vietnamese</option>
                           <option value="en">English</option>
-                        </select>
+                        </Select>
                       </div>
 
                       {/* Schedule Date */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
-                          Schedule Date
-                        </label>
-                        <input
+                        <Label className="mb-2">Schedule Date</Label>
+                        <Input
                           type="datetime-local"
                           name="youtubeMetadata.scheduleDate"
                           value={formData.youtubeMetadata.scheduleDate}
                           onChange={handleInputChange}
-                          className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
                         />
                       </div>
                     </div>
@@ -1278,18 +1217,12 @@ export default function CreateRenderDialog({
 
                 {/* Submit Button - Full Width */}
                 <div className="col-span-2 flex justify-end mt-6">
-                  <button
-                    type="submit"
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors"
-                  >
+                  <Button type="submit" variant="primary" size="lg">
                     Create
-                  </button>
+                  </Button>
                 </div>
               </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </Dialog>
 
       <LoadingDialog isOpen={isLoading} message={loadingMessage} />
       <ErrorDialog

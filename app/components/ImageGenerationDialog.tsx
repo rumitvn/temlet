@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  PhotoIcon, 
-  XMarkIcon, 
+import {
+  PhotoIcon,
+  XMarkIcon,
   SparklesIcon,
   ComputerDesktopIcon,
   CloudIcon,
@@ -14,6 +13,7 @@ import {
 import LoadingDialog from './LoadingDialog';
 import ErrorDialog from './ErrorDialog';
 import SuccessDialog from './SuccessDialog';
+import { Button, IconButton, Input, Textarea, Select, Label, Dialog } from "@/app/components/ui";
 
 interface ImageGenerationDialogProps {
   isOpen: boolean;
@@ -130,7 +130,7 @@ export default function ImageGenerationDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.prompt.trim()) {
       setError('Please enter a prompt for image generation');
       return;
@@ -159,7 +159,7 @@ export default function ImageGenerationDialog({
       if (data.success) {
         setGeneratedImageUrl(data.imageUrl);
         setSuccessMessage('Image generated successfully!');
-        
+
         // If the image was saved as an asset, notify the parent
         if (data.savedAsset) {
           onImageGenerated(data.savedAsset);
@@ -186,321 +186,268 @@ export default function ImageGenerationDialog({
 
   const getModelStatusIcon = (model: ModelInfo) => {
     if (model.available) {
-      return <CheckCircleIcon className="w-5 h-5 text-green-500" />;
+      return <CheckCircleIcon className="w-5 h-5 text-success" />;
     } else {
-      return <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />;
+      return <ExclamationTriangleIcon className="w-5 h-5 text-danger" />;
     }
   };
 
   return (
     <>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-            onClick={handleClose}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-600">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <PhotoIcon className="w-6 h-6 text-purple-600" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-semibold text-white">Generate Image</h2>
-                    <p className="text-sm text-gray-400">Create images using AI models</p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleClose}
-                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
-                >
-                  <XMarkIcon className="w-6 h-6" />
-                </button>
-              </div>
+      <Dialog
+        isOpen={isOpen}
+        onClose={handleClose}
+        size="lg"
+        showClose={false}
+        className="p-0 overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-border">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-accent-muted rounded-lg">
+              <PhotoIcon className="w-6 h-6 text-accent" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-text">Generate Image</h2>
+              <p className="text-sm text-text-muted">Create images using AI models</p>
+            </div>
+          </div>
+          <IconButton aria-label="Close dialog" variant="ghost" onClick={handleClose}>
+            <XMarkIcon className="w-6 h-6" />
+          </IconButton>
+        </div>
 
-              {/* Content */}
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Model Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-3">
-                      AI Model
-                    </label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {models && Object.entries(models).map(([key, model]) => (
-                        <div
-                          key={key}
-                          className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                            formData.model === key
-                              ? 'border-purple-500 bg-purple-900 bg-opacity-20'
-                              : 'border-gray-600 hover:border-gray-500 bg-gray-700'
-                          } ${!model.available ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          onClick={() => model.available && setFormData(prev => ({ ...prev, model: key as 'openai' | 'grok' | 'comfyui' }))}
-                        >
-                          <div className="flex items-center space-x-3">
-                            {getModelIcon(key)}
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2">
-                                <span className="font-medium text-white">{model.name}</span>
-                                {getModelStatusIcon(model)}
-                              </div>
-                              {!model.available && (
-                                <p className="text-xs text-red-400 mt-1">
-                                  {key === 'openai' ? 'API key not configured' : 'Not available'}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          {formData.model === key && (
-                            <div className="absolute top-2 right-2">
-                              <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                            </div>
-                          )}
+        {/* Content */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Model Selection */}
+            <div>
+              <Label className="mb-3">AI Model</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {models && Object.entries(models).map(([key, model]) => (
+                  <div
+                    key={key}
+                    className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      formData.model === key
+                        ? 'border-accent bg-accent-muted'
+                        : 'border-border hover:border-border-strong bg-surface-raised'
+                    } ${!model.available ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => model.available && setFormData(prev => ({ ...prev, model: key as 'openai' | 'grok' | 'comfyui' }))}
+                  >
+                    <div className="flex items-center space-x-3">
+                      {getModelIcon(key)}
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium text-text">{model.name}</span>
+                          {getModelStatusIcon(model)}
                         </div>
-                      ))}
+                        {!model.available && (
+                          <p className="text-xs text-danger mt-1">
+                            {key === 'openai' ? 'API key not configured' : 'Not available'}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    {models?.comfyui && !models.comfyui.available && (
-                      <div className="mt-3 flex items-center space-x-2">
-                        <button
-                          type="button"
-                          onClick={checkComfyUI}
-                          disabled={isCheckingComfyUI}
-                          className="text-sm text-purple-400 hover:text-purple-300 disabled:opacity-50"
-                        >
-                          {isCheckingComfyUI ? 'Checking...' : 'Check ComfyUI Connection'}
-                        </button>
+                    {formData.model === key && (
+                      <div className="absolute top-2 right-2">
+                        <div className="w-3 h-3 bg-accent rounded-full"></div>
                       </div>
                     )}
                   </div>
-
-                  {/* Prompt */}
-                  <div>
-                    <label htmlFor="prompt" className="block text-sm font-medium text-gray-400 mb-2">
-                      Prompt *
-                    </label>
-                    <textarea
-                      id="prompt"
-                      name="prompt"
-                      value={formData.prompt}
-                      onChange={handleInputChange}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
-                      placeholder="Describe the image you want to generate..."
-                      required
-                    />
-                  </div>
-
-                  {/* Model-specific options */}
-                  {formData.model === 'openai' && models?.openai && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label htmlFor="size" className="block text-sm font-medium text-gray-400 mb-2">
-                          Size
-                        </label>
-                        <select
-                          id="size"
-                          name="size"
-                          value={formData.size}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
-                        >
-                          {models.openai.sizes?.map(size => (
-                            <option key={size} value={size}>{size}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label htmlFor="quality" className="block text-sm font-medium text-gray-400 mb-2">
-                          Quality
-                        </label>
-                        <select
-                          id="quality"
-                          name="quality"
-                          value={formData.quality}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
-                        >
-                          {models.openai.qualities?.map(quality => (
-                            <option key={quality} value={quality}>{quality}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label htmlFor="style" className="block text-sm font-medium text-gray-400 mb-2">
-                          Style
-                        </label>
-                        <select
-                          id="style"
-                          name="style"
-                          value={formData.style}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
-                        >
-                          {models.openai.styles?.map(style => (
-                            <option key={style} value={style}>{style}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  {formData.model === 'grok' && models?.grok && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="size" className="block text-sm font-medium text-gray-400 mb-2">
-                          Size (Fixed)
-                        </label>
-                        <select
-                          id="size"
-                          name="size"
-                          value={formData.size}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
-                          disabled
-                        >
-                          {models.grok.sizes?.map(size => (
-                            <option key={size} value={size}>{size}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label htmlFor="quality" className="block text-sm font-medium text-gray-400 mb-2">
-                          Quality (Fixed)
-                        </label>
-                        <select
-                          id="quality"
-                          name="quality"
-                          value={formData.quality}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
-                          disabled
-                        >
-                          {models.grok.qualities?.map(quality => (
-                            <option key={quality} value={quality}>{quality}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  {formData.model === 'comfyui' && models?.comfyui && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="size" className="block text-sm font-medium text-gray-400 mb-2">
-                          Size
-                        </label>
-                        <select
-                          id="size"
-                          name="size"
-                          value={formData.size}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
-                        >
-                          {models.comfyui.sizes?.map(size => (
-                            <option key={size} value={size}>{size}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label htmlFor="comfyuiUrl" className="block text-sm font-medium text-gray-400 mb-2">
-                          ComfyUI URL
-                        </label>
-                        <input
-                          type="url"
-                          id="comfyuiUrl"
-                          name="comfyuiUrl"
-                          value={formData.comfyuiUrl}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
-                          placeholder="http://localhost:8188"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* File options */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="category" className="block text-sm font-medium text-gray-400 mb-2">
-                        Category
-                      </label>
-                      <input
-                        type="text"
-                        id="category"
-                        name="category"
-                        value={formData.category}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
-                        placeholder="image"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="filename" className="block text-sm font-medium text-gray-400 mb-2">
-                        Filename (optional)
-                      </label>
-                      <input
-                        type="text"
-                        id="filename"
-                        name="filename"
-                        value={formData.filename}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white bg-gray-700"
-                        placeholder="generated_image.png"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Generated Image Preview */}
-                  {generatedImageUrl && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">
-                        Generated Image
-                      </label>
-                      <div className="border border-gray-600 rounded-lg p-4">
-                        <img
-                          src={generatedImageUrl}
-                          alt="Generated"
-                          className="w-full h-64 object-contain rounded-lg"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-600">
-                    <button
-                      type="button"
-                      onClick={handleClose}
-                      className="px-4 py-2 text-gray-300 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isLoading || !formData.prompt.trim() || (models ? models[formData.model]?.available !== true : true)}
-                      className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
-                    >
-                      <SparklesIcon className="w-4 h-4" />
-                      <span>Generate Image</span>
-                    </button>
-                  </div>
-                </form>
+                ))}
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              {models?.comfyui && !models.comfyui.available && (
+                <div className="mt-3 flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={checkComfyUI}
+                    disabled={isCheckingComfyUI}
+                    className="text-sm text-accent hover:text-accent-hover disabled:opacity-50"
+                  >
+                    {isCheckingComfyUI ? 'Checking...' : 'Check ComfyUI Connection'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Prompt */}
+            <div>
+              <Label htmlFor="prompt" className="mb-2">Prompt *</Label>
+              <Textarea
+                id="prompt"
+                name="prompt"
+                value={formData.prompt}
+                onChange={handleInputChange}
+                rows={4}
+                placeholder="Describe the image you want to generate..."
+                required
+              />
+            </div>
+
+            {/* Model-specific options */}
+            {formData.model === 'openai' && models?.openai && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="size" className="mb-2">Size</Label>
+                  <Select
+                    id="size"
+                    name="size"
+                    value={formData.size}
+                    onChange={handleInputChange}
+                  >
+                    {models.openai.sizes?.map(size => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="quality" className="mb-2">Quality</Label>
+                  <Select
+                    id="quality"
+                    name="quality"
+                    value={formData.quality}
+                    onChange={handleInputChange}
+                  >
+                    {models.openai.qualities?.map(quality => (
+                      <option key={quality} value={quality}>{quality}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="style" className="mb-2">Style</Label>
+                  <Select
+                    id="style"
+                    name="style"
+                    value={formData.style}
+                    onChange={handleInputChange}
+                  >
+                    {models.openai.styles?.map(style => (
+                      <option key={style} value={style}>{style}</option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {formData.model === 'grok' && models?.grok && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="size" className="mb-2">Size (Fixed)</Label>
+                  <Select
+                    id="size"
+                    name="size"
+                    value={formData.size}
+                    onChange={handleInputChange}
+                    disabled
+                  >
+                    {models.grok.sizes?.map(size => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="quality" className="mb-2">Quality (Fixed)</Label>
+                  <Select
+                    id="quality"
+                    name="quality"
+                    value={formData.quality}
+                    onChange={handleInputChange}
+                    disabled
+                  >
+                    {models.grok.qualities?.map(quality => (
+                      <option key={quality} value={quality}>{quality}</option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {formData.model === 'comfyui' && models?.comfyui && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="size" className="mb-2">Size</Label>
+                  <Select
+                    id="size"
+                    name="size"
+                    value={formData.size}
+                    onChange={handleInputChange}
+                  >
+                    {models.comfyui.sizes?.map(size => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="comfyuiUrl" className="mb-2">ComfyUI URL</Label>
+                  <Input
+                    type="url"
+                    id="comfyuiUrl"
+                    name="comfyuiUrl"
+                    value={formData.comfyuiUrl}
+                    onChange={handleInputChange}
+                    placeholder="http://localhost:8188"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* File options */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="category" className="mb-2">Category</Label>
+                <Input
+                  type="text"
+                  id="category"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  placeholder="image"
+                />
+              </div>
+              <div>
+                <Label htmlFor="filename" className="mb-2">Filename (optional)</Label>
+                <Input
+                  type="text"
+                  id="filename"
+                  name="filename"
+                  value={formData.filename}
+                  onChange={handleInputChange}
+                  placeholder="generated_image.png"
+                />
+              </div>
+            </div>
+
+            {/* Generated Image Preview */}
+            {generatedImageUrl && (
+              <div>
+                <Label className="mb-2">Generated Image</Label>
+                <div className="border border-border rounded-lg p-4">
+                  <img
+                    src={generatedImageUrl}
+                    alt="Generated"
+                    className="w-full h-64 object-contain rounded-lg"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center justify-end space-x-3 pt-4 border-t border-border">
+              <Button type="button" variant="secondary" onClick={handleClose}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={isLoading || !formData.prompt.trim() || (models ? models[formData.model]?.available !== true : true)}
+                leftIcon={<SparklesIcon className="w-4 h-4" />}
+              >
+                Generate Image
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Dialog>
 
       {/* Loading Dialog */}
       <LoadingDialog
@@ -523,4 +470,4 @@ export default function ImageGenerationDialog({
       />
     </>
   );
-} 
+}

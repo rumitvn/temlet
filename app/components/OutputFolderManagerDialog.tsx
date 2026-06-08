@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button, Dialog } from '@/app/components/ui';
 
 interface OutputFolderManagerDialogProps {
   isOpen: boolean;
@@ -24,33 +25,39 @@ export default function OutputFolderManagerDialog({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Manage Output Folders</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
-        </div>
-        <ul className="space-y-2">
-          {outputFolders.length === 0 && <li className="text-gray-400">No output folders saved.</li>}
-          {outputFolders.map(folder => (
-            <li key={folder.id} className="flex justify-between items-center bg-gray-700 rounded px-4 py-2">
-              <span className="truncate max-w-xs">{folder.path}</span>
-              <button
-                onClick={() => handleDelete(folder.id)}
-                className="ml-4 px-2 py-1 text-sm bg-red-600 hover:bg-red-700 rounded text-white"
-              >
-                Delete
-              </button>
-            </li>
-          ))}
-        </ul>
-        <div className="flex justify-end mt-4">
-          <button onClick={onClose} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg">Close</button>
-        </div>
-      </div>
-    </div>
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Manage Output Folders"
+      size="md"
+      footer={
+        <Button variant="primary" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      <ul className="space-y-2">
+        {outputFolders.length === 0 && (
+          <li className="text-text-muted">No output folders saved.</li>
+        )}
+        {outputFolders.map(folder => (
+          <li
+            key={folder.id}
+            className="flex justify-between items-center bg-surface-raised rounded-md px-4 py-2"
+          >
+            <span className="truncate max-w-xs text-text">{folder.path}</span>
+            <Button
+              variant="danger"
+              size="sm"
+              className="ml-4"
+              onClick={() => handleDelete(folder.id)}
+            >
+              Delete
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </Dialog>
   );
-} 
+}

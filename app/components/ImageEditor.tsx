@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { XMarkIcon, CheckIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
+import { CheckIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
+import { Button, Select, Label, Dialog } from "@/app/components/ui";
 
 interface ImageEditorProps {
   isOpen: boolean;
@@ -271,151 +271,121 @@ export default function ImageEditor({
   }, [originalImage, cropArea, scale, canvasSize]);
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-white">Edit Image: {imageName}</h2>
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      size="xl"
+      title={`Edit Image: ${imageName}`}
+    >
+      {/* Image Editor */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Canvas Container */}
+        <div className="flex-1">
+          <div className="mb-4">
+            <div className="flex items-center gap-4 text-sm text-text-muted">
+              <span>Target Size: {defaultSize}x{defaultSize}</span>
+              <span>Scale: {(scale * 100).toFixed(0)}%</span>
               <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-white transition-colors"
+                onClick={resetCrop}
+                className="flex items-center gap-1 text-info hover:text-text"
               >
-                <XMarkIcon className="w-6 h-6" />
+                <ArrowPathIcon className="w-4 h-4" />
+                Reset
               </button>
             </div>
+          </div>
 
-            {/* Image Editor */}
-            <div className="flex flex-col lg:flex-row gap-6">
-              {/* Canvas Container */}
-              <div className="flex-1">
-                <div className="mb-4">
-                  <div className="flex items-center gap-4 text-sm text-gray-300">
-                    <span>Target Size: {defaultSize}x{defaultSize}</span>
-                    <span>Scale: {(scale * 100).toFixed(0)}%</span>
-                    <button
-                      onClick={resetCrop}
-                      className="flex items-center gap-1 text-blue-400 hover:text-blue-300"
-                    >
-                      <ArrowPathIcon className="w-4 h-4" />
-                      Reset
-                    </button>
-                  </div>
-                </div>
+          <div
+            ref={containerRef}
+            className="relative bg-bg rounded-lg overflow-hidden cursor-move"
+            style={{ width: canvasSize.width, height: canvasSize.height }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onWheel={handleWheel}
+          >
+            <canvas
+              ref={canvasRef}
+              className="block"
+              style={{ width: canvasSize.width, height: canvasSize.height }}
+            />
+          </div>
 
-                <div
-                  ref={containerRef}
-                  className="relative bg-gray-900 rounded-lg overflow-hidden cursor-move"
-                  style={{ width: canvasSize.width, height: canvasSize.height }}
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
-                  onWheel={handleWheel}
+          <div className="mt-4 text-xs text-text-muted">
+            <p>• Drag to move the crop area</p>
+            <p>• Scroll to zoom in/out</p>
+            <p>• The white border shows the crop area</p>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="lg:w-64 space-y-4">
+          <div className="bg-surface-raised rounded-lg p-4">
+            <h3 className="text-sm font-medium text-text mb-3">Settings</h3>
+
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs mb-1">Output Size</Label>
+                <Select
+                  value={currentSize}
+                  onChange={(e) => {
+                    const newSize = parseInt(e.target.value);
+                    console.log('📏 Size changed to:', newSize);
+                    setCurrentSize(newSize);
+                    // Reset crop area when size changes
+                    if (originalImage) {
+                      initializeCropArea(originalImage);
+                    }
+                  }}
+                  className="text-sm"
                 >
-                  <canvas
-                    ref={canvasRef}
-                    className="block"
-                    style={{ width: canvasSize.width, height: canvasSize.height }}
-                  />
-                </div>
-
-                <div className="mt-4 text-xs text-gray-400">
-                  <p>• Drag to move the crop area</p>
-                  <p>• Scroll to zoom in/out</p>
-                  <p>• The white border shows the crop area</p>
-                </div>
+                  <option value={512}>512x512</option>
+                  <option value={1024}>1024x1024</option>
+                </Select>
               </div>
 
-              {/* Controls */}
-              <div className="lg:w-64 space-y-4">
-                <div className="bg-gray-700 rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-white mb-3">Settings</h3>
-                  
-                  <div className="space-y-3">
-                                         <div>
-                       <label className="block text-xs text-gray-300 mb-1">Output Size</label>
-                                                  <select
-                             value={currentSize}
-                             onChange={(e) => {
-                               const newSize = parseInt(e.target.value);
-                               console.log('📏 Size changed to:', newSize);
-                               setCurrentSize(newSize);
-                               // Reset crop area when size changes
-                               if (originalImage) {
-                                 initializeCropArea(originalImage);
-                               }
-                             }}
-                             className="w-full bg-gray-600 text-white rounded px-3 py-2 text-sm"
-                           >
-                             <option value={512}>512x512</option>
-                             <option value={1024}>1024x1024</option>
-                           </select>
-                     </div>
-
-                    <div>
-                      <label className="block text-xs text-gray-300 mb-1">Zoom</label>
-                      <input
-                        type="range"
-                        min="0.1"
-                        max="3"
-                        step="0.1"
-                        value={scale}
-                        onChange={(e) => setScale(parseFloat(e.target.value))}
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-700 rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-white mb-3">Actions</h3>
-                  
-                  <div className="space-y-2">
-                    <button
-                      onClick={saveImage}
-                      disabled={isLoading}
-                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white py-2 px-4 rounded flex items-center justify-center gap-2 transition-colors"
-                    >
-                      {isLoading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <CheckIcon className="w-4 h-4" />
-                          Save Image
-                        </>
-                      )}
-                    </button>
-                    
-                    <button
-                      onClick={onClose}
-                      className="w-full bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
+              <div>
+                <Label className="text-xs mb-1">Zoom</Label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="3"
+                  step="0.1"
+                  value={scale}
+                  onChange={(e) => setScale(parseFloat(e.target.value))}
+                  className="w-full"
+                />
               </div>
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          </div>
+
+          <div className="bg-surface-raised rounded-lg p-4">
+            <h3 className="text-sm font-medium text-text mb-3">Actions</h3>
+
+            <div className="space-y-2">
+              <Button
+                onClick={saveImage}
+                disabled={isLoading}
+                loading={isLoading}
+                variant="primary"
+                className="w-full"
+                leftIcon={<CheckIcon className="w-4 h-4" />}
+              >
+                {isLoading ? 'Saving...' : 'Save Image'}
+              </Button>
+
+              <Button
+                onClick={onClose}
+                variant="secondary"
+                className="w-full"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Dialog>
   );
 } 

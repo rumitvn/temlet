@@ -2,6 +2,19 @@
 
 import React, { useState } from "react";
 import { config } from "../../lib/config";
+import {
+  Button,
+  Card,
+  Input,
+  Label,
+  Badge,
+  Table,
+  THead,
+  TBody,
+  TR,
+  TH,
+  TD,
+} from "@/app/components/ui";
 
 /**
  * Example "Create Jobs" page:
@@ -222,171 +235,142 @@ export default function CreateJobPage() {
   // RENDER
   // --------------------------
   return (
-    <div style={{ padding: "1rem" }}>
-      <h1>Render Reward Image</h1>
+    <div className="p-4 bg-bg text-text min-h-screen">
+      <h1 className="text-2xl font-bold text-accent mb-4">Render Reward Image</h1>
 
-      {/* Template Source + Composition */}
-      <div style={styles.field}>
-        <label style={styles.label}>Template Source (AEP path):</label>
-        <input
-          style={styles.input}
-          type="text"
-          value={templateSrc}
-          onChange={(e) => setTemplateSrc(e.target.value)}
-        />
-      </div>
-      <div style={styles.field}>
-        <label style={styles.label}>Composition:</label>
-        <input
-          style={styles.input}
-          type="text"
-          value={composition}
-          onChange={(e) => setComposition(e.target.value)}
-        />
-      </div>
+      <Card className="p-4 space-y-4">
+        {/* Template Source + Composition */}
+        <div className="space-y-1">
+          <Label htmlFor="templateSrc">Template Source (AEP path):</Label>
+          <Input
+            id="templateSrc"
+            type="text"
+            value={templateSrc}
+            onChange={(e) => setTemplateSrc(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="composition">Composition:</Label>
+          <Input
+            id="composition"
+            type="text"
+            value={composition}
+            onChange={(e) => setComposition(e.target.value)}
+          />
+        </div>
 
-      <div style={styles.field}>
-        <label style={styles.label}>Output Folder (e.g. D:/nexrender-output):</label>
-        <input
-          style={styles.input}
-          type="text"
-          value={outputFolder}
-          onChange={(e) => setOutputFolder(e.target.value)}
-        />
-      </div>
+        <div className="space-y-1">
+          <Label htmlFor="outputFolder">
+            Output Folder (e.g. D:/nexrender-output):
+          </Label>
+          <Input
+            id="outputFolder"
+            type="text"
+            value={outputFolder}
+            onChange={(e) => setOutputFolder(e.target.value)}
+          />
+        </div>
 
-      {/* Local root path for images */}
-      <div style={styles.field}>
-        <label style={styles.label}>Local Root Path for Images:</label>
-        <input
-          style={styles.input}
-          type="text"
-          value={localRootPath}
-          onChange={(e) => setLocalRootPath(e.target.value)}
-        />
-        <small style={{ color: "var(--foreground)", opacity: "0.7" }}>
-          Example: <code>file:///C:/Users/youruser/Documents/minimate/animals</code>
-        </small>
-      </div>
+        {/* Local root path for images */}
+        <div className="space-y-1">
+          <Label htmlFor="localRootPath">Local Root Path for Images:</Label>
+          <Input
+            id="localRootPath"
+            type="text"
+            value={localRootPath}
+            onChange={(e) => setLocalRootPath(e.target.value)}
+          />
+          <small className="text-text-faint">
+            Example:{" "}
+            <code>file:///C:/Users/youruser/Documents/minimate/animals</code>
+          </small>
+        </div>
 
-      <hr style={{ margin: "1rem 0" }} />
+        <hr className="border-border" />
 
-      {/* Titles (.txt) */}
-      <div style={styles.field}>
-        <label style={styles.label}>Titles (.txt) file:</label>
-        <input
-          type="file"
-          accept=".txt"
-          onChange={handleTitlesFileChange}
-          disabled={loadingTitles}
-        />
-        {loadingTitles && <p>Loading titles...</p>}
-        {!!titles.length && (
-          <p style={{ marginTop: "0.5rem" }}>
-            Loaded {titles.length} lines from text file
-          </p>
-        )}
-      </div>
+        {/* Titles (.txt) */}
+        <div className="space-y-1">
+          <Label htmlFor="titlesFile">Titles (.txt) file:</Label>
+          <input
+            id="titlesFile"
+            type="file"
+            accept=".txt"
+            onChange={handleTitlesFileChange}
+            disabled={loadingTitles}
+            className="block w-full text-sm text-text-muted file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-2 file:text-accent-fg hover:file:bg-accent-hover"
+          />
+          {loadingTitles && <p className="text-text-muted">Loading titles...</p>}
+          {!!titles.length && (
+            <p className="mt-2 text-text-muted">
+              Loaded {titles.length} lines from text file
+            </p>
+          )}
+        </div>
 
-      {/* Images folder (webkitdirectory) */}
-      <div style={styles.field}>
-        <label style={styles.label}>
-          Images Folder (should contain .png files):
-        </label>
-        <input
-          type="file"
-          multiple
-          // @ts-expect-error `webkitdirectory` is a valid DOM attribute missing from React's input types
-          webkitdirectory="true"
-          onChange={handleImagesFolderChange}
-          disabled={loadingImages}
-        />
-        {loadingImages && <p>Loading images...</p>}
-        {!!images.length && (
-          <p style={{ marginTop: "0.5rem" }}>
-            Loaded {images.length} .png files from folder
-          </p>
-        )}
-      </div>
+        {/* Images folder (webkitdirectory) */}
+        <div className="space-y-1">
+          <Label htmlFor="imagesFolder">
+            Images Folder (should contain .png files):
+          </Label>
+          <input
+            id="imagesFolder"
+            type="file"
+            multiple
+            // @ts-expect-error `webkitdirectory` is a valid DOM attribute missing from React's input types
+            webkitdirectory="true"
+            onChange={handleImagesFolderChange}
+            disabled={loadingImages}
+            className="block w-full text-sm text-text-muted file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-2 file:text-accent-fg hover:file:bg-accent-hover"
+          />
+          {loadingImages && <p className="text-text-muted">Loading images...</p>}
+          {!!images.length && (
+            <p className="mt-2 text-text-muted">
+              Loaded {images.length} .png files from folder
+            </p>
+          )}
+        </div>
 
-      {/* Create All button */}
-      <button
-        onClick={handleCreateAllJobs}
-        style={styles.button}
-        disabled={creatingAll}
-      >
-        {creatingAll ? "Creating jobs..." : "Create All Jobs"}
-      </button>
+        {/* Create All button */}
+        <Button
+          variant="primary"
+          onClick={handleCreateAllJobs}
+          loading={creatingAll}
+          disabled={creatingAll}
+        >
+          {creatingAll ? "Creating jobs..." : "Create All Jobs"}
+        </Button>
+      </Card>
 
       {/* Results table */}
       {!!jobResults.length && (
-        <div style={{ marginTop: "2rem" }}>
-          <h2>Created Jobs</h2>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Title</th>
-                <th style={styles.th}>Image Path</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>UID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobResults.map((r, idx) => (
-                <tr key={idx}>
-                  <td style={styles.td}>{r.title}</td>
-                  <td style={styles.td}>{r.imagePath}</td>
-                  <td style={styles.td}>{r.status}</td>
-                  <td style={styles.td}>{r.uid}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-3">Created Jobs</h2>
+          <Card>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Title</TH>
+                  <TH>Image Path</TH>
+                  <TH>Status</TH>
+                  <TH>UID</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {jobResults.map((r, idx) => (
+                  <TR key={idx}>
+                    <TD>{r.title}</TD>
+                    <TD>{r.imagePath}</TD>
+                    <TD>
+                      <Badge status={r.status}>{r.status}</Badge>
+                    </TD>
+                    <TD>{r.uid}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </Card>
         </div>
       )}
     </div>
   );
 }
-
-const styles = {
-  field: {
-    marginBottom: "1rem",
-  },
-  label: {
-    display: "block",
-    marginBottom: "0.25rem",
-    fontWeight: "bold",
-  },
-  input: {
-    width: "100%",
-    padding: "0.5rem",
-    fontSize: "1rem",
-    backgroundColor: "var(--background)", // match theme
-    color: "var(--foreground)",
-    border: "1px solid var(--foreground)",
-    borderRadius: "4px",
-  },
-  button: {
-    padding: "0.75rem 1.5rem",
-    fontSize: "1rem",
-    border: "none",
-    cursor: "pointer" as const,
-    borderRadius: "4px",
-    backgroundColor: "#007bff", // or a color variable if you prefer
-    color: "#fff",
-    fontWeight: 500,
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse" as const,
-  },
-  th: {
-    border: "1px solid var(--foreground)",
-    padding: "8px",
-    textAlign: "left" as const,
-  },
-  td: {
-    border: "1px solid var(--foreground)",
-    padding: "8px",
-  },
-};
