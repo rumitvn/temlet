@@ -1,6 +1,6 @@
-# NexRender Manager
+# Temlet
 
-A comprehensive video rendering and upload management system for After Effects projects.
+A comprehensive video rendering and upload management system for After Effects projects. Made by rumitx.
 
 ## Features
 

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Auto Render AE",
+  title: "Temlet",
   description: "made by rumitx",
 };
 

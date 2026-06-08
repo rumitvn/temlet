@@ -1,6 +1,6 @@
-# Docker Setup for Nexrender Manager
+# Docker Setup for Temlet
 
-This document explains how to use Docker to run the Nexrender Manager system in a more reliable and portable way.
+This document explains how to use Docker to run the Temlet system in a more reliable and portable way.
 
 ## 🚀 Quick Start
 

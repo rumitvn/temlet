@@ -1180,7 +1180,7 @@ export default function Page() {
             transition={{ duration: 0.5 }}
             className="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 bg-clip-text text-transparent"
           >
-            RumitX Studio
+            Temlet
           </motion.h1>
           <motion.div
             initial={{ opacity: 0, x: -20 }}

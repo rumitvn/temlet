@@ -1,7 +1,7 @@
 {
 	"info": {
 		"_postman_id": "d5b14a2d-b247-406b-9f5b-e8da12dbb53b",
-		"name": "RumitX Studio",
+		"name": "Temlet",
 		"description": "API collection for managing render items and YouTube uploads",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "4563140"
