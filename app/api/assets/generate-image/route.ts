@@ -3,6 +3,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import OpenAI from "openai";
 import { config } from "../../../../lib/config";
+import { logger } from "@/app/lib/logger";
 
 // Lazily create the OpenAI client so the module can be imported (e.g. during
 // `next build`) without the API key being present. The key is only required
@@ -66,7 +67,7 @@ async function generateImageWithOpenAI(params: GenerateImageRequest) {
       revisedPrompt: response.data[0].revised_prompt,
     };
   } catch (error) {
-    console.error("OpenAI image generation error:", error);
+    logger.error("OpenAI image generation error:", error);
     throw new Error(`OpenAI generation failed: ${error}`);
   }
 }
@@ -91,7 +92,7 @@ async function generateImageWithGrok(params: GenerateImageRequest) {
       revisedPrompt: response.data[0].revised_prompt,
     };
   } catch (error) {
-    console.error("Grok image generation error:", error);
+    logger.error("Grok image generation error:", error);
     throw new Error(`Grok generation failed: ${error}`);
   }
 }
@@ -257,7 +258,7 @@ async function generateImageWithComfyUI(params: GenerateImageRequest) {
     };
 
     // Queue the prompt
-    console.log('Sending ComfyUI workflow:', JSON.stringify({ prompt: workflow, extra_data: {} }, null, 2));
+    logger.debug('Sending ComfyUI workflow:', JSON.stringify({ prompt: workflow, extra_data: {} }, null, 2));
     const queueResponse = await fetch(`${comfyuiUrl}/prompt`, {
       method: "POST",
       headers: {
@@ -268,9 +269,9 @@ async function generateImageWithComfyUI(params: GenerateImageRequest) {
 
     if (!queueResponse.ok) {
       const errorText = await queueResponse.text();
-      console.error("ComfyUI queue error response:", errorText);
-      console.error("ComfyUI workflow sent:", JSON.stringify(workflow, null, 2));
-      console.error("ComfyUI URL:", comfyuiUrl);
+      logger.error("ComfyUI queue error response:", errorText);
+      logger.error("ComfyUI workflow sent:", JSON.stringify(workflow, null, 2));
+      logger.error("ComfyUI URL:", comfyuiUrl);
       throw new Error(`ComfyUI queue failed: ${queueResponse.statusText} - ${errorText}`);
     }
 
@@ -321,7 +322,7 @@ async function generateImageWithComfyUI(params: GenerateImageRequest) {
       subfolder: imageData.subfolder,
     };
   } catch (error) {
-    console.error("ComfyUI image generation error:", error);
+    logger.error("ComfyUI image generation error:", error);
     throw new Error(`ComfyUI generation failed: ${error}`);
   }
 }
@@ -349,7 +350,7 @@ export async function POST(req: NextRequest) {
       try {
         result = await generateImageWithComfyUI(body);
       } catch (error) {
-        console.error('ComfyUI failed, falling back to Grok:', error);
+        logger.error('ComfyUI failed, falling back to Grok:', error);
         // Fallback to Grok if ComfyUI fails
         result = await generateImageWithGrok(body);
       }
@@ -400,7 +401,7 @@ export async function POST(req: NextRequest) {
           status: 'available' as const
         };
       } catch (error) {
-        console.error('Error saving generated image:', error);
+        logger.error('Error saving generated image:', error);
         // Don't fail the request if saving fails
       }
     }
@@ -410,7 +411,7 @@ export async function POST(req: NextRequest) {
       savedAsset
     });
   } catch (error) {
-    console.error('Error generating image:', error);
+    logger.error('Error generating image:', error);
     return NextResponse.json(
       { error: `Failed to generate image: ${error}` },
       { status: 500 }
@@ -481,7 +482,7 @@ export async function GET(req: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('Error getting image generation info:', error);
+    logger.error('Error getting image generation info:', error);
     return NextResponse.json(
       { error: 'Failed to get image generation info' },
       { status: 500 }

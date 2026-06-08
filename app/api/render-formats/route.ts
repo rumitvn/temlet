@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/app/lib/db";
+import { prisma } from "@/lib/prisma";
+import { logger } from "@/app/lib/logger";
 
 // GET /api/render-formats - Get all render formats
 export async function GET() {
@@ -12,7 +13,7 @@ export async function GET() {
 
         return NextResponse.json(formats);
     } catch (error) {
-        console.error('Error fetching render formats:', error);
+        logger.error('Error fetching render formats:', error);
         return NextResponse.json(
             { error: 'Failed to fetch render formats' },
             { status: 500 }
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json(format);
     } catch (error) {
-        console.error('Error creating render format:', error);
+        logger.error('Error creating render format:', error);
         return NextResponse.json(
             { error: 'Failed to create render format' },
             { status: 500 }

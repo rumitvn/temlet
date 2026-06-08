@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '../../../../app/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { RenderStatus } from '@/app/types/render';
 import { Prisma } from '@prisma/client';
+import { logger } from "@/app/lib/logger";
 
 type StatusCountResult = {
   status: string;
@@ -51,7 +52,7 @@ export async function GET() {
 
     return NextResponse.json(counts);
   } catch (error) {
-    console.error('Error fetching status counts:', error);
+    logger.error('Error fetching status counts:', error);
     return NextResponse.json(
       { error: 'Failed to fetch status counts' },
       { status: 500 }

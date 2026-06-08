@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { logger } from "@/app/lib/logger";
 import {
   PhotoIcon,
   XMarkIcon,
@@ -107,7 +108,7 @@ export default function ImageGenerationDialog({
         setModels(data.models);
       }
     } catch (error) {
-      console.error('Error loading models:', error);
+      logger.error('Error loading models:', error);
     }
   };
 
@@ -168,7 +169,7 @@ export default function ImageGenerationDialog({
         throw new Error('Image generation failed');
       }
     } catch (error) {
-      console.error('Error generating image:', error);
+      logger.error('Error generating image:', error);
       setError(error instanceof Error ? error.message : 'Failed to generate image');
     } finally {
       setIsLoading(false);

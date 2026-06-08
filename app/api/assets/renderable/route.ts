@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 import { config } from "../../../../lib/config";
+import { getFileStats, getFileType } from "@/app/lib/file-utils";
+import { logger } from "@/app/lib/logger";
 
 interface Asset {
   id: string;
@@ -42,24 +44,6 @@ interface AssetGroup {
     requiredQuiz3Images: number;
     availableQuiz3Images: number;
   };
-}
-
-// Helper function to get file stats
-async function getFileStats(filePath: string) {
-  try {
-    const stats = await fs.stat(filePath);
-    return {
-      size: stats.size,
-      lastModified: stats.mtime,
-      exists: true
-    };
-  } catch (error) {
-    return {
-      size: 0,
-      lastModified: new Date(),
-      exists: false
-    };
-  }
 }
 
 // Helper function to check if a JSON file has been rendered
@@ -157,7 +141,7 @@ async function loadJSONContent(jsonPath: string): Promise<string[]> {
     const jsonData = JSON.parse(content);
     return jsonData.quiz_3?.options || [];
   } catch (error) {
-    console.error(`Error loading JSON content from ${jsonPath}:`, error);
+    logger.error(`Error loading JSON content from ${jsonPath}:`, error);
     return [];
   }
 }
@@ -203,7 +187,7 @@ function checkQuiz3ImageOptions(jsonAsset: Asset, allImages: Asset[], jsonOption
       completionRate
     };
   } catch (error) {
-    console.error('Error checking quiz 3 image options:', error);
+    logger.error('Error checking quiz 3 image options:', error);
     return {
       options: [],
       availableImages: [],
@@ -230,21 +214,11 @@ async function scanDirectory(dirPath: string, category: string): Promise<Asset[]
         assets.push(...subAssets);
       } else if (entry.isFile()) {
         // Determine file type based on extension
-        const ext = path.extname(entry.name).toLowerCase();
-        let type: 'voice' | 'image' | 'video' | 'json' = 'json';
-        
-        if (['.mp3', '.wav', '.aac'].includes(ext)) {
-          type = 'voice';
-        } else if (['.jpg', '.jpeg', '.png', '.gif', '.bmp'].includes(ext)) {
-          type = 'image';
-        } else if (['.mp4', '.avi', '.mov', '.wmv'].includes(ext)) {
-          type = 'video';
-        } else if (ext === '.json') {
-          type = 'json';
-        } else {
+        const type = getFileType(entry.name);
+        if (type === 'other') {
           continue; // Skip non-asset files
         }
-        
+
         const stats = await getFileStats(fullPath);
         const { key, order } = extractKeyAndOrder(entry.name, type, fullPath);
         
@@ -263,7 +237,7 @@ async function scanDirectory(dirPath: string, category: string): Promise<Asset[]
       }
     }
   } catch (error) {
-    console.error(`Error scanning directory ${dirPath}:`, error);
+    logger.error(`Error scanning directory ${dirPath}:`, error);
   }
   
   return assets;
@@ -371,9 +345,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    console.log(`Found ${rewardAssets.length} reward assets:`);
+    logger.debug(`Found ${rewardAssets.length} reward assets:`);
     rewardAssets.forEach(reward => {
-      console.log(`  - ${reward.name}: ${reward.path}`);
+      logger.debug(`  - ${reward.name}: ${reward.path}`);
     });
 
 
@@ -431,7 +405,7 @@ export async function GET(req: NextRequest) {
     // Add rewards to their respective groups
     rewardAssets.forEach(rewardAsset => {
       if (rewardAsset.key && groupedAssets[rewardAsset.key]) {
-        console.log(`Adding reward ${rewardAsset.name} to group ${rewardAsset.key}`);
+        logger.debug(`Adding reward ${rewardAsset.name} to group ${rewardAsset.key}`);
         groupedAssets[rewardAsset.key].assets.rewards.push(rewardAsset);
       }
     });
@@ -450,10 +424,10 @@ export async function GET(req: NextRequest) {
       group.renderStatus.requiredRewards = group.assets.jsons.length; // 1 reward per JSON
       group.renderStatus.availableRewards = group.assets.rewards.length;
       
-      console.log(`Group ${group.key}: ${group.assets.rewards.length} rewards for ${group.assets.jsons.length} JSONs`);
+      logger.debug(`Group ${group.key}: ${group.assets.rewards.length} rewards for ${group.assets.jsons.length} JSONs`);
       if (group.assets.rewards.length > 0) {
         group.assets.rewards.forEach(reward => {
-          console.log(`  - Reward: ${reward.name} (${reward.path})`);
+          logger.debug(`  - Reward: ${reward.name} (${reward.path})`);
         });
       }
       
@@ -468,7 +442,7 @@ export async function GET(req: NextRequest) {
           totalQuiz3Images += quiz3Status.availableImages.length;
           totalRequiredQuiz3Images += quiz3Status.options.length;
         } catch (error) {
-          console.error(`Error processing quiz 3 options for ${jsonAsset.name}:`, error);
+          logger.error(`Error processing quiz 3 options for ${jsonAsset.name}:`, error);
         }
       }
       
@@ -497,7 +471,7 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching renderable assets:', error);
+    logger.error('Error fetching renderable assets:', error);
     return NextResponse.json(
       { error: 'Failed to fetch renderable assets' },
       { status: 500 }

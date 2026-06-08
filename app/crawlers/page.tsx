@@ -39,6 +39,12 @@ import {
   TD,
 } from "@/app/components/ui";
 import { statusClass } from "@/app/theme/status";
+import {
+  types as filterTypes,
+  topics as filterTopics,
+  channels as filterChannels,
+  sites as filterSites,
+} from "@/app/data/filters";
 
 // Custom debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -57,51 +63,11 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-// Default filter values
-const defaultTypes = ["Image", "Video"];
-const defaultTopics = [
-  "Animals",
-  "Plants",
-  "Histories",
-  "Science",
-  "Technology",
-  "Nature",
-  "Space",
-  "Ocean",
-  "Weather",
-  "Geography"
-];
-const defaultChannels = [
-  "MiniMate",
-  "RumitX Studio",
-  "RumitX Shorts",
-  "RumitX Nature",
-  "RumitX Science",
-  "RumitX History"
-];
-const defaultSites = [
-  "Pexels",
-  "Pixabay",
-  "Unsplash",
-  "Pexels Videos",
-  "Pixabay Videos"
-];
-
-// Try to import from filters file, fallback to defaults if it fails
-let types = defaultTypes;
-let topics = defaultTopics;
-let channels = defaultChannels;
-let sites = defaultSites;
-
-try {
-  const filters = require("@/app/data/filters");
-  types = filters.types || defaultTypes;
-  topics = filters.topics || defaultTopics;
-  channels = filters.channels || defaultChannels;
-  sites = filters.sites || defaultSites;
-} catch (error) {
-  console.warn("Failed to load filters from file, using defaults:", error);
-}
+// Filter option lists (single source of truth: app/data/filters.ts)
+const types = [...filterTypes];
+const topics = [...filterTopics];
+const channels = [...filterChannels];
+const sites = [...filterSites];
 
 const getProgressBarColor = (_status: CrawlerJob['status']) => {
   return 'bg-accent';

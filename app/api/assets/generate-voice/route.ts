@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import { config } from '../../../../lib/config';
+import { logger } from "@/app/lib/logger";
 
 // Token cache to avoid getting new tokens for each request
 let tokenCache: {
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🔧 Voice generation request:`, {
+    logger.debug(`🔧 Voice generation request:`, {
       text: text.substring(0, 50) + '...',
       filename,
       jsonKey,
@@ -39,12 +40,12 @@ export async function POST(request: NextRequest) {
       `${jsonKey}_${jsonOrder}`
     );
 
-    console.log(`📁 Voice folder path: ${voiceFolder}`);
+    logger.debug(`📁 Voice folder path: ${voiceFolder}`);
 
     // Ensure the voice folder exists
     if (!fs.existsSync(voiceFolder)) {
       fs.mkdirSync(voiceFolder, { recursive: true });
-      console.log(`✅ Created voice folder: ${voiceFolder}`);
+      logger.debug(`✅ Created voice folder: ${voiceFolder}`);
     }
 
     // Full path for the voice file
@@ -54,14 +55,14 @@ export async function POST(request: NextRequest) {
     const ttsResult = await createVoiceFile(text, filename, voiceFolder);
 
     if (ttsResult.success) {
-      console.log(`✅ Voice file created successfully: ${outputPath}`);
+      logger.debug(`✅ Voice file created successfully: ${outputPath}`);
       return NextResponse.json({
         success: true,
         path: outputPath,
         message: `Voice file ${filename} created successfully`
       });
     } else {
-      console.error(`❌ Voice generation failed: ${ttsResult.error}`);
+      logger.error(`❌ Voice generation failed: ${ttsResult.error}`);
       return NextResponse.json(
         { error: ttsResult.error },
         { status: 500 }
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('❌ Error in voice generation API:', error);
+    logger.error('❌ Error in voice generation API:', error);
     return NextResponse.json(
       { error: `Failed to generate voice file: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
@@ -85,15 +86,15 @@ async function createVoiceFile(text: string, filename: string, outputFolder: str
     const serviceAccountKey = process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY || process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY_FILE;
     const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID || "minimatevn";
     
-    console.log(`🔧 Google Cloud Configuration:`);
-    console.log(`   Project ID: ${projectId}`);
-    console.log(`   Service Account Key: ${serviceAccountKey ? 'Configured' : 'Not configured'}`);
+    logger.debug(`🔧 Google Cloud Configuration:`);
+    logger.debug(`   Project ID: ${projectId}`);
+    logger.debug(`   Service Account Key: ${serviceAccountKey ? 'Configured' : 'Not configured'}`);
     
     if (!serviceAccountKey) {
-      console.log(`⚠️ No Google Cloud service account key found. Creating test file instead.`);
-      console.log(`💡 To use Google Cloud TTS, set either:`);
-      console.log(`   - GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY (JSON string)`);
-      console.log(`   - GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY_FILE (path to JSON file)`);
+      logger.debug(`⚠️ No Google Cloud service account key found. Creating test file instead.`);
+      logger.debug(`💡 To use Google Cloud TTS, set either:`);
+      logger.debug(`   - GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY (JSON string)`);
+      logger.debug(`   - GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY_FILE (path to JSON file)`);
       return createTestVoiceFile(text, filename, outputFolder);
     }
 
@@ -101,7 +102,7 @@ async function createVoiceFile(text: string, filename: string, outputFolder: str
     const accessToken = await getGoogleCloudAccessToken(serviceAccountKey);
     
     if (!accessToken) {
-      console.log(`⚠️ Failed to get access token. Creating test file instead.`);
+      logger.debug(`⚠️ Failed to get access token. Creating test file instead.`);
       return createTestVoiceFile(text, filename, outputFolder);
     }
 
@@ -122,7 +123,7 @@ async function createVoiceFile(text: string, filename: string, outputFolder: str
       }
     };
 
-    console.log(`🔊 Requesting TTS for: ${filename} with text: "${text.substring(0, 30)}..."`);
+    logger.debug(`🔊 Requesting TTS for: ${filename} with text: "${text.substring(0, 30)}..."`);
     
     const response = await fetch(GOOGLE_TTS_ENDPOINT, {
       method: 'POST',
@@ -130,14 +131,14 @@ async function createVoiceFile(text: string, filename: string, outputFolder: str
       body: JSON.stringify(payload)
     });
 
-    console.log(`📡 TTS Response status: ${response.status}`);
+    logger.debug(`📡 TTS Response status: ${response.status}`);
 
     if (response.status === 200) {
       const data = await response.json();
       const audioContent = data.audioContent;
       
       if (!audioContent) {
-        console.error(`❌ No audio content returned for ${filename}`);
+        logger.error(`❌ No audio content returned for ${filename}`);
         return {
           success: false,
           error: `No audio content returned for ${filename}`
@@ -150,7 +151,7 @@ async function createVoiceFile(text: string, filename: string, outputFolder: str
       const audioBuffer = Buffer.from(audioContent, 'base64');
       fs.writeFileSync(outPath, audioBuffer);
       
-      console.log(`✅ Saved ${filename} => ${outPath}`);
+      logger.debug(`✅ Saved ${filename} => ${outPath}`);
       
       return {
         success: true,
@@ -158,7 +159,7 @@ async function createVoiceFile(text: string, filename: string, outputFolder: str
       };
     } else {
       const errorText = await response.text();
-      console.error(`❌ TTS failed for ${filename}: ${response.status} - ${errorText}`);
+      logger.error(`❌ TTS failed for ${filename}: ${response.status} - ${errorText}`);
       
       // Provide helpful error messages for common issues
       let errorMessage = `TTS failed for ${filename}: ${response.status}`;
@@ -178,7 +179,7 @@ async function createVoiceFile(text: string, filename: string, outputFolder: str
     }
 
   } catch (error) {
-    console.error(`❌ Error in createVoiceFile for ${filename}:`, error);
+    logger.error(`❌ Error in createVoiceFile for ${filename}:`, error);
     return {
       success: false,
       error: `Failed to create voice file: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -192,7 +193,7 @@ async function getGoogleCloudAccessToken(serviceAccountKey: string) {
     // Check if we have a valid cached token
     const now = Date.now();
     if (tokenCache && tokenCache.expiresAt > now) {
-      console.log(`🔄 Using cached access token (expires in ${Math.round((tokenCache.expiresAt - now) / 1000)}s)`);
+      logger.debug(`🔄 Using cached access token (expires in ${Math.round((tokenCache.expiresAt - now) / 1000)}s)`);
       return tokenCache.token;
     }
     
@@ -205,14 +206,14 @@ async function getGoogleCloudAccessToken(serviceAccountKey: string) {
       serviceAccount = JSON.parse(serviceAccountKey);
     } catch (parseError) {
       // If parsing fails, try to read from file
-      console.log(`📄 Trying to read service account key from file: ${serviceAccountKey}`);
+      logger.debug(`📄 Trying to read service account key from file: ${serviceAccountKey}`);
       try {
         const keyPath = path.join(process.cwd(), serviceAccountKey);
         const keyContent = fs.readFileSync(keyPath, 'utf8');
         serviceAccount = JSON.parse(keyContent);
-        console.log(`✅ Successfully read service account key from file`);
+        logger.debug(`✅ Successfully read service account key from file`);
       } catch (fileError) {
-        console.error(`❌ Failed to read service account key from file:`, fileError);
+        logger.error(`❌ Failed to read service account key from file:`, fileError);
         return null;
       }
     }
@@ -236,7 +237,7 @@ async function getGoogleCloudAccessToken(serviceAccountKey: string) {
       }
     });
     
-    console.log(`🔑 Getting new access token for service account: ${serviceAccount.client_email}`);
+    logger.debug(`🔑 Getting new access token for service account: ${serviceAccount.client_email}`);
     
     const response = await fetch(tokenEndpoint, {
       method: 'POST',
@@ -251,7 +252,7 @@ async function getGoogleCloudAccessToken(serviceAccountKey: string) {
     
     if (response.ok) {
       const data = await response.json();
-      console.log(`✅ Successfully obtained new access token`);
+      logger.debug(`✅ Successfully obtained new access token`);
       
       // Cache the token (expire 5 minutes before the actual expiry)
       tokenCache = {
@@ -262,11 +263,11 @@ async function getGoogleCloudAccessToken(serviceAccountKey: string) {
       return data.access_token;
     } else {
       const errorText = await response.text();
-      console.error('❌ Failed to get access token:', errorText);
+      logger.error('❌ Failed to get access token:', errorText);
       return null;
     }
   } catch (error) {
-    console.error('❌ Error getting access token:', error);
+    logger.error('❌ Error getting access token:', error);
     return null;
   }
 }
@@ -288,14 +289,14 @@ function createTestVoiceFile(text: string, filename: string, outputFolder: strin
     
     fs.writeFileSync(outPath, testAudioData);
     
-    console.log(`✅ Created test voice file: ${outPath}`);
+    logger.debug(`✅ Created test voice file: ${outPath}`);
     
     return {
       success: true,
       path: outPath
     };
   } catch (error) {
-    console.error(`❌ Error creating test voice file:`, error);
+    logger.error(`❌ Error creating test voice file:`, error);
     return {
       success: false,
       error: `Failed to create test voice file: ${error instanceof Error ? error.message : 'Unknown error'}`

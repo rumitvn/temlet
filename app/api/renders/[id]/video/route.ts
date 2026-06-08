@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/app/lib/db";
+import { prisma } from "@/lib/prisma";
 import fs from 'fs';
 import path from 'path';
+import { logger } from "@/app/lib/logger";
 
 export async function GET(
     req: NextRequest,
@@ -49,7 +50,7 @@ export async function GET(
             },
         });
     } catch (error) {
-        console.error('Error serving video file:', error);
+        logger.error('Error serving video file:', error);
         return NextResponse.json(
             { error: 'Failed to serve video file' },
             { status: 500 }

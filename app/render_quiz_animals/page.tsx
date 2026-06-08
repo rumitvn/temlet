@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import { NEXRENDER_BASE_URL } from "@/app/lib/constants";
 import { config } from "../../lib/config";
+import { logger } from "@/app/lib/logger";
 import {
   Button,
   Card,
@@ -310,7 +312,7 @@ export default function RenderQuizAnimalsPage() {
         const body = buildRequestBody(data);
 
         // 3) POST to Nexrender
-        const res = await fetch("http://localhost:3000/api/v1/jobs", {
+        const res = await fetch(`${NEXRENDER_BASE_URL}/api/v1/jobs`, {
           method: "POST",
           headers: {
             "nexrender-secret": "myapisecret",
@@ -331,7 +333,7 @@ export default function RenderQuizAnimalsPage() {
           uid: result.uid || "",
         };
       } catch (err: any) {
-        console.error(err);
+        logger.error(err);
         newResults[i] = {
           ...newResults[i],
           status: "error",

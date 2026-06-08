@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 import { config } from "../../../lib/config";
+import { logger } from "@/app/lib/logger";
+import {
+  getFileStats,
+  getFileType,
+  getAllowedAssetPaths,
+  isPathAllowed,
+} from "@/app/lib/file-utils";
 
 // Default channel and topic - can be made configurable via API parameters
 const DEFAULT_CHANNEL = "minimate";
@@ -21,53 +28,24 @@ interface Asset {
   status: 'available' | 'missing' | 'processing';
 }
 
-// Helper function to get file stats
-async function getFileStats(filePath: string) {
-  try {
-    const stats = await fs.stat(filePath);
-    return {
-      size: stats.size,
-      lastModified: stats.mtime,
-      exists: true
-    };
-  } catch (error) {
-    return {
-      size: 0,
-      lastModified: new Date(),
-      exists: false
-    };
-  }
-}
-
 // Helper function to scan directory recursively
 async function scanDirectory(dirPath: string, category: string): Promise<Asset[]> {
   const assets: Asset[] = [];
-  
+
   try {
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
-    
+
     for (const entry of entries) {
       const fullPath = path.join(dirPath, entry.name);
-      
+
       if (entry.isDirectory()) {
         // Recursively scan subdirectories
         const subAssets = await scanDirectory(fullPath, category);
         assets.push(...subAssets);
       } else if (entry.isFile()) {
         // Determine file type based on extension
-        const ext = path.extname(entry.name).toLowerCase();
-        let type: 'voice' | 'image' | 'video' | 'json' | 'other' = 'other';
-        
-        if (['.mp3', '.wav', '.aac'].includes(ext)) {
-          type = 'voice';
-        } else if (['.jpg', '.jpeg', '.png', '.gif', '.bmp'].includes(ext)) {
-          type = 'image';
-        } else if (['.mp4', '.avi', '.mov', '.wmv'].includes(ext)) {
-          type = 'video';
-        } else if (ext === '.json') {
-          type = 'json';
-        }
-        
+        const type = getFileType(entry.name);
+
         // Only include files that match expected asset types
         if (type !== 'other') {
           const stats = await getFileStats(fullPath);
@@ -86,7 +64,7 @@ async function scanDirectory(dirPath: string, category: string): Promise<Asset[]
       }
     }
   } catch (error) {
-    console.error(`Error scanning directory ${dirPath}:`, error);
+    logger.error(`Error scanning directory ${dirPath}:`, error);
   }
   
   return assets;
@@ -130,7 +108,7 @@ export async function GET(req: NextRequest) {
       total: allAssets.length
     });
   } catch (error) {
-    console.error('Error fetching assets:', error);
+    logger.error('Error fetching assets:', error);
     return NextResponse.json(
       { error: 'Failed to fetch assets' },
       { status: 500 }
@@ -180,21 +158,10 @@ export async function POST(req: NextRequest) {
         
         // Get file stats
         const stats = await getFileStats(filePath);
-        
+
         // Determine file type
-        const ext = path.extname(fileName).toLowerCase();
-        let type: 'voice' | 'image' | 'video' | 'json' | 'other' = 'other';
-        
-        if (['.mp3', '.wav', '.aac'].includes(ext)) {
-          type = 'voice';
-        } else if (['.jpg', '.jpeg', '.png', '.gif', '.bmp'].includes(ext)) {
-          type = 'image';
-        } else if (['.mp4', '.avi', '.mov', '.wmv'].includes(ext)) {
-          type = 'video';
-        } else if (ext === '.json') {
-          type = 'json';
-        }
-        
+        const type = getFileType(fileName);
+
         // Only process files that match expected asset types
         if (type !== 'other') {
           uploadedAssets.push({
@@ -209,7 +176,7 @@ export async function POST(req: NextRequest) {
           });
         }
       } catch (error) {
-        console.error(`Error uploading file ${file.name}:`, error);
+        logger.error(`Error uploading file ${file.name}:`, error);
       }
     }
     
@@ -219,7 +186,7 @@ export async function POST(req: NextRequest) {
       count: uploadedAssets.length
     });
   } catch (error) {
-    console.error('Error uploading assets:', error);
+    logger.error('Error uploading assets:', error);
     return NextResponse.json(
       { error: 'Failed to upload assets' },
       { status: 500 }
@@ -249,33 +216,10 @@ export async function DELETE(req: NextRequest) {
       try {
         if (filePath) {
           // Validate the path is within allowed directories
-          const assetPaths = getAssetPaths();
-          const allowedPaths = [
-            assetPaths.voice,
-            assetPaths.image,
-            assetPaths.video,
-            assetPaths.json,
-            assetPaths.reward,
-            `${assetPaths.reward}/output`,
-            `${assetPaths.reward}/reward_1`,
-            `${assetPaths.reward}/reward_2`,
-            `${assetPaths.reward}/reward_3`,
-            `${assetPaths.reward}/reward_4`,
-            `${assetPaths.reward}/reward_5`
-          ];
-          
-          // Also create backslash versions for Windows paths
-          const allowedPathsBackslash = allowedPaths.map(path => path.replace(/\//g, '\\'));
-          
-          // Check if path starts with any allowed directory
-          const isAllowed = allowedPaths.some(allowedPath => 
-            filePath.startsWith(allowedPath)
-          ) || allowedPathsBackslash.some(allowedPath => 
-            filePath.startsWith(allowedPath)
-          );
-          
-          if (!isAllowed) {
-            console.error(`Access denied for path: ${filePath}`);
+          const allowedPaths = getAllowedAssetPaths(DEFAULT_CHANNEL, DEFAULT_TOPIC);
+
+          if (!isPathAllowed(filePath, allowedPaths)) {
+            logger.error(`Access denied for path: ${filePath}`);
             failedAssets.push(assetId);
             continue;
           }
@@ -285,9 +229,9 @@ export async function DELETE(req: NextRequest) {
             await fs.access(filePath);
             await fs.unlink(filePath);
             deletedAssets.push(assetId);
-            console.log(`Successfully deleted file: ${filePath}`);
+            logger.debug(`Successfully deleted file: ${filePath}`);
           } catch (error) {
-            console.error(`Error deleting file ${filePath}:`, error);
+            logger.error(`Error deleting file ${filePath}:`, error);
             failedAssets.push(assetId);
           }
         } else {
@@ -295,7 +239,7 @@ export async function DELETE(req: NextRequest) {
           deletedAssets.push(assetId);
         }
       } catch (error) {
-        console.error(`Error deleting asset ${assetId}:`, error);
+        logger.error(`Error deleting asset ${assetId}:`, error);
         failedAssets.push(assetId);
       }
     }
@@ -306,7 +250,7 @@ export async function DELETE(req: NextRequest) {
       failed: failedAssets
     });
   } catch (error) {
-    console.error('Error deleting assets:', error);
+    logger.error('Error deleting assets:', error);
     return NextResponse.json(
       { error: 'Failed to delete assets' },
       { status: 500 }

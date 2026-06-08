@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { config } from "../../../../lib/config";
+import { logger } from "@/app/lib/logger";
 
 interface SK3QLRContent {
   key: string;
@@ -56,11 +57,11 @@ export async function POST(req: NextRequest) {
   try {
     const { content, channel, topic } = await req.json();
     
-    console.log('=== RENDER API DEBUG ===');
-    console.log('Content:', content);
-    console.log('Channel:', channel);
-    console.log('Topic:', topic);
-    console.log('Working Directory:', config.workingDirectory);
+    logger.debug('=== RENDER API DEBUG ===');
+    logger.debug('Content:', content);
+    logger.debug('Channel:', channel);
+    logger.debug('Topic:', topic);
+    logger.debug('Working Directory:', config.workingDirectory);
     
     if (!content || !channel || !topic) {
       return NextResponse.json(
@@ -79,14 +80,14 @@ export async function POST(req: NextRequest) {
 
     // Create the render directory path using config
     const renderDir = config.buildAssetPath('render', channel, topic);
-    console.log('Render Directory:', renderDir);
+    logger.debug('Render Directory:', renderDir);
     
     // Ensure the directory exists
     try {
       await mkdir(renderDir, { recursive: true });
-      console.log('✅ Directory created/verified:', renderDir);
+      logger.debug('✅ Directory created/verified:', renderDir);
     } catch (error) {
-      console.error('❌ Error creating directory:', error);
+      logger.error('❌ Error creating directory:', error);
       return NextResponse.json(
         { error: 'Failed to create render directory' },
         { status: 500 }
@@ -96,14 +97,14 @@ export async function POST(req: NextRequest) {
     // Create the filename
     const fileName = `${content.key}_${content.order}.json`;
     const filePath = path.join(renderDir, fileName);
-    console.log('File Path:', filePath);
+    logger.debug('File Path:', filePath);
 
     // Write the content to file
     try {
       await writeFile(filePath, JSON.stringify(content, null, 2), 'utf8');
-      console.log('✅ File written successfully:', fileName);
+      logger.debug('✅ File written successfully:', fileName);
     } catch (error) {
-      console.error('❌ Error writing file:', error);
+      logger.error('❌ Error writing file:', error);
       return NextResponse.json(
         { error: 'Failed to write render file' },
         { status: 500 }
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ Error creating render file:', error);
+    logger.error('❌ Error creating render file:', error);
     return NextResponse.json(
       { error: 'Failed to create render file' },
       { status: 500 }

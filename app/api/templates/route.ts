@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/app/lib/db";
+import { prisma } from "@/lib/prisma";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
+import { logger } from "@/app/lib/logger";
 
 // GET /api/templates - List all templates
 export async function GET() {
@@ -14,7 +15,7 @@ export async function GET() {
 
         return NextResponse.json(templates);
     } catch (error) {
-        console.error('Error listing templates:', error);
+        logger.error('Error listing templates:', error);
         return NextResponse.json(
             { error: 'Failed to list templates' },
             { status: 500 }
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
             );
         }
     } catch (error) {
-        console.error('Error saving template:', error);
+        logger.error('Error saving template:', error);
         return NextResponse.json(
             { error: 'Failed to save template' },
             { status: 500 }
@@ -129,7 +130,7 @@ export async function DELETE(req: NextRequest) {
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Error deleting template:', error);
+        logger.error('Error deleting template:', error);
         return NextResponse.json(
             { error: 'Failed to delete template' },
             { status: 500 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { crawlerService } from '@/app/services/crawlerService';
+import { logger } from "@/app/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,11 +36,11 @@ export async function POST(request: NextRequest) {
               await crawlerService.resumeJob(id);
               return { id, success: true };
             default:
-              console.warn(`Unknown action: ${action}`);
+              logger.warn(`Unknown action: ${action}`);
               return { id, success: false, error: 'Unknown action' };
           }
         } catch (error) {
-          console.error(`Error processing job ${id} with action ${action}:`, error);
+          logger.error(`Error processing job ${id} with action ${action}:`, error);
           return { 
             id, 
             success: false, 
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (failed.length > 0) {
-      console.error('Some jobs failed:', failed);
+      logger.error('Some jobs failed:', failed);
       return NextResponse.json({
         success: false,
         error: `Failed to process ${failed.length} job(s)`,
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
       results: results.map(r => r.status === 'fulfilled' ? r.value : null)
     });
   } catch (error) {
-    console.error('Error processing batch action:', error);
+    logger.error('Error processing batch action:', error);
     return NextResponse.json(
       { error: 'Failed to process batch action' },
       { status: 500 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 import { config } from "../../../../lib/config";
+import { logger } from "@/app/lib/logger";
 
 export async function POST(req: NextRequest) {
   try {
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error uploading edited image:', error);
+    logger.error('Error uploading edited image:', error);
     return NextResponse.json(
       { error: 'Failed to upload edited image' },
       { status: 500 }

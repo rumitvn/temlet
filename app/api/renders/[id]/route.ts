@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/app/lib/db";
+import { prisma } from "@/lib/prisma";
+import { logger } from "@/app/lib/logger";
 
 // GET /api/renders/[id] - Get a single render item
 export async function GET(
@@ -21,7 +22,7 @@ export async function GET(
 
         return NextResponse.json(renderItem);
     } catch (error) {
-        console.error('Error fetching render item:', error);
+        logger.error('Error fetching render item:', error);
         return NextResponse.json(
             { error: 'Failed to fetch render item' },
             { status: 500 }
@@ -92,7 +93,7 @@ export async function PATCH(
 
         return NextResponse.json(renderItem);
     } catch (error) {
-        console.error('Error updating render item:', error);
+        logger.error('Error updating render item:', error);
         return NextResponse.json(
             { error: 'Failed to update render item' },
             { status: 500 }
@@ -113,7 +114,7 @@ export async function DELETE(
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Error deleting render item:', error);
+        logger.error('Error deleting render item:', error);
         return NextResponse.json(
             { error: 'Failed to delete render item' },
             { status: 500 }

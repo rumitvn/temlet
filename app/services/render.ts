@@ -1,9 +1,11 @@
 import { RenderItem } from "@prisma/client";
+import { NEXRENDER_BASE_URL } from "@/app/lib/constants";
 import { TemplateAeAsset } from "../types/render";
 import { config, normalizePath } from "../../lib/config";
+import { logger } from "@/app/lib/logger";
 
 export const generateAssets = (renderItem: RenderItem, channel: string = "minimate", topic: string = "animals"): TemplateAeAsset[] => {
-  console.log('🔧 generateAssets function received channel:', channel, 'topic:', topic);
+  logger.debug('🔧 generateAssets function received channel:', channel, 'topic:', topic);
   const { templateAeRenderFormat, jsonContent } = renderItem;
   const content = typeof jsonContent === 'string' ? JSON.parse(jsonContent) : jsonContent;
   
@@ -232,8 +234,8 @@ export const generateAssets = (renderItem: RenderItem, channel: string = "minima
 
 export async function checkRenderStatus(uid: string) {
   try {
-    console.log('Checking render status for UID:', uid);
-    const response = await fetch(`http://localhost:3000/api/v1/jobs/${uid}`, {
+    logger.debug('Checking render status for UID:', uid);
+    const response = await fetch(`${NEXRENDER_BASE_URL}/api/v1/jobs/${uid}`, {
       headers: {
         'nexrender-secret': 'myapisecret'
       }
@@ -244,10 +246,10 @@ export async function checkRenderStatus(uid: string) {
     }
 
     const data = await response.json();
-    console.log('Nexrender response:', data);
+    logger.debug('Nexrender response:', data);
     return data;
   } catch (error) {
-    console.error('Error checking render status:', error);
+    logger.error('Error checking render status:', error);
     throw error;
   }
 } 

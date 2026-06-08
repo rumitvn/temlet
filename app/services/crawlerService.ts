@@ -1,9 +1,10 @@
-import { prisma } from '@/app/lib/db';
+import { prisma } from '@/lib/prisma';
 import { config } from '@/lib/config';
 import fs from 'fs';
 import path from 'path';
 import puppeteer from 'puppeteer';
 import type { Browser } from 'puppeteer';
+import { logger } from "@/app/lib/logger";
 
 /**
  * Crawler Service for downloading images and videos from various sites
@@ -105,7 +106,7 @@ export class CrawlerService {
         settings: job.settings as any
       };
     } catch (error) {
-      console.error('Error creating crawler job:', error);
+      logger.error('Error creating crawler job:', error);
       
       // Check if it's a database connection issue
       if (error instanceof Error) {
@@ -136,7 +137,7 @@ export class CrawlerService {
         settings: job.settings as any
       };
     } catch (error) {
-      console.error('Error fetching crawler job:', error);
+      logger.error('Error fetching crawler job:', error);
       return null;
     }
   }
@@ -159,7 +160,7 @@ export class CrawlerService {
         data: updateData
       });
     } catch (error) {
-      console.error('Error updating job status:', error);
+      logger.error('Error updating job status:', error);
       throw new Error('Failed to update job status');
     }
   }
@@ -176,7 +177,7 @@ export class CrawlerService {
         }
       });
     } catch (error) {
-      console.error('Error updating job progress:', error);
+      logger.error('Error updating job progress:', error);
       throw new Error('Failed to update job progress');
     }
   }
@@ -225,7 +226,7 @@ export class CrawlerService {
         totalJobs
       };
     } catch (error) {
-      console.error('Error fetching jobs:', error);
+      logger.error('Error fetching jobs:', error);
       
       // Check if it's a database connection issue
       if (error instanceof Error) {
@@ -255,7 +256,7 @@ export class CrawlerService {
 
       return result;
     } catch (error) {
-      console.error('Error fetching status counts:', error);
+      logger.error('Error fetching status counts:', error);
       return {};
     }
   }
@@ -302,7 +303,7 @@ export class CrawlerService {
         averageSpeed: 0
       };
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      logger.error('Error fetching stats:', error);
       return {
         totalJobs: 0,
         activeJobs: 0,
@@ -321,7 +322,7 @@ export class CrawlerService {
         where: { id }
       });
     } catch (error) {
-      console.error('Error deleting job:', error);
+      logger.error('Error deleting job:', error);
       throw new Error('Failed to delete job');
     }
   }
@@ -332,7 +333,7 @@ export class CrawlerService {
         where: { id: { in: ids } }
       });
     } catch (error) {
-      console.error('Error deleting jobs:', error);
+      logger.error('Error deleting jobs:', error);
       throw new Error('Failed to delete jobs');
     }
   }
@@ -349,7 +350,7 @@ export class CrawlerService {
       const { keyword, site, type, channel, topic, settings } = job;
       const { maxItems, quality, format } = settings;
 
-      console.log(`Starting real crawl for: ${keyword} on ${site}, type: ${type}`);
+      logger.debug(`Starting real crawl for: ${keyword} on ${site}, type: ${type}`);
 
       // Configure browser with stealth mode
       browser = await puppeteer.launch({
@@ -385,11 +386,11 @@ export class CrawlerService {
 
       // Crawl based on site and type
       if (site === 'freepik') {
-        console.log(`Crawling Freepik for videos with keyword: ${keyword}`);
+        logger.debug(`Crawling Freepik for videos with keyword: ${keyword}`);
         
         // Use the search URL with free content filter
         const searchUrl = `https://www.freepik.com/search?format=search&query=${encodeURIComponent(keyword)}&selection=1&type=video`;
-        console.log('Search URL:', searchUrl);
+        logger.debug('Search URL:', searchUrl);
         
         try {
           // Create output directory
@@ -402,18 +403,18 @@ export class CrawlerService {
           await this.updateJobStatus(id, 'crawling', 0);
 
           // Navigate with longer timeout and wait for network to be idle
-          console.log('Navigating to search page...');
+          logger.debug('Navigating to search page...');
           await page.goto(searchUrl, { 
             waitUntil: ['networkidle2', 'domcontentloaded'], 
             timeout: 45000 
           });
 
           // Wait for JavaScript to initialize...
-          console.log('Waiting for JavaScript to initialize...');
+          logger.debug('Waiting for JavaScript to initialize...');
           await new Promise(resolve => setTimeout(resolve, 5000));
 
           // Wait for the content to be loaded
-          console.log('Waiting for content to load...');
+          logger.debug('Waiting for content to load...');
           await page.waitForFunction(() => {
             // Check for either videos or no results message
             return (
@@ -424,8 +425,8 @@ export class CrawlerService {
 
           // Log the page content for debugging
           const pageContent = await page.content();
-          console.log('Page loaded. Content length:', pageContent.length);
-          console.log('First 500 characters:', pageContent.substring(0, 500));
+          logger.debug('Page loaded. Content length:', pageContent.length);
+          logger.debug('First 500 characters:', pageContent.substring(0, 500));
 
           // Check for any error messages or captcha
           const hasError = await page.evaluate(() => {
@@ -434,12 +435,12 @@ export class CrawlerService {
           });
 
           if (hasError) {
-            console.log('Found error message on page:', hasError);
+            logger.debug('Found error message on page:', hasError);
             throw new Error(`Page error: ${hasError}`);
           }
 
           // Try to find any video elements with broader selectors
-          console.log('Searching for video elements...');
+          logger.debug('Searching for video elements...');
           const videoElements = await page.evaluate(() => {
             const selectors = [
               // Grid and list items
@@ -460,7 +461,7 @@ export class CrawlerService {
             ];
 
             const elements = document.querySelectorAll(selectors.join(', '));
-            console.log('Found elements:', elements.length);
+            logger.debug('Found elements:', elements.length);
 
             // Log some details about what we found
             const details = Array.from(elements).map(el => ({
@@ -476,8 +477,8 @@ export class CrawlerService {
             };
           });
 
-          console.log('Video elements found:', videoElements.count);
-          console.log('Element details:', JSON.stringify(videoElements.details, null, 2));
+          logger.debug('Video elements found:', videoElements.count);
+          logger.debug('Element details:', JSON.stringify(videoElements.details, null, 2));
 
           // Extract video URLs with broader matching
           const detailUrls = await page.evaluate(() => {
@@ -500,7 +501,7 @@ export class CrawlerService {
             return Array.from(urls);
           });
 
-          console.log(`Found ${detailUrls.length} video detail URLs:`, detailUrls);
+          logger.debug(`Found ${detailUrls.length} video detail URLs:`, detailUrls);
 
           if (detailUrls.length === 0) {
             // Try to get more information about the page state
@@ -514,7 +515,7 @@ export class CrawlerService {
               possibleVideos: document.querySelectorAll('[data-type="video"], video, .video').length
             }));
 
-            console.log('Page state when no videos found:', pageState);
+            logger.debug('Page state when no videos found:', pageState);
             throw new Error(`No videos found for keyword: ${keyword}. Page title: ${pageState.title}`);
           }
 
@@ -523,7 +524,7 @@ export class CrawlerService {
           
           for (const detailUrl of detailUrls.slice(0, maxItems)) {
             try {
-              console.log(`\nProcessing detail page: ${detailUrl}`);
+              logger.debug(`\nProcessing detail page: ${detailUrl}`);
               await page.goto(detailUrl, { 
                 waitUntil: ['networkidle2', 'domcontentloaded'],
                 timeout: 30000 
@@ -579,24 +580,24 @@ export class CrawlerService {
                 return info;
               });
 
-              console.log('Download info:', downloadInfo);
+              logger.debug('Download info:', downloadInfo);
 
               if (downloadInfo.downloadUrl) {
                 downloadUrls.push(downloadInfo.downloadUrl);
-                console.log(`Found download URL: ${downloadInfo.downloadUrl}`);
+                logger.debug(`Found download URL: ${downloadInfo.downloadUrl}`);
               } else {
-                console.log(`No download URL found. Premium: ${downloadInfo.isPremium}, Button found: ${downloadInfo.buttonFound}`);
+                logger.debug(`No download URL found. Premium: ${downloadInfo.isPremium}, Button found: ${downloadInfo.buttonFound}`);
               }
 
               await new Promise(resolve => setTimeout(resolve, 1500));
               
             } catch (error) {
-              console.error(`Error processing detail page ${detailUrl}:`, error);
+              logger.error(`Error processing detail page ${detailUrl}:`, error);
             }
           }
 
           // Update status to downloading before starting downloads
-          console.log('Starting download phase...');
+          logger.debug('Starting download phase...');
           await this.updateJobStatus(id, 'downloading', 0);
           
           videoUrls = downloadUrls;
@@ -619,7 +620,7 @@ export class CrawlerService {
           for (let i = 0; i < videoUrls.length; i++) {
             try {
               const videoUrl = videoUrls[i];
-              console.log(`Downloading video ${i + 1}/${totalItems}: ${videoUrl}`);
+              logger.debug(`Downloading video ${i + 1}/${totalItems}: ${videoUrl}`);
 
               // Download video using node-fetch with timeout
               const controller = new AbortController();
@@ -661,7 +662,7 @@ export class CrawlerService {
                 });
 
               } catch (error) {
-                console.error(`Error downloading video ${i + 1}:`, error);
+                logger.error(`Error downloading video ${i + 1}:`, error);
                 failedItems++;
                 
                 // Update failed items count
@@ -680,7 +681,7 @@ export class CrawlerService {
               await new Promise(resolve => setTimeout(resolve, 1000));
 
             } catch (error) {
-              console.error(`Error processing video ${i + 1}:`, error);
+              logger.error(`Error processing video ${i + 1}:`, error);
               failedItems++;
             }
           }
@@ -694,15 +695,15 @@ export class CrawlerService {
             await this.updateJobStatus(id, 'completed', 100);
           }
 
-          console.log(`Job ${id} completed: Downloaded ${downloadedItems} videos, Failed ${failedItems}`);
+          logger.debug(`Job ${id} completed: Downloaded ${downloadedItems} videos, Failed ${failedItems}`);
           
         } catch (error) {
-          console.error('Error crawling Freepik:', error);
+          logger.error('Error crawling Freepik:', error);
           await this.updateJobStatus(id, 'failed', undefined, `Failed to crawl Freepik videos: ${error instanceof Error ? error.message : 'Unknown error'}`);
           throw new Error(`Failed to crawl Freepik videos: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       } else if (site === 'mixkit') {
-        console.log(`Crawling Mixkit for videos with keyword: ${keyword}`);
+        logger.debug(`Crawling Mixkit for videos with keyword: ${keyword}`);
         
         // First go to the search results page
         const searchUrl = `https://mixkit.co/free-stock-video/${encodeURIComponent(keyword)}/`;
@@ -742,8 +743,8 @@ export class CrawlerService {
             return items;
           }, maxItems);
 
-          console.log(`Found ${videos.length} videos on Mixkit (limited to ${maxItems})`);
-          console.log('First few videos:', videos.slice(0, 3));
+          logger.debug(`Found ${videos.length} videos on Mixkit (limited to ${maxItems})`);
+          logger.debug('First few videos:', videos.slice(0, 3));
 
           // For each video, construct the direct download URL
           const downloadUrls: string[] = [];
@@ -752,7 +753,7 @@ export class CrawlerService {
             try {
               // Construct direct download URL
               const downloadUrl = `https://assets.mixkit.co/videos/${video.id}/${video.id}-720.mp4`;
-              console.log(`Checking download URL for video ${video.id}: ${downloadUrl}`);
+              logger.debug(`Checking download URL for video ${video.id}: ${downloadUrl}`);
 
               // Verify the URL is accessible
               const response = await fetch(downloadUrl, {
@@ -766,12 +767,12 @@ export class CrawlerService {
 
               if (response.ok) {
                 downloadUrls.push(downloadUrl);
-                console.log(`Found working download URL for video ${video.id}`);
+                logger.debug(`Found working download URL for video ${video.id}`);
               } else {
-                console.error(`Download URL returned status ${response.status} for video ${video.id}`);
+                logger.error(`Download URL returned status ${response.status} for video ${video.id}`);
               }
             } catch (error) {
-              console.error(`Error checking download URL for video ${video.id}:`, error);
+              logger.error(`Error checking download URL for video ${video.id}:`, error);
             }
 
             // Add a small delay between requests to avoid rate limiting
@@ -779,11 +780,11 @@ export class CrawlerService {
           }
 
           videoUrls = [...new Set(downloadUrls)]; // Remove duplicates
-          console.log(`Successfully got ${videoUrls.length} download URLs from Mixkit`);
+          logger.debug(`Successfully got ${videoUrls.length} download URLs from Mixkit`);
           totalItems = videoUrls.length;
           
         } catch (error) {
-          console.error('Error crawling Mixkit:', error);
+          logger.error('Error crawling Mixkit:', error);
           throw new Error('Failed to crawl Mixkit videos');
         }
       }
@@ -793,8 +794,8 @@ export class CrawlerService {
       }
 
       // Debug: Show what we found
-      console.log(`Found ${totalItems} ${type}s to download`);
-      console.log('First few video URLs:', videoUrls.slice(0, 3));
+      logger.debug(`Found ${totalItems} ${type}s to download`);
+      logger.debug('First few video URLs:', videoUrls.slice(0, 3));
 
       // Create output directory if it doesn't exist
       const outputDir = path.join(config.workingDirectory, channel.toLowerCase(), topic.toLowerCase(), 'crawler', type, keyword);
@@ -819,7 +820,7 @@ export class CrawlerService {
       for (let i = 0; i < videoUrls.length; i++) {
         try {
           const videoUrl = videoUrls[i];
-          console.log(`Downloading video ${i + 1}/${totalItems}: ${videoUrl}`);
+          logger.debug(`Downloading video ${i + 1}/${totalItems}: ${videoUrl}`);
 
           // Download video using node-fetch with timeout
           const controller = new AbortController();
@@ -860,14 +861,14 @@ export class CrawlerService {
             });
 
           } catch (error) {
-            console.error(`Error downloading video ${i + 1}:`, error);
+            logger.error(`Error downloading video ${i + 1}:`, error);
             failedItems++;
           } finally {
             clearTimeout(timeout);
           }
 
         } catch (error) {
-          console.error(`Error processing video ${i + 1}:`, error);
+          logger.error(`Error processing video ${i + 1}:`, error);
           failedItems++;
           
           await this.prisma.crawlerJob.update({
@@ -910,10 +911,10 @@ export class CrawlerService {
         });
       }
       
-      console.log(`Job ${id} completed: Downloaded ${downloadedItems} ${job.type}s, Failed ${failedItems}`);
+      logger.debug(`Job ${id} completed: Downloaded ${downloadedItems} ${job.type}s, Failed ${failedItems}`);
 
     } catch (error) {
-      console.error(`Error starting job ${id}:`, error);
+      logger.error(`Error starting job ${id}:`, error);
       await this.updateJobStatus(id, 'failed', undefined, error instanceof Error ? error.message : 'Unknown error');
       throw new Error(`Failed to start job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
@@ -927,7 +928,7 @@ export class CrawlerService {
     try {
       await this.updateJobStatus(id, 'paused');
     } catch (error) {
-      console.error('Error pausing job:', error);
+      logger.error('Error pausing job:', error);
       throw new Error('Failed to pause job');
     }
   }
@@ -944,12 +945,12 @@ export class CrawlerService {
 
       // Start the job process
       this.startJob(id).catch(error => {
-        console.error(`Error starting resumed job ${id}:`, error);
+        logger.error(`Error starting resumed job ${id}:`, error);
         // If starting fails, mark as failed
         this.updateJobStatus(id, 'failed', undefined, error instanceof Error ? error.message : 'Failed to resume job');
       });
     } catch (error) {
-      console.error('Error resuming job:', error);
+      logger.error('Error resuming job:', error);
       throw new Error('Failed to resume job');
     }
   }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/app/lib/db";
+import { NEXRENDER_BASE_URL } from "@/app/lib/constants";
+import { prisma } from "@/lib/prisma";
 import { generateAssets } from "@/app/services/render";
+import { logger } from "@/app/lib/logger";
 
 // Helper function to normalize paths to use forward slashes and add file:// prefix for input files only
 const normalizePath = (path: string, isOutputPath: boolean = false): string => {
@@ -19,7 +21,7 @@ export async function POST(
 ) {
   try {
     const { id } = await context.params;
-    console.log('Starting render for item:', id);
+    logger.debug('Starting render for item:', id);
 
     // Get the render item
     const renderItem = await prisma.renderItem.findUnique({
@@ -27,14 +29,14 @@ export async function POST(
     });
 
     if (!renderItem) {
-      console.error('Render item not found:', id);
+      logger.error('Render item not found:', id);
       return NextResponse.json(
         { error: "Render item not found" },
         { status: 404 }
       );
     }
 
-    console.log('Found render item:', {
+    logger.debug('Found render item:', {
       id: renderItem.id,
       fileName: renderItem.fileName,
       templateAeUrl: renderItem.templateAeUrl,
@@ -66,11 +68,11 @@ export async function POST(
       },
     };
 
-    console.log('Sending request to Nexrender:', JSON.stringify(requestBody, null, 2));
+    logger.debug('Sending request to Nexrender:', JSON.stringify(requestBody, null, 2));
 
     // Check if Nexrender server is accessible first
     try {
-      const healthCheck = await fetch("http://localhost:3000/api/v1/jobs", {
+      const healthCheck = await fetch(`${NEXRENDER_BASE_URL}/api/v1/jobs`, {
         method: "GET",
         headers: {
           "nexrender-secret": "myapisecret",
@@ -81,14 +83,14 @@ export async function POST(
         throw new Error(`Nexrender server health check failed: ${healthCheck.status} ${healthCheck.statusText}`);
       }
     } catch (healthError) {
-      console.error('Nexrender server not accessible:', healthError);
+      logger.error('Nexrender server not accessible:', healthError);
       return NextResponse.json(
         { error: "Nexrender server is not accessible. Please ensure it's running on localhost:3000" },
         { status: 503 }
       );
     }
 
-    const response = await fetch("http://localhost:3000/api/v1/jobs", {
+    const response = await fetch(`${NEXRENDER_BASE_URL}/api/v1/jobs`, {
       method: "POST",
       headers: {
         "nexrender-secret": "myapisecret",
@@ -99,7 +101,7 @@ export async function POST(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Nexrender API error:', {
+      logger.error('Nexrender API error:', {
         status: response.status,
         statusText: response.statusText,
         error: errorText
@@ -108,10 +110,10 @@ export async function POST(
     }
 
     const jobData = await response.json();
-    console.log('Nexrender job created:', jobData);
+    logger.debug('Nexrender job created:', jobData);
 
     // Update render item with job UID and status
-    console.log('Updating render item with job UID:', jobData.uid);
+    logger.debug('Updating render item with job UID:', jobData.uid);
     await prisma.renderItem.update({
       where: { id },
       data: {
@@ -120,10 +122,10 @@ export async function POST(
       },
     });
 
-    console.log('Render process completed successfully');
+    logger.debug('Render process completed successfully');
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error in render process:", error);
+    logger.error("Error in render process:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to start render" },
       { status: 500 }

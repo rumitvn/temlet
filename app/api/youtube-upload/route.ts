@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
+import { YOUTUBE_CATEGORY_ID } from "@/app/lib/constants";
 import { Readable } from "stream";
 import sharp from "sharp";
 import { writeFile, unlink } from "fs/promises";
@@ -7,6 +8,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { logger } from "@/app/lib/logger";
 
 const execAsync = promisify(exec);
 
@@ -26,14 +28,14 @@ async function extractFrameFromVideo(videoBuffer: Buffer, timestamp: string = "0
     
     // Try to use system ffmpeg if available
     try {
-      console.log(`Extracting frame at ${timestamp}...`);
+      logger.debug(`Extracting frame at ${timestamp}...`);
       await execAsync(`ffmpeg -i "${tempVideoPath}" -ss ${timestamp} -vframes 1 -q:v 2 "${tempFramePath}"`);
       
       // Read the extracted frame and get its dimensions
       const frameImage = sharp(tempFramePath);
       const metadata = await frameImage.metadata();
       
-      console.log(`Extracted frame dimensions: ${metadata.width}x${metadata.height}`);
+      logger.debug(`Extracted frame dimensions: ${metadata.width}x${metadata.height}`);
       
       // Determine optimal thumbnail size based on aspect ratio
       let targetWidth, targetHeight;
@@ -55,7 +57,7 @@ async function extractFrameFromVideo(videoBuffer: Buffer, timestamp: string = "0
         targetHeight = 720;
       }
       
-      console.log(`Resizing thumbnail to: ${targetWidth}x${targetHeight}`);
+      logger.debug(`Resizing thumbnail to: ${targetWidth}x${targetHeight}`);
       
       const frameBuffer = await frameImage
         .resize(targetWidth, targetHeight, { 
@@ -71,7 +73,7 @@ async function extractFrameFromVideo(videoBuffer: Buffer, timestamp: string = "0
       
       return frameBuffer;
     } catch (ffmpegError) {
-      console.warn('System ffmpeg not available, creating custom thumbnail...');
+      logger.warn('System ffmpeg not available, creating custom thumbnail...');
       
       // Create a more attractive fallback thumbnail with video info
       const fallbackThumbnail = await sharp({
@@ -124,7 +126,7 @@ async function processThumbnail(thumbnailBuffer: Buffer): Promise<Buffer> {
     const image = sharp(thumbnailBuffer);
     const metadata = await image.metadata();
     
-    console.log(`Processing thumbnail with dimensions: ${metadata.width}x${metadata.height}`);
+    logger.debug(`Processing thumbnail with dimensions: ${metadata.width}x${metadata.height}`);
     
     // Determine optimal size based on aspect ratio
     let targetWidth, targetHeight;
@@ -146,7 +148,7 @@ async function processThumbnail(thumbnailBuffer: Buffer): Promise<Buffer> {
       targetHeight = 720;
     }
     
-    console.log(`Resizing thumbnail to: ${targetWidth}x${targetHeight}`);
+    logger.debug(`Resizing thumbnail to: ${targetWidth}x${targetHeight}`);
     
     // Process thumbnail to meet YouTube requirements
     return await image
@@ -161,14 +163,14 @@ async function processThumbnail(thumbnailBuffer: Buffer): Promise<Buffer> {
       })
       .toBuffer();
   } catch (error) {
-    console.error('Error processing thumbnail:', error);
+    logger.error('Error processing thumbnail:', error);
     throw error;
   }
 }
 
 export async function POST(req: Request) {
   try {
-    console.log('Starting YouTube upload process...');
+    logger.debug('Starting YouTube upload process...');
     
     const form = await req.formData();
     const mp4File = form.get("mp4") as File;
@@ -179,7 +181,7 @@ export async function POST(req: Request) {
     const description = form.get("description")?.toString() || "";
     const playlistId = form.get("playlistId")?.toString() || "";
     const tagsRaw = form.get("tags")?.toString() || "";
-    const categoryId = form.get("categoryId")?.toString() || "27";
+    const categoryId = form.get("categoryId")?.toString() || YOUTUBE_CATEGORY_ID;
     const defaultLanguage = form.get("defaultLanguage")?.toString() || "vi";
     const defaultAudioLanguage = form.get("defaultAudioLanguage")?.toString() || "vi";
     const scheduleDateRaw = form.get("scheduleDate")?.toString();
@@ -188,15 +190,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing mp4 file" }, { status: 400 });
     }
 
-    console.log('Title received:', title);
+    logger.debug('Title received:', title);
     if (!title || !title.trim()) {
-      console.error('Backend: Empty or invalid title received:', title);
+      logger.error('Backend: Empty or invalid title received:', title);
       return NextResponse.json({ error: "Empty or invalid title" }, { status: 400 });
     }
 
     const scheduledAt = toScheduledISO(scheduleDateRaw);
     if (scheduleDateRaw && !scheduledAt) {
-      console.error('Invalid schedule date:', scheduleDateRaw);
+      logger.error('Invalid schedule date:', scheduleDateRaw);
       return NextResponse.json({ error: "Invalid scheduleDate" }, { status: 400 });
     }
 
@@ -205,12 +207,12 @@ export async function POST(req: Request) {
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
 
-    console.log('Processing video file...');
+    logger.debug('Processing video file...');
     const buffer = Buffer.from(await mp4File.arrayBuffer());
     const stream = Readable.from(buffer);
 
-    console.log('Video file size:', buffer.length, 'bytes');
-    console.log('Title char codes:', Array.from(title).map(c => c.charCodeAt(0)));
+    logger.debug('Video file size:', buffer.length, 'bytes');
+    logger.debug('Title char codes:', Array.from(title).map(c => c.charCodeAt(0)));
 
     const creds = JSON.parse(process.env.YOUTUBE_TOKEN_JSON || "{}");
     const oauth2Client = new google.auth.OAuth2(
@@ -222,7 +224,7 @@ export async function POST(req: Request) {
 
     const youtube = google.youtube({ version: "v3", auth: oauth2Client });
 
-    console.log('Uploading video to YouTube...');
+    logger.debug('Uploading video to YouTube...');
     const requestBody = {
       snippet: {
         title,
@@ -240,7 +242,7 @@ export async function POST(req: Request) {
         containsSyntheticMedia: false,
       },
     };
-    console.log('YouTube API requestBody:', JSON.stringify(requestBody, null, 2));
+    logger.debug('YouTube API requestBody:', JSON.stringify(requestBody, null, 2));
 
     const videoRes = await youtube.videos.insert({
       part: ["snippet", "status"],
@@ -249,46 +251,46 @@ export async function POST(req: Request) {
     });
 
     const videoId = videoRes.data.id;
-    console.log('Video uploaded successfully:', videoId);
+    logger.debug('Video uploaded successfully:', videoId);
 
     // Handle thumbnail upload (only if enabled)
     if (videoId && enableThumbnail) {
-      console.log('Thumbnail upload is enabled, processing...');
+      logger.debug('Thumbnail upload is enabled, processing...');
       let thumbnailBuffer: Buffer | null = null;
       
       // Check if user provided thumbnail
       if (thumbnailFile && thumbnailFile.size > 0) {
         if (isValidThumbnailFormat(thumbnailFile)) {
           try {
-            console.log('Processing provided thumbnail...');
+            logger.debug('Processing provided thumbnail...');
             const rawThumbnailBuffer = Buffer.from(await thumbnailFile.arrayBuffer());
             thumbnailBuffer = await processThumbnail(rawThumbnailBuffer);
-            console.log('Thumbnail processed successfully');
+            logger.debug('Thumbnail processed successfully');
           } catch (processError) {
-            console.error('Failed to process thumbnail:', processError);
-            console.log('Will extract frame from video instead');
+            logger.error('Failed to process thumbnail:', processError);
+            logger.debug('Will extract frame from video instead');
           }
         } else {
-          console.warn('Invalid thumbnail format or size, will extract frame from video');
+          logger.warn('Invalid thumbnail format or size, will extract frame from video');
         }
       }
       
       // If no valid thumbnail provided, extract frame from video
       if (!thumbnailBuffer) {
         try {
-          console.log(`Extracting frame from video at ${frameTimestamp}...`);
+          logger.debug(`Extracting frame from video at ${frameTimestamp}...`);
           thumbnailBuffer = await extractFrameFromVideo(buffer, frameTimestamp);
-          console.log('Frame extracted successfully');
+          logger.debug('Frame extracted successfully');
         } catch (frameError) {
-          console.error('Failed to extract frame:', frameError);
-          console.log('Will use YouTube auto-generated thumbnail');
+          logger.error('Failed to extract frame:', frameError);
+          logger.debug('Will use YouTube auto-generated thumbnail');
         }
       }
       
       // Upload thumbnail if we have a valid one
       if (thumbnailBuffer) {
         try {
-          console.log('Uploading thumbnail to YouTube...');
+          logger.debug('Uploading thumbnail to YouTube...');
           const thumbnailStream = Readable.from(thumbnailBuffer);
           
           await youtube.thumbnails.set({
@@ -296,20 +298,20 @@ export async function POST(req: Request) {
             media: { body: thumbnailStream },
           });
           
-          console.log('Thumbnail uploaded successfully');
-        } catch (thumbnailError: any) {
-          console.error('Thumbnail upload failed:', thumbnailError);
-          console.log('YouTube will use auto-generated thumbnail');
+          logger.debug('Thumbnail uploaded successfully');
+        } catch (thumbnailError: unknown) {
+          logger.error('Thumbnail upload failed:', thumbnailError);
+          logger.debug('YouTube will use auto-generated thumbnail');
           // Don't fail the entire upload if thumbnail fails
           // Just log the error and continue
         }
       }
     } else if (videoId) {
-      console.log('Thumbnail upload is disabled, YouTube will use auto-generated thumbnail');
+      logger.debug('Thumbnail upload is disabled, YouTube will use auto-generated thumbnail');
     }
 
     if (playlistId && videoId) {
-      console.log('Adding video to playlist:', playlistId);
+      logger.debug('Adding video to playlist:', playlistId);
       await youtube.playlistItems.insert({
         part: ["snippet"],
         requestBody: {
@@ -326,7 +328,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, videoId });
   } catch (err: any) {
-    console.error("Upload error:", err);
+    logger.error("Upload error:", err);
     return NextResponse.json({ 
       error: err.message || "Upload failed",
       details: err.response?.data || err

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/app/lib/db";
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { apiError, parsePaginationParams } from "@/app/lib/api-utils";
+import { logger } from "@/app/lib/logger";
 
 // GET /api/renders - List render items with filtering and sorting
 export async function GET(req: NextRequest) {
@@ -8,15 +11,12 @@ export async function GET(req: NextRequest) {
         const type = searchParams.get('type');
         const topic = searchParams.get('topic');
         const status = searchParams.get('status');
-        const sortBy = searchParams.get('sortBy') || 'createdAt';
-        const sortOrder = searchParams.get('sortOrder') || 'desc';
-        const page = parseInt(searchParams.get('page') || '1');
-        const limit = parseInt(searchParams.get('limit') || '10');
+        const { page, limit, sortBy, sortOrder } = parsePaginationParams(searchParams);
         const skip = (page - 1) * limit;
         const ids = searchParams.get('ids')?.split(',');
 
         // Build the where clause
-        const whereClause: any = {};
+        const whereClause: Prisma.RenderItemWhereInput = {};
         
         if (type) {
             whereClause.type = type;
@@ -53,11 +53,8 @@ export async function GET(req: NextRequest) {
             totalPages: Math.ceil(total / limit)
         });
     } catch (error) {
-        console.error('Error listing render items:', error);
-        return NextResponse.json(
-            { error: 'Failed to list render items' },
-            { status: 500 }
-        );
+        logger.error('Error listing render items:', error);
+        return apiError('Failed to list render items');
     }
 }
 
@@ -100,10 +97,7 @@ export async function POST(req: NextRequest) {
         
         const missingFields = requiredFields.filter(field => !body[field]);
         if (missingFields.length > 0) {
-            return NextResponse.json(
-                { error: `Missing required fields: ${missingFields.join(', ')}` },
-                { status: 400 }
-            );
+            return apiError(`Missing required fields: ${missingFields.join(', ')}`, 400);
         }
 
         // Check if fileName already exists
@@ -112,10 +106,7 @@ export async function POST(req: NextRequest) {
         });
 
         if (existing) {
-            return NextResponse.json(
-                { error: 'File name already exists' },
-                { status: 400 }
-            );
+            return apiError('File name already exists', 400);
         }
 
         // Fetch the render format details to include the code field
@@ -124,10 +115,7 @@ export async function POST(req: NextRequest) {
         });
 
         if (!renderFormat) {
-            return NextResponse.json(
-                { error: 'Invalid render format ID' },
-                { status: 400 }
-            );
+            return apiError('Invalid render format ID', 400);
         }
 
         const renderItem = await prisma.renderItem.create({
@@ -163,10 +151,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json(renderItem);
     } catch (error) {
-        console.error('Error creating render item:', error);
-        return NextResponse.json(
-            { error: 'Failed to create render item' },
-            { status: 500 }
-        );
+        logger.error('Error creating render item:', error);
+        return apiError('Failed to create render item');
     }
 } 

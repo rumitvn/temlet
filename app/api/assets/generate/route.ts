@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { logger } from "@/app/lib/logger";
 
 // Lazily create the OpenAI client so the module can be imported during build
 // without the API key. The key is only required when OpenAI is actually used.
@@ -69,8 +70,8 @@ export async function POST(req: NextRequest) {
     const { prompt, description, language, topic, provider = "grok", order = 1, existingContent = [], previewItems = [], availableInputs = [] } = await req.json();
     
     // Debug logging
-    console.log('=== AI GENERATE REQUEST DEBUG ===');
-    console.log('Request body:', {
+    logger.debug('=== AI GENERATE REQUEST DEBUG ===');
+    logger.debug('Request body:', {
       prompt,
       description,
       language,
@@ -1024,10 +1025,10 @@ CRITICAL: Return ONLY the JSON object. Do not include any other text, explanatio
     const userPrompt = getTopicSpecificUserPrompt(topic);
 
     // Debug logging for prompts
-    console.log('=== AI PROMPTS DEBUG ===');
-    console.log('System Prompt:', systemPrompt);
-    console.log('User Prompt:', userPrompt);
-    console.log('Uniqueness Instructions:', uniquenessInstructions);
+    logger.debug('=== AI PROMPTS DEBUG ===');
+    logger.debug('System Prompt:', systemPrompt);
+    logger.debug('User Prompt:', userPrompt);
+    logger.debug('Uniqueness Instructions:', uniquenessInstructions);
 
     let content = "";
 
@@ -1077,7 +1078,7 @@ CRITICAL: Return ONLY the JSON object. Do not include any other text, explanatio
       content = chat.choices[0].message.content || "";
     }
 
-    console.log('AI Generated Content: ', content);
+    logger.debug('AI Generated Content: ', content);
     
     // Extract JSON from the response (handle cases where AI adds extra text)
     let jsonContent = content;
@@ -1093,8 +1094,8 @@ CRITICAL: Return ONLY the JSON object. Do not include any other text, explanatio
     try {
       parsed = JSON.parse(jsonContent);
     } catch (parseError) {
-      console.error('JSON Parse Error:', parseError);
-      console.error('Attempted to parse:', jsonContent);
+      logger.error('JSON Parse Error:', parseError);
+      logger.error('Attempted to parse:', jsonContent);
       
       // Try to clean up common JSON issues
       let cleanedContent = jsonContent
@@ -1106,8 +1107,8 @@ CRITICAL: Return ONLY the JSON object. Do not include any other text, explanatio
       try {
         parsed = JSON.parse(cleanedContent);
       } catch (secondError) {
-        console.error('Second JSON Parse Error:', secondError);
-        console.error('Cleaned content:', cleanedContent);
+        logger.error('Second JSON Parse Error:', secondError);
+        logger.error('Cleaned content:', cleanedContent);
         
         return NextResponse.json(
           { error: 'Failed to parse AI response. Please try again.' },
@@ -1122,7 +1123,7 @@ CRITICAL: Return ONLY the JSON object. Do not include any other text, explanatio
       fileName: `${parsed.key}_${parsed.order}.json`
     });
   } catch (error) {
-    console.error('Error generating AI content:', error);
+    logger.error('Error generating AI content:', error);
     return NextResponse.json(
       { error: 'Failed to generate content' },
       { status: 500 }

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { checkRenderStatus } from "./render";
 import { generateMetadata } from "./metadata";
+import { logger } from "@/app/lib/logger";
 
 function mapNexrenderStatus(nexrenderState: string): string {
   // Initial states
@@ -34,7 +35,7 @@ export async function startMonitoring() {
     try {
       await prisma.$connect();
     } catch (dbError) {
-      console.log('Database not available, skipping monitoring:', dbError);
+      logger.debug('Database not available, skipping monitoring:', dbError);
       return;
     }
 
@@ -72,7 +73,7 @@ export async function startMonitoring() {
       try {
         // Handle metadata processing for rendered items
         if (render.status === 'rendered' && render.autoCreateMetadata && !render.metadataTime) {
-          console.log(`Starting metadata generation for render ${render.id}`);
+          logger.debug(`Starting metadata generation for render ${render.id}`);
           try {
             // First check if the item is still in the same state
             const currentItem = await prisma.renderItem.findUnique({
@@ -84,7 +85,7 @@ export async function startMonitoring() {
             if (!currentItem || 
                 currentItem.status !== 'rendered' || 
                 ['pending_metadata', 'processing_metadata'].includes(currentItem.status)) {
-              console.log(`Skipping metadata generation for render ${render.id} - already being processed or state changed`);
+              logger.debug(`Skipping metadata generation for render ${render.id} - already being processed or state changed`);
               continue;
             }
 
@@ -107,9 +108,9 @@ export async function startMonitoring() {
               }
             });
             
-            console.log(`Successfully generated metadata for render ${render.id}`);
+            logger.debug(`Successfully generated metadata for render ${render.id}`);
           } catch (error) {
-            console.error(`Error generating metadata for render ${render.id}:`, error);
+            logger.error(`Error generating metadata for render ${render.id}:`, error);
             // Update status to declined if metadata generation fails
             await prisma.renderItem.update({
               where: { id: render.id },
@@ -124,15 +125,15 @@ export async function startMonitoring() {
 
         // Handle render status monitoring
         if (render.nexrenderUid) {
-          console.log(`Checking status for render ${render.id} (${render.nexrenderUid})`);
+          logger.debug(`Checking status for render ${render.id} (${render.nexrenderUid})`);
           const status = await checkRenderStatus(render.nexrenderUid);
           
           const newStatus = mapNexrenderStatus(status.state);
-          console.log(`Current status: ${render.status}, New status: ${newStatus}`);
+          logger.debug(`Current status: ${render.status}, New status: ${newStatus}`);
 
           // Only update if status changed or progress changed
           if (newStatus !== render.status || status.renderProgress !== render.renderProgress) {
-            console.log(`Status changed for render ${render.id}: ${render.status} -> ${newStatus}`);
+            logger.debug(`Status changed for render ${render.id}: ${render.status} -> ${newStatus}`);
             await prisma.renderItem.update({
               where: { id: render.id },
               data: {
@@ -142,21 +143,21 @@ export async function startMonitoring() {
               }
             });
           } else {
-            console.log(`No status change for render ${render.id}`);
+            logger.debug(`No status change for render ${render.id}`);
           }
         }
       } catch (error) {
-        console.error(`Error processing render ${render.id}:`, error);
+        logger.error(`Error processing render ${render.id}:`, error);
       }
     }
   } catch (error) {
-    console.error('Error in monitoring:', error);
+    logger.error('Error in monitoring:', error);
   } finally {
     // Always disconnect from database
     try {
       await prisma.$disconnect();
     } catch (disconnectError) {
-      console.log('Error disconnecting from database:', disconnectError);
+      logger.debug('Error disconnecting from database:', disconnectError);
     }
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { logger } from "@/app/lib/logger";
 import {
   CloudIcon,
   ComputerDesktopIcon,
@@ -60,7 +61,7 @@ export default function ProviderSelectionDialog({
         setModels(data.models);
       }
     } catch (error) {
-      console.error('Error loading models:', error);
+      logger.error('Error loading models:', error);
     } finally {
       setIsLoading(false);
     }
