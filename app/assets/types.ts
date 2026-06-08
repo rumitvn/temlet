@@ -204,3 +204,16 @@ export interface CrawlerResource {
 export type ResourceType = "image" | "video" | "quiz3-image";
 export type ApiResourceType = "image" | "video";
 export type ResourceTarget = "main" | "quiz3";
+
+export interface SelectionState {
+  [key: string]: {
+    isSelected: boolean;
+    isLoading: boolean;
+    error?: string;
+  };
+}
+
+export interface Toast {
+  message: string;
+  type: "success" | "error" | "info";
+}
