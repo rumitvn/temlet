@@ -1394,7 +1394,6 @@ export default function AssetsPage() {
 
 
 
-  // Fullscreen image viewer component
   if (loading) {
     return (
       <div className="min-h-screen bg-bg text-text p-8">
