@@ -20,7 +20,7 @@ interface Site {
   url: string;
 }
 
-interface CreateCrawlerData {
+export interface CreateCrawlerData {
   name: string;
   keyword: string;
   sites: string[];

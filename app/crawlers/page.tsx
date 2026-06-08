@@ -1,173 +1,31 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  PlusIcon, 
-  MagnifyingGlassIcon, 
+import { useState } from "react";
+import { motion } from "framer-motion";
+import {
+  PlusIcon,
+  MagnifyingGlassIcon,
   FunnelIcon,
-  ChevronUpIcon,
-  ChevronDownIcon
 } from "@heroicons/react/24/outline";
-import { 
-  ClockIcon,
+import {
   ArrowPathIcon,
-  CheckCircleIcon,
-  XCircleIcon,
   DocumentTextIcon,
-  ArrowUpTrayIcon,
-  ShieldCheckIcon,
-  PhotoIcon,
-  VideoCameraIcon,
-  GlobeAltIcon,
-  ExclamationTriangleIcon,
-  PlayIcon,
-  PauseIcon
 } from "@heroicons/react/24/solid";
-import CreateCrawlerDialog from "../components/CreateCrawlerDialog";
-import {
-  Button,
-  Card,
-  Input,
-  Label,
-  Badge,
-  Table,
-  THead,
-  TBody,
-  TR,
-  TH,
-  TD,
-} from "@/app/components/ui";
-import { statusClass } from "@/app/theme/status";
-import {
-  types as filterTypes,
-  topics as filterTopics,
-  channels as filterChannels,
-  sites as filterSites,
-} from "@/app/data/filters";
-
-// Custom debounce hook
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
-
-// Filter option lists (single source of truth: app/data/filters.ts)
-const types = [...filterTypes];
-const topics = [...filterTopics];
-const channels = [...filterChannels];
-const sites = [...filterSites];
-
-const getProgressBarColor = (_status: CrawlerJob['status']) => {
-  return 'bg-accent';
-};
-
-const statusGroups = {
-  active: {
-    title: "Active",
-    icon: PlayIcon,
-    statuses: ['pending', 'crawling', 'downloading'] as CrawlerStatus[]
-  },
-  completed: {
-    title: "Completed",
-    icon: CheckCircleIcon,
-    statuses: ['completed'] as CrawlerStatus[]
-  },
-  issues: {
-    title: "Issues",
-    icon: ExclamationTriangleIcon,
-    statuses: ['failed', 'paused'] as CrawlerStatus[]
-  }
-};
-
-type CrawlerStatus = 'pending' | 'crawling' | 'downloading' | 'completed' | 'failed' | 'paused';
-
-interface CrawlerJob {
-  id: string;
-  name: string;
-  keyword: string;
-  site: string;
-  type: 'image' | 'video';
-  channel: string;
-  topic: string;
-  status: CrawlerStatus;
-  progress: number;
-  totalItems: number;
-  downloadedItems: number;
-  failedItems: number;
-  createdAt: Date;
-  startedAt?: Date;
-  completedAt?: Date;
-  error?: string;
-  outputPath: string;
-  settings: {
-    maxItems: number;
-    quality: 'low' | 'medium' | 'high';
-    format: string;
-  };
-}
-
-interface CrawlerStats {
-  totalJobs: number;
-  activeJobs: number;
-  completedJobs: number;
-  failedJobs: number;
-  totalDownloaded: number;
-  totalFailed: number;
-  averageSpeed: number;
-}
-
-const getStatusIcon = (status: CrawlerStatus) => {
-  switch (status) {
-    case 'pending':
-      return ClockIcon;
-    case 'crawling':
-      return GlobeAltIcon;
-    case 'downloading':
-      return ArrowUpTrayIcon;
-    case 'completed':
-      return CheckCircleIcon;
-    case 'failed':
-      return XCircleIcon;
-    case 'paused':
-      return PauseIcon;
-    default:
-      return ClockIcon;
-  }
-};
-
-const isActiveStatus = (status: CrawlerJob['status']) => {
-  return status === 'crawling' || status === 'downloading';
-};
-
-interface SSEEvent extends Event {
-  data: string;
-}
-
-interface SSEJobUpdate {
-  type: 'job_update' | 'completed' | 'error';
-  job?: Partial<CrawlerJob>;
-  error?: string;
-}
+import CreateCrawlerDialog, {
+  type CreateCrawlerData,
+} from "../components/CreateCrawlerDialog";
+import { Button, Input } from "@/app/components/ui";
+import { logger } from "@/app/lib/logger";
+import { useDebounce } from "@/app/hooks/useDebounce";
+import { useCrawlerData } from "./useCrawlerData";
+import CrawlerStatsCards from "./components/CrawlerStatsCards";
+import CrawlerStatusBar from "./components/CrawlerStatusBar";
+import CrawlerFilters from "./components/CrawlerFilters";
+import CrawlerJobsTable from "./components/CrawlerJobsTable";
 
 export default function CrawlersPage() {
-  const [jobs, setJobs] = useState<CrawlerJob[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage] = useState(20);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 200);
   const [showFilters, setShowFilters] = useState(false);
@@ -180,281 +38,30 @@ export default function CrawlersPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const [statusCounts, setStatusCounts] = useState<Partial<Record<CrawlerStatus, number>>>({});
-  const [loadingCounts, setLoadingCounts] = useState(true);
-  const [stats, setStats] = useState<CrawlerStats>({
-    totalJobs: 0,
-    activeJobs: 0,
-    completedJobs: 0,
-    failedJobs: 0,
-    totalDownloaded: 0,
-    totalFailed: 0,
-    averageSpeed: 0
+
+  const {
+    jobs,
+    loading,
+    error,
+    totalPages,
+    statusCounts,
+    loadingCounts,
+    stats,
+    fetchJobs,
+    fetchStatusCounts,
+    fetchStats,
+  } = useCrawlerData({
+    currentPage,
+    sortBy,
+    sortOrder,
+    itemsPerPage,
+    debouncedSearchQuery,
+    selectedType,
+    selectedTopic,
+    selectedChannel,
+    selectedSite,
+    selectedStatus,
   });
-
-  // SSE monitoring for real-time updates
-  const [sseConnections, setSseConnections] = useState<Map<string, EventSource>>(new Map());
-
-  const fetchJobs = useCallback(async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        sortBy,
-        sortOrder,
-        limit: itemsPerPage.toString()
-      });
-
-      if (debouncedSearchQuery) {
-        params.append("q", debouncedSearchQuery);
-      }
-      if (selectedType) params.append("type", selectedType);
-      if (selectedTopic) params.append("topic", selectedTopic);
-      if (selectedChannel) params.append("channel", selectedChannel);
-      if (selectedSite) params.append("site", selectedSite);
-      if (selectedStatus) params.append("status", selectedStatus);
-
-      const response = await fetch(`/api/crawlers?${params}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch crawler jobs');
-      }
-      const data = await response.json();
-      console.log('Fetched jobs data:', data.jobs); // Log fetched jobs
-      setJobs(data.jobs || []);
-      setTotalPages(data.totalPages || 1);
-    } catch (error) {
-      console.error('Error fetching jobs:', error);
-      setError('Failed to load crawler jobs');
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, sortBy, sortOrder, itemsPerPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, selectedSite, selectedStatus]);
-
-  const fetchStatusCounts = useCallback(async () => {
-    try {
-      setLoadingCounts(true);
-      const response = await fetch('/api/crawlers/status-counts');
-      if (!response.ok) {
-        throw new Error('Failed to fetch status counts');
-      }
-      const data = await response.json();
-      setStatusCounts(data);
-    } catch (error) {
-      console.error('Error fetching status counts:', error);
-    } finally {
-      setLoadingCounts(false);
-    }
-  }, []);
-
-  const fetchStats = useCallback(async () => {
-    try {
-      const response = await fetch('/api/crawlers/stats');
-      if (!response.ok) {
-        throw new Error('Failed to fetch stats');
-      }
-      const data = await response.json();
-      setStats(data);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  }, []);
-
-  // Add a polling mechanism to ensure job status stays in sync
-  const pollJobStatus = useCallback(async (jobId: string) => {
-    try {
-      const response = await fetch(`/api/crawlers/${jobId}/status`); // Update endpoint to match your API
-      if (!response.ok) {
-        if (response.status === 404) {
-          console.log(`Job ${jobId} not found, stopping polling`);
-          return; // Stop polling if job doesn't exist
-        }
-        throw new Error(`Failed to fetch job status: ${response.statusText}`);
-      }
-      const jobData = await response.json();
-      
-      console.log(`Polled status for job ${jobId}:`, jobData);
-      
-      // Update only this specific job in state
-      setJobs(prevJobs => {
-        const jobIndex = prevJobs.findIndex(j => j.id === jobId);
-        if (jobIndex === -1) return prevJobs; // Job not in list
-
-        const updatedJobs = [...prevJobs];
-        updatedJobs[jobIndex] = {
-          ...prevJobs[jobIndex],
-          ...jobData,
-          // Ensure we keep the type field
-          type: jobData.type || prevJobs[jobIndex].type
-        };
-        return updatedJobs;
-      });
-
-      // If job is still active, schedule next poll
-      if (['pending', 'crawling', 'downloading'].includes(jobData.status)) {
-        setTimeout(() => pollJobStatus(jobId), 5000); // Poll every 5 seconds
-      } else {
-        // Job is complete/failed, only update counts
-        Promise.all([
-          fetchStatusCounts(),
-          fetchStats()
-        ]).catch(error => console.error('Error updating counts:', error));
-      }
-    } catch (error) {
-      console.error(`Error polling job ${jobId}:`, error);
-      // Schedule next poll even on error, but with a longer delay
-      setTimeout(() => pollJobStatus(jobId), 10000); // Retry after 10 seconds
-    }
-  }, [fetchStatusCounts, fetchStats]); // Remove fetchJobs from dependencies
-
-  // Function to update a single job's data
-  const updateJobInState = useCallback((jobId: string, jobData: Partial<CrawlerJob>) => {
-    setJobs(prevJobs => {
-      const jobIndex = prevJobs.findIndex(j => j.id === jobId);
-      if (jobIndex === -1) return prevJobs; // Job not in list
-
-      const updatedJobs = [...prevJobs];
-      updatedJobs[jobIndex] = {
-        ...prevJobs[jobIndex],
-        ...jobData,
-        // Ensure we keep the type field
-        type: jobData.type || prevJobs[jobIndex].type
-      };
-      return updatedJobs;
-    });
-  }, []);
-
-  // Function to start monitoring a specific job
-  const startJobMonitoring = useCallback((jobId: string) => {
-    // Close existing connection if any
-    const existingConnection = sseConnections.get(jobId);
-    if (existingConnection) {
-      existingConnection.close();
-    }
-
-    console.log(`Starting new SSE connection for job ${jobId}`);
-
-    // Create new SSE connection
-    const eventSource = new EventSource(`/api/crawlers/stream?jobId=${jobId}`);
-    
-    // Handle connection open
-    eventSource.onopen = () => {
-      console.log(`SSE connection opened for job ${jobId}`);
-      // Start polling as backup
-      pollJobStatus(jobId);
-    };
-
-    eventSource.onmessage = (event: SSEEvent) => {
-      try {
-        const data = JSON.parse(event.data) as SSEJobUpdate;
-        console.log(`SSE update received for job ${jobId}:`, {
-          type: data.type,
-          jobData: data.job,
-          rawData: data
-        });
-        
-        if (data.type === 'job_update' && data.job) {
-          // Update the specific job in the UI immediately
-          updateJobInState(jobId, data.job);
-
-          // If job is completed or failed, clean up
-          if (data.job.status === 'completed' || data.job.status === 'failed') {
-            console.log(`Job ${jobId} finished with status ${data.job.status}, closing connection`);
-            eventSource.close();
-            setSseConnections(prev => {
-              const newMap = new Map(prev);
-              newMap.delete(jobId);
-              return newMap;
-            });
-            
-            // Only update counts, not full job list
-            Promise.all([
-              fetchStatusCounts(),
-              fetchStats()
-            ]).catch(error => console.error('Error updating counts:', error));
-          }
-        }
-      } catch (error) {
-        console.error('Error parsing SSE data:', error);
-        console.error('Raw event data:', event.data);
-      }
-    };
-
-    eventSource.onerror = (error: Event) => {
-      console.error(`SSE connection error for job ${jobId}:`, error);
-      
-      // Only close on real errors, not disconnects
-      if ((error.target as EventSource)?.readyState === EventSource.CLOSED) {
-        console.log(`SSE connection closed for job ${jobId}`);
-        eventSource.close();
-        setSseConnections(prev => {
-          const newMap = new Map(prev);
-          newMap.delete(jobId);
-          return newMap;
-        });
-        
-        // Start polling as backup
-        pollJobStatus(jobId);
-      }
-    };
-
-    // Store the connection
-    setSseConnections(prev => new Map(prev).set(jobId, eventSource));
-  }, [updateJobInState, fetchStatusCounts, fetchStats, pollJobStatus]); // Remove fetchJobs from dependencies
-
-  // Monitor active jobs and start SSE connections
-  useEffect(() => {
-    // Get all jobs that should be monitored
-    const jobsToMonitor = jobs.filter(job => 
-      ['pending', 'crawling', 'downloading'].includes(job.status)
-    );
-
-    console.log('Jobs to monitor:', jobsToMonitor.map(j => ({ id: j.id, status: j.status })));
-
-    // Start monitoring for each job that needs it
-    jobsToMonitor.forEach(job => {
-      if (!sseConnections.has(job.id)) {
-        console.log(`Starting SSE monitoring for job ${job.id} (status: ${job.status})`);
-        startJobMonitoring(job.id);
-      }
-    });
-
-    // Only clean up connections for jobs that are definitely done
-    Array.from(sseConnections.keys()).forEach(jobId => {
-      const job = jobs.find(j => j.id === jobId);
-      if (job && ['completed', 'failed'].includes(job.status)) {
-        console.log(`Closing SSE connection for completed/failed job ${jobId} (status: ${job.status})`);
-        const connection = sseConnections.get(jobId);
-        if (connection) {
-          connection.close();
-          setSseConnections(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(jobId);
-            return newMap;
-          });
-        }
-      }
-    });
-
-    // Cleanup on unmount
-    return () => {
-      if (document.visibilityState === 'hidden') {
-        console.log('Page is being unloaded, cleaning up all SSE connections');
-        sseConnections.forEach((eventSource, jobId) => {
-          console.log(`Cleaning up SSE connection for job ${jobId}`);
-          eventSource.close();
-        });
-      }
-    };
-  }, [jobs, sseConnections, startJobMonitoring]);
-
-  useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
-
-  useEffect(() => {
-    fetchStatusCounts();
-    fetchStats();
-  }, [fetchStatusCounts, fetchStats]);
 
   const getActiveFiltersCount = () => {
     let count = 0;
@@ -482,39 +89,37 @@ export default function CrawlersPage() {
     setSelectedStatus(null);
   };
 
-  const formatDate = (dateString: string | number | Date | null | undefined) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleString();
-  };
-
   const handleStatusClick = (status: string) => {
     setSelectedStatus(selectedStatus === status ? null : status);
   };
 
   const handleItemSelect = (itemId: string, event: React.MouseEvent) => {
     // Prevent row click from triggering when clicking checkboxes or action buttons
-    if ((event.target as HTMLElement).closest('button, input[type="checkbox"]')) {
+    if (
+      (event.target as HTMLElement).closest('button, input[type="checkbox"]')
+    ) {
       return;
     }
 
     if (event.ctrlKey || event.metaKey) {
       // Toggle selection with Ctrl/Cmd key
-      setSelectedItems(prev => 
-        prev.includes(itemId) 
-          ? prev.filter(id => id !== itemId)
-          : [...prev, itemId]
+      setSelectedItems((prev) =>
+        prev.includes(itemId)
+          ? prev.filter((id) => id !== itemId)
+          : [...prev, itemId],
       );
     } else if (event.shiftKey && selectedItems.length > 0) {
       // Range selection with Shift key
-      const allJobIds = jobs.map(job => job.id);
-      const lastSelectedIndex = allJobIds.indexOf(selectedItems[selectedItems.length - 1]);
+      const allJobIds = jobs.map((job) => job.id);
+      const lastSelectedIndex = allJobIds.indexOf(
+        selectedItems[selectedItems.length - 1],
+      );
       const currentIndex = allJobIds.indexOf(itemId);
       const start = Math.min(lastSelectedIndex, currentIndex);
       const end = Math.max(lastSelectedIndex, currentIndex);
       const rangeIds = allJobIds.slice(start, end + 1);
-      
-      setSelectedItems(prev => {
+
+      setSelectedItems((prev) => {
         const newSelection = [...new Set([...prev, ...rangeIds])];
         return newSelection;
       });
@@ -524,18 +129,22 @@ export default function CrawlersPage() {
     }
   };
 
-  const handleCheckboxChange = (itemId: string, checked: boolean, event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCheckboxChange = (
+    itemId: string,
+    checked: boolean,
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     event.stopPropagation();
-    
+
     if (checked) {
-      setSelectedItems(prev => [...prev, itemId]);
+      setSelectedItems((prev) => [...prev, itemId]);
     } else {
-      setSelectedItems(prev => prev.filter(id => id !== itemId));
+      setSelectedItems((prev) => prev.filter((id) => id !== itemId));
     }
   };
 
   const handleSelectAll = () => {
-    setSelectedItems(jobs.map(job => job.id));
+    setSelectedItems(jobs.map((job) => job.id));
   };
 
   const handleDeselectAll = () => {
@@ -543,19 +152,23 @@ export default function CrawlersPage() {
   };
 
   const handleDeleteSelected = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedItems.length} crawler job(s)?`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedItems.length} crawler job(s)?`,
+      )
+    ) {
       return;
     }
 
     try {
-      const response = await fetch('/api/crawlers/batch', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: selectedItems })
+      const response = await fetch("/api/crawlers/batch", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedItems }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete jobs');
+        throw new Error("Failed to delete jobs");
       }
 
       // Refresh the jobs list instead of filtering locally
@@ -564,8 +177,8 @@ export default function CrawlersPage() {
       fetchStatusCounts();
       fetchStats();
     } catch (error) {
-      console.error('Error deleting jobs:', error);
-      alert('Failed to delete jobs');
+      logger.error("Error deleting jobs:", error);
+      alert("Failed to delete jobs");
     }
   };
 
@@ -574,20 +187,24 @@ export default function CrawlersPage() {
     if (ids.length === 0) return;
 
     try {
-      if (action === 'delete') {
+      if (action === "delete") {
         // Handle delete separately
-        if (!confirm(`Are you sure you want to delete ${ids.length} crawler job(s)?`)) {
+        if (
+          !confirm(
+            `Are you sure you want to delete ${ids.length} crawler job(s)?`,
+          )
+        ) {
           return;
         }
 
-        const response = await fetch('/api/crawlers/batch', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids })
+        const response = await fetch("/api/crawlers/batch", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids }),
         });
 
         if (!response.ok) {
-          throw new Error('Failed to delete jobs');
+          throw new Error("Failed to delete jobs");
         }
 
         // Immediately update counts after deletion
@@ -596,13 +213,13 @@ export default function CrawlersPage() {
         fetchStats();
       } else {
         // Handle other actions (start, pause, resume)
-        const response = await fetch('/api/crawlers/batch-action', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            ids, 
-            action 
-          })
+        const response = await fetch("/api/crawlers/batch-action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ids,
+            action,
+          }),
         });
 
         if (!response.ok) {
@@ -619,101 +236,68 @@ export default function CrawlersPage() {
         }
       }
     } catch (error) {
-      console.error(`Error ${action}ing jobs:`, error);
+      logger.error(`Error ${action}ing jobs:`, error);
       alert(`Failed to ${action} jobs`);
     }
   };
 
-  // Function to update a specific job in the UI
-  const updateJobInUI = (jobId: string, action: string) => {
-    setJobs(prevJobs => prevJobs.map(job => {
-      if (job.id === jobId) {
-        const updatedJob = { ...job };
-        
-        switch (action) {
-          case 'start':
-            updatedJob.status = 'crawling';
-            updatedJob.startedAt = new Date();
-            updatedJob.progress = 0;
-            updatedJob.downloadedItems = 0;
-            updatedJob.failedItems = 0;
-            updatedJob.totalItems = 0;
-            break;
-          case 'pause':
-            updatedJob.status = 'paused';
-            break;
-          case 'resume':
-            updatedJob.status = 'crawling';
-            break;
-          case 'delete':
-            // Job will be removed from the list
-            return null;
-        }
-        
-        return updatedJob;
-      }
-      return job;
-    }).filter(Boolean) as CrawlerJob[]);
-  };
-
-  // Function to update job progress from external updates
-  const updateJobProgress = (jobId: string, updates: any) => {
-    setJobs(prevJobs => prevJobs.map(job => {
-      if (job.id === jobId) {
-        return { ...job, ...updates };
-      }
-      return job;
-    }));
-  };
-
-  const handleCreateCrawler = async (data: any) => {
+  const handleCreateCrawler = async (data: CreateCrawlerData) => {
     try {
-      console.log('Received form data:', data); // Log incoming data
-      
+      logger.debug("Received form data:", data); // Log incoming data
+
       // Create a crawler job for each selected site
-      const responses = await Promise.all(data.sites.map(async (site: string) => {
-        // Create a clean job data object with explicit type
-        const jobData = {
-          name: data.name,
-          keyword: data.keyword,
-          site: site,
-          type: data.type,
-          channel: data.channel,
-          topic: data.topic,
-          settings: {
-            maxItems: data.settings.maxItems,
-            quality: data.settings.quality,
-            format: data.settings.format
+      await Promise.all(
+        data.sites.map(async (site: string) => {
+          // Create a clean job data object with explicit type
+          const jobData = {
+            name: data.name,
+            keyword: data.keyword,
+            site: site,
+            type: data.type,
+            channel: data.channel,
+            topic: data.topic,
+            settings: {
+              maxItems: data.settings.maxItems,
+              quality: data.settings.quality,
+              format: data.settings.format,
+            },
+          };
+
+          logger.debug("Creating crawler job with data:", jobData); // Log job data before sending
+
+          const response = await fetch("/api/crawlers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(jobData),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to create crawler job for site ${site}`);
           }
-        };
 
-        console.log('Creating crawler job with data:', jobData); // Log job data before sending
+          const responseData = await response.json();
+          logger.debug("API response:", responseData); // Log API response
+          return responseData;
+        }),
+      );
 
-        const response = await fetch('/api/crawlers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(jobData)
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to create crawler job for site ${site}`);
-        }
-
-        const responseData = await response.json();
-        console.log('API response:', responseData); // Log API response
-        return responseData;
-      }));
-      
       // Refresh everything after creating all jobs
       await fetchJobs(); // Add await here
       await fetchStatusCounts(); // Add await here
       await fetchStats(); // Add await here
       setIsCreateDialogOpen(false);
     } catch (error) {
-      console.error('Error creating crawler jobs:', error);
-      alert('Failed to create one or more crawler jobs');
+      logger.error("Error creating crawler jobs:", error);
+      alert("Failed to create one or more crawler jobs");
     }
   };
+
+  const sortButtons: { field: string; label: string }[] = [
+    { field: "createdAt", label: "Date" },
+    { field: "name", label: "Name" },
+    { field: "type", label: "Type" },
+    { field: "status", label: "Status" },
+  ];
 
   return (
     <div className="min-h-screen bg-bg text-text p-8">
@@ -722,7 +306,7 @@ export default function CrawlersPage() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex justify-between items-center mb-8 h-24 sticky top-0 z-40 bg-bg/95 backdrop-blur"
-        style={{ backdropFilter: 'blur(8px)' }}
+        style={{ backdropFilter: "blur(8px)" }}
       >
         <div>
           <motion.h1
@@ -739,7 +323,9 @@ export default function CrawlersPage() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="flex items-center gap-2 mt-1"
           >
-            <span className="text-text-muted">Download images and videos from websites</span>
+            <span className="text-text-muted">
+              Download images and videos from websites
+            </span>
           </motion.div>
         </div>
 
@@ -749,7 +335,7 @@ export default function CrawlersPage() {
             <Button
               variant="secondary"
               leftIcon={<DocumentTextIcon className="w-5 h-5" />}
-              onClick={() => window.location.href = '/'}
+              onClick={() => (window.location.href = "/")}
             >
               Renders
             </Button>
@@ -759,7 +345,7 @@ export default function CrawlersPage() {
             <Button
               variant="secondary"
               leftIcon={<DocumentTextIcon className="w-5 h-5" />}
-              onClick={() => window.location.href = '/assets'}
+              onClick={() => (window.location.href = "/assets")}
             >
               Assets
             </Button>
@@ -778,102 +364,16 @@ export default function CrawlersPage() {
       </motion.div>
 
       {/* Stats Overview */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <GlobeAltIcon className="w-6 h-6 text-info" />
-              <h3 className="text-lg font-medium text-text-muted">Total Jobs</h3>
-            </div>
-            <p className="text-3xl font-bold text-info">{stats.totalJobs}</p>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <PlayIcon className="w-6 h-6 text-warning" />
-              <h3 className="text-lg font-medium text-text-muted">Active Jobs</h3>
-            </div>
-            <p className="text-3xl font-bold text-warning">{stats.activeJobs}</p>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircleIcon className="w-6 h-6 text-success" />
-              <h3 className="text-lg font-medium text-text-muted">Completed</h3>
-            </div>
-            <p className="text-3xl font-bold text-success">{stats.completedJobs}</p>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <ArrowUpTrayIcon className="w-6 h-6 text-accent" />
-              <h3 className="text-lg font-medium text-text-muted">Downloaded</h3>
-            </div>
-            <p className="text-3xl font-bold text-accent">{stats.totalDownloaded}</p>
-          </Card>
-        </div>
-      </motion.div>
+      <CrawlerStatsCards stats={stats} />
 
       {/* Status Counts Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div className="flex flex-col lg:flex-row gap-4">
-          {Object.entries(statusGroups).map(([groupKey, group]) => (
-            <Card key={groupKey} className="flex-1 p-3 mb-4 lg:mb-0">
-              <div className="flex items-center gap-2 mb-2">
-                <group.icon className="w-6 h-6 text-accent" />
-                <h3 className="text-2xl font-bold text-text-muted flex items-center">
-                  {group.title}
-                  {loadingCounts && (
-                    <svg className="animate-spin ml-2 h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                    </svg>
-                  )}
-                </h3>
-                {selectedStatus && (
-                  <button
-                    onClick={() => setSelectedStatus(null)}
-                    className="ml-4 px-2 py-1 text-xs bg-surface-raised hover:bg-surface-sunken rounded text-text-muted"
-                  >
-                    Clear Status Filter
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                {group.statuses.map((status) => {
-                  const Icon = getStatusIcon(status);
-                  const count = statusCounts[status] || 0;
-                  return (
-                    <motion.button
-                      key={status}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleStatusClick(status)}
-                      className={`flex items-center justify-between p-2 rounded-lg text-lg font-medium transition-all ${
-                        statusClass(status)
-                      } ${selectedStatus === status ? 'ring-2 ring-accent-ring' : ''}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Icon className="w-5 h-5" />
-                        <span>{status.replace(/_/g, ' ')}</span>
-                      </div>
-                      <span className="text-2xl font-extrabold">{count}</span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </Card>
-          ))}
-        </div>
-      </motion.div>
+      <CrawlerStatusBar
+        statusCounts={statusCounts}
+        loadingCounts={loadingCounts}
+        selectedStatus={selectedStatus}
+        onStatusClick={handleStatusClick}
+        onClearStatus={() => setSelectedStatus(null)}
+      />
 
       {/* Action Bar */}
       <motion.div
@@ -898,8 +398,13 @@ export default function CrawlersPage() {
             variant="secondary"
             size="sm"
             onClick={() => {
-              console.log('Current jobs state:', jobs);
-              console.log('Active jobs:', jobs.filter(job => ['pending', 'crawling', 'downloading'].includes(job.status)));
+              logger.debug("Current jobs state:", jobs);
+              logger.debug(
+                "Active jobs:",
+                jobs.filter((job) =>
+                  ["pending", "crawling", "downloading"].includes(job.status),
+                ),
+              );
             }}
           >
             Debug Jobs
@@ -911,10 +416,18 @@ export default function CrawlersPage() {
             <Button variant="danger" size="sm" onClick={handleDeleteSelected}>
               Delete ({selectedItems.length})
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => handleActionClick('pause')}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleActionClick("pause")}
+            >
               Pause ({selectedItems.length})
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => handleActionClick('resume')}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleActionClick("resume")}
+            >
               Resume ({selectedItems.length})
             </Button>
           </div>
@@ -943,7 +456,9 @@ export default function CrawlersPage() {
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              showFilters ? "bg-accent text-accent-fg hover:bg-accent-hover" : "bg-surface hover:bg-surface-raised text-text"
+              showFilters
+                ? "bg-accent text-accent-fg hover:bg-accent-hover"
+                : "bg-surface hover:bg-surface-raised text-text"
             }`}
           >
             <FunnelIcon className="w-5 h-5" />
@@ -958,377 +473,51 @@ export default function CrawlersPage() {
 
         {/* Sorting buttons */}
         <div className="flex gap-2">
-          <button
-            onClick={() => handleSort("createdAt")}
-            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-              sortBy === "createdAt"
-                ? "bg-accent text-accent-fg hover:bg-accent-hover"
-                : "bg-surface text-text-muted hover:bg-surface-raised"
-            }`}
-          >
-            Date
-            {sortBy === "createdAt" && (
-              <span className="ml-1">
-                {sortOrder === "asc" ? "↑" : "↓"}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => handleSort("name")}
-            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-              sortBy === "name"
-                ? "bg-accent text-accent-fg hover:bg-accent-hover"
-                : "bg-surface text-text-muted hover:bg-surface-raised"
-            }`}
-          >
-            Name
-            {sortBy === "name" && (
-              <span className="ml-1">
-                {sortOrder === "asc" ? "↑" : "↓"}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => handleSort("type")}
-            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-              sortBy === "type"
-                ? "bg-accent text-accent-fg hover:bg-accent-hover"
-                : "bg-surface text-text-muted hover:bg-surface-raised"
-            }`}
-          >
-            Type
-            {sortBy === "type" && (
-              <span className="ml-1">
-                {sortOrder === "asc" ? "↑" : "↓"}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => handleSort("status")}
-            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-              sortBy === "status"
-                ? "bg-accent text-accent-fg hover:bg-accent-hover"
-                : "bg-surface text-text-muted hover:bg-surface-raised"
-            }`}
-          >
-            Status
-            {sortBy === "status" && (
-              <span className="ml-1">
-                {sortOrder === "asc" ? "↑" : "↓"}
-              </span>
-            )}
-          </button>
+          {sortButtons.map(({ field, label }) => (
+            <button
+              key={field}
+              onClick={() => handleSort(field)}
+              className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                sortBy === field
+                  ? "bg-accent text-accent-fg hover:bg-accent-hover"
+                  : "bg-surface text-text-muted hover:bg-surface-raised"
+              }`}
+            >
+              {label}
+              {sortBy === field && (
+                <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
+              )}
+            </button>
+          ))}
         </div>
 
-        <AnimatePresence>
-          {showFilters && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="bg-surface border border-border rounded-lg p-4 space-y-4"
-            >
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium text-text">Filters</h3>
-                <button
-                  onClick={clearFilters}
-                  className="text-text-muted hover:text-text"
-                >
-                  Clear All
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Type Filter */}
-                <div>
-                  <Label className="mb-2">Type</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {types.map((type) => (
-                      <button
-                        key={type}
-                        onClick={() => setSelectedType(selectedType === type ? null : type)}
-                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                          selectedType === type
-                            ? "bg-accent text-accent-fg hover:bg-accent-hover"
-                            : "bg-surface-raised text-text-muted hover:bg-surface-sunken"
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Topic Filter */}
-                <div>
-                  <Label className="mb-2">Topic</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {topics.map((topic) => (
-                      <button
-                        key={topic}
-                        onClick={() => setSelectedTopic(selectedTopic === topic ? null : topic)}
-                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                          selectedTopic === topic
-                            ? "bg-accent text-accent-fg hover:bg-accent-hover"
-                            : "bg-surface-raised text-text-muted hover:bg-surface-sunken"
-                        }`}
-                      >
-                        {topic}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Channel Filter */}
-                <div>
-                  <Label className="mb-2">Channel</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {channels.map((channel) => (
-                      <button
-                        key={channel}
-                        onClick={() => setSelectedChannel(selectedChannel === channel ? null : channel)}
-                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                          selectedChannel === channel
-                            ? "bg-accent text-accent-fg hover:bg-accent-hover"
-                            : "bg-surface-raised text-text-muted hover:bg-surface-sunken"
-                        }`}
-                      >
-                        {channel}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Site Filter */}
-                <div>
-                  <Label className="mb-2">Site</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {sites.map((site) => (
-                      <button
-                        key={site}
-                        onClick={() => setSelectedSite(selectedSite === site ? null : site)}
-                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                          selectedSite === site
-                            ? "bg-accent text-accent-fg hover:bg-accent-hover"
-                            : "bg-surface-raised text-text-muted hover:bg-surface-sunken"
-                        }`}
-                      >
-                        {site}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <CrawlerFilters
+          show={showFilters}
+          selectedType={selectedType}
+          selectedTopic={selectedTopic}
+          selectedChannel={selectedChannel}
+          selectedSite={selectedSite}
+          onSelectType={setSelectedType}
+          onSelectTopic={setSelectedTopic}
+          onSelectChannel={setSelectedChannel}
+          onSelectSite={setSelectedSite}
+          onClearAll={clearFilters}
+        />
       </motion.div>
 
       {/* Jobs Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-surface border border-border rounded-xl overflow-hidden shadow-card"
-      >
-        <div className="p-4 border-b border-border">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-text">Crawler Jobs</h2>
-            <div className="flex gap-2">
-              <Button variant="secondary" size="sm" onClick={handleSelectAll}>
-                Select All
-              </Button>
-              <Button variant="secondary" size="sm" onClick={handleDeselectAll}>
-                Deselect All
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto"></div>
-            <p className="mt-2 text-text-muted">Loading crawler jobs...</p>
-          </div>
-        ) : error ? (
-          <div className="p-8 text-center">
-            <p className="text-danger">{error}</p>
-          </div>
-        ) : jobs.length === 0 ? (
-          <div className="p-8 text-center">
-            <GlobeAltIcon className="w-12 h-12 text-text-faint mx-auto mb-4" />
-            <p className="text-text-muted">No crawler jobs found</p>
-            <Button
-              variant="primary"
-              className="mt-4"
-              onClick={() => setIsCreateDialogOpen(true)}
-            >
-              Create Your First Crawler
-            </Button>
-          </div>
-        ) : (
-          <Table>
-              <THead>
-                <tr>
-                  <TH>
-                    <input
-                      type="checkbox"
-                      checked={selectedItems.length === jobs.length && jobs.length > 0}
-                      onChange={(e) => e.target.checked ? handleSelectAll() : handleDeselectAll()}
-                      className="rounded border-border bg-surface-sunken accent-accent"
-                    />
-                  </TH>
-                  <TH>Name</TH>
-                  <TH>Keyword</TH>
-                  <TH>Site</TH>
-                  <TH>Type</TH>
-                  <TH>Status</TH>
-                  <TH>Progress</TH>
-                  <TH>Channel</TH>
-                  <TH>Topic</TH>
-                  <TH>Created</TH>
-                  <TH>Actions</TH>
-                </tr>
-              </THead>
-              <TBody>
-                {jobs.map((job) => {
-                  const StatusIcon = getStatusIcon(job.status);
-                  const isSelected = selectedItems.includes(job.id);
-                  
-                  return (
-                    <motion.tr
-                      key={job.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className={`border-b border-border hover:bg-surface-raised/50 transition-colors ${
-                        isSelected ? 'bg-accent-muted' : ''
-                      } cursor-pointer`}
-                      onClick={(e) => handleItemSelect(job.id, e)}
-                    >
-                      <TD onClick={e => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => handleCheckboxChange(job.id, e.target.checked, e)}
-                          className="rounded border-border bg-surface-sunken accent-accent"
-                        />
-                      </TD>
-                      <TD>
-                        <div className="flex items-center gap-2">
-                          {job.type === 'image' ? (
-                            <PhotoIcon className="w-5 h-5 text-info" />
-                          ) : (
-                            <VideoCameraIcon className="w-5 h-5 text-danger" />
-                          )}
-                          <span className="font-medium">{job.name}</span>
-                        </div>
-                      </TD>
-                      <TD className="text-text-muted">{job.keyword}</TD>
-                      <TD className="text-text-muted">{job.site}</TD>
-                      <TD>
-                        <Badge
-                          tone={job.type === 'image' ? 'info' : job.type === 'video' ? 'danger' : 'neutral'}
-                          className="text-xs"
-                        >
-                          {job.type === 'image' ? 'Image' : job.type === 'video' ? 'Video' : 'Unknown'}
-                        </Badge>
-                      </TD>
-                      <TD>
-                        <div className="flex items-center gap-2">
-                          <StatusIcon className={`w-4 h-4 ${isActiveStatus(job.status) ? 'animate-pulse' : ''}`} />
-                          <Badge
-                            status={job.status}
-                            className={`text-xs ${isActiveStatus(job.status) ? 'animate-pulse' : ''}`}
-                          >
-                            {job.status}
-                          </Badge>
-                        </div>
-                      </TD>
-                      <TD>
-                        <div className="flex items-center gap-2">
-                          <div className="w-20 bg-surface-sunken rounded-full h-2">
-                            <div
-                              className={`${getProgressBarColor(job.status)} h-2 rounded-full transition-all duration-300`}
-                              style={{ width: `${job.progress}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-sm text-text-muted">
-                            {job.downloadedItems}/{job.totalItems}
-                          </span>
-                        </div>
-                      </TD>
-                      <TD className="text-text-muted">{job.channel}</TD>
-                      <TD className="text-text-muted">{job.topic}</TD>
-                      <TD className="text-text-muted">{formatDate(job.createdAt)}</TD>
-                      <TD>
-                        <div className="flex gap-2">
-                          {/* No longer needed as SSE handles updates */}
-                          {job.status === 'pending' && (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleActionClick('start', job.id);
-                              }}
-                            >
-                              Start
-                            </Button>
-                          )}
-                          {(job.status === 'crawling' || job.status === 'downloading') && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleActionClick('pause', job.id);
-                              }}
-                            >
-                              Pause
-                            </Button>
-                          )}
-                          {job.status === 'paused' && (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleActionClick('resume', job.id);
-                              }}
-                            >
-                              Resume
-                            </Button>
-                          )}
-                          {job.status === 'failed' && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleActionClick('start', job.id);
-                              }}
-                            >
-                              Retry
-                            </Button>
-                          )}
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleActionClick('delete', job.id);
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </TD>
-                    </motion.tr>
-                  );
-                })}
-              </TBody>
-            </Table>
-        )}
-      </motion.div>
+      <CrawlerJobsTable
+        jobs={jobs}
+        loading={loading}
+        error={error}
+        selectedItems={selectedItems}
+        onSelectAll={handleSelectAll}
+        onDeselectAll={handleDeselectAll}
+        onItemSelect={handleItemSelect}
+        onCheckboxChange={handleCheckboxChange}
+        onActionClick={handleActionClick}
+        onCreateClick={() => setIsCreateDialogOpen(true)}
+      />
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -1367,4 +556,4 @@ export default function CrawlersPage() {
       />
     </div>
   );
-} 
+}
