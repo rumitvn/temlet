@@ -1,6 +1,6 @@
 {
   "name": "temlet",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Self-hosted video rendering and upload management for After Effects projects — render with nexrender, auto-generate metadata, and schedule uploads to YouTube and TikTok.",
   "type": "module",
   "license": "MIT",
