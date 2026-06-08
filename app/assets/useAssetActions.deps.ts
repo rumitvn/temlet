@@ -63,3 +63,12 @@ export interface AssetActionsDeps {
   setUploadingStates: Dispatch<SetStateAction<BoolMap>>;
   setVoiceGeneratingStates: Dispatch<SetStateAction<BoolMap>>;
 }
+
+/**
+ * Context passed to the per-domain handler factories. Extends the page-owned
+ * deps with the hook-owned state the factories need.
+ */
+export interface AssetActionsCtx extends AssetActionsDeps {
+  imageGeneratingStates: BoolMap;
+  setImageGeneratingStates: Dispatch<SetStateAction<BoolMap>>;
+}
