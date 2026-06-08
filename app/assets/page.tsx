@@ -54,6 +54,9 @@ import JSONPreview from "./components/JSONPreview";
 import AssetGroupCard from "./components/AssetGroupCard";
 import AIGeneratorDialog from "./components/AIGeneratorDialog";
 import UploadAssetsDialog from "./components/UploadAssetsDialog";
+import AssetOverviewBar from "./components/AssetOverviewBar";
+import AssetSearchFilters from "./components/AssetSearchFilters";
+import AssetPreviewModal from "./components/AssetPreviewModal";
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetGroups, setAssetGroups] = useState<AssetGroup[]>([]);
@@ -509,28 +512,6 @@ export default function AssetsPage() {
   }, [assetGroups]);
 
   // Filter options
-  const channelOptions = [
-    { value: "minimate", label: "MiniMate" },
-    { value: "rumitx_studio", label: "RumitX Studio" },
-    { value: "rumitx_shorts", label: "RumitX Shorts" },
-    { value: "rumitx_nature", label: "RumitX Nature" },
-    { value: "rumitx_science", label: "RumitX Science" },
-    { value: "rumitx_history", label: "RumitX History" }
-  ];
-
-  const topicOptions = [
-    { value: "animals", label: "Animals" },
-    { value: "plants", label: "Plants" },
-    { value: "histories", label: "Histories" },
-    { value: "science", label: "Science" },
-    { value: "technology", label: "Technology" },
-    { value: "nature", label: "Nature" },
-    { value: "space", label: "Space" },
-    { value: "ocean", label: "Ocean" },
-    { value: "weather", label: "Weather" },
-    { value: "geography", label: "Geography" }
-  ];
-
   // AI Generator state
   const [aiContent, setAiContent] = useState<SK3QLRContent>({
     id: "",
@@ -2984,296 +2965,28 @@ export default function AssetsPage() {
       </motion.div>
 
       {/* Overview Status Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6 p-4 bg-surface rounded-lg border border-border"
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-accent">📊 Overview Status</h2>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-text-muted">Overall Completion:</span>
-            <span className={`text-lg font-bold ${calculateOverviewStatus.completionRate >= 75 ? 'text-success' : calculateOverviewStatus.completionRate >= 50 ? 'text-warning' : 'text-danger'}`}>
-              {calculateOverviewStatus.completionRate}%
-            </span>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3">
-          {/* Total Groups */}
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'all'
-                ? 'bg-accent border-accent text-accent-fg'
-                : 'bg-surface-raised border-border text-text-muted hover:bg-surface'
-            }`}
-          >
-            <div className="text-center">
-              <div className="text-2xl mb-1">📁</div>
-              <div className="text-sm font-medium">Total Groups</div>
-              <div className="text-lg font-bold">{calculateOverviewStatus.totalGroups}</div>
-            </div>
-          </button>
-
-          {/* Complete Groups */}
-          <button
-            onClick={() => setStatusFilter(statusFilter === 'complete' ? 'all' : 'complete')}
-            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'complete'
-                ? 'bg-success border-4 ring-2 ring-success text-white shadow-lg'
-                : calculateOverviewStatus.completeGroups > 0
-                ? 'bg-success-bg border border-success text-success hover:bg-surface'
-                : 'bg-surface-raised border border-border text-text-muted'
-            }`}
-          >
-            <div className="text-center">
-              <div className="text-2xl mb-1">✅</div>
-              <div className="text-sm font-medium">Complete</div>
-              <div className="text-lg font-bold">{calculateOverviewStatus.completeGroups}</div>
-            </div>
-          </button>
-
-          {/* Missing JSON */}
-          <button
-            onClick={() => setStatusFilter(statusFilter === 'missing-json' ? 'all' : 'missing-json')}
-            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'missing-json' 
-                ? 'bg-danger border-4 ring-2 ring-danger text-white shadow-lg'
-                : calculateOverviewStatus.missingJson > 0
-                ? 'bg-danger-bg border border-danger text-danger hover:bg-surface'
-                : 'bg-surface-raised border border-border text-text-muted'
-            }`}
-          >
-            <div className="text-center">
-              <div className="text-2xl mb-1">📄</div>
-              <div className="text-sm font-medium">Missing JSON</div>
-              <div className="text-lg font-bold">{calculateOverviewStatus.missingJson}</div>
-            </div>
-          </button>
-
-          {/* Missing Image */}
-          <button
-            onClick={() => setStatusFilter(statusFilter === 'missing-image' ? 'all' : 'missing-image')}
-            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'missing-image' 
-                ? 'bg-danger border-4 ring-2 ring-danger text-white shadow-lg'
-                : calculateOverviewStatus.missingImage > 0
-                ? 'bg-danger-bg border border-danger text-danger hover:bg-surface'
-                : 'bg-surface-raised border border-border text-text-muted'
-            }`}
-          >
-            <div className="text-center">
-              <div className="text-2xl mb-1">🖼️</div>
-              <div className="text-sm font-medium">Missing Image</div>
-              <div className="text-lg font-bold">{calculateOverviewStatus.missingImage}</div>
-            </div>
-          </button>
-
-          {/* Missing Videos */}
-          <button
-            onClick={() => setStatusFilter(statusFilter === 'missing-videos' ? 'all' : 'missing-videos')}
-            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'missing-videos' 
-                ? 'bg-danger border-4 ring-2 ring-danger text-white shadow-lg'
-                : calculateOverviewStatus.missingVideos > 0
-                ? 'bg-danger-bg border border-danger text-danger hover:bg-surface'
-                : 'bg-surface-raised border border-border text-text-muted'
-            }`}
-          >
-            <div className="text-center">
-              <div className="text-2xl mb-1">🎥</div>
-              <div className="text-sm font-medium">Missing Videos</div>
-              <div className="text-lg font-bold">{calculateOverviewStatus.missingVideos}</div>
-            </div>
-          </button>
-
-          {/* Missing Voices */}
-          <button
-            onClick={() => setStatusFilter(statusFilter === 'missing-voices' ? 'all' : 'missing-voices')}
-            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'missing-voices'
-                ? 'bg-warning border-4 ring-2 ring-warning text-white shadow-lg'
-                : calculateOverviewStatus.missingVoices > 0
-                ? 'bg-warning-bg border border-warning text-warning hover:bg-surface'
-                : 'bg-surface-raised border border-border text-text-muted'
-            }`}
-          >
-            <div className="text-center">
-              <div className="text-2xl mb-1">🎵</div>
-              <div className="text-sm font-medium">Missing Voices</div>
-              <div className="text-lg font-bold">{calculateOverviewStatus.missingVoices}</div>
-            </div>
-          </button>
-
-          {/* Missing Rewards */}
-          <button
-            onClick={() => setStatusFilter(statusFilter === 'missing-rewards' ? 'all' : 'missing-rewards')}
-            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'missing-rewards'
-                ? 'bg-warning border-4 ring-2 ring-warning text-white shadow-lg'
-                : calculateOverviewStatus.missingRewards > 0
-                ? 'bg-warning-bg border border-warning text-warning hover:bg-surface'
-                : 'bg-surface-raised border border-border text-text-muted'
-            }`}
-          >
-            <div className="text-center">
-              <div className="text-2xl mb-1">🏆</div>
-              <div className="text-sm font-medium">Missing Rewards</div>
-              <div className="text-lg font-bold">{calculateOverviewStatus.missingRewards}</div>
-            </div>
-          </button>
-
-          {/* Missing Quiz 3 Images */}
-          <button
-            onClick={() => setStatusFilter(statusFilter === 'missing-quiz3-images' ? 'all' : 'missing-quiz3-images')}
-            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'missing-quiz3-images'
-                ? 'bg-info border-4 ring-2 ring-info text-white shadow-lg'
-                : calculateOverviewStatus.missingQuiz3Images > 0
-                ? 'bg-info-bg border border-info text-info hover:bg-surface'
-                : 'bg-surface-raised border border-border text-text-muted'
-            }`}
-          >
-            <div className="text-center">
-              <div className="text-2xl mb-1">🖼️</div>
-              <div className="text-sm font-medium">Missing Quiz 3 Images</div>
-              <div className="text-lg font-bold">{calculateOverviewStatus.missingQuiz3Images}</div>
-            </div>
-          </button>
-
-          {/* Incomplete Groups */}
-          <button
-            onClick={() => setStatusFilter(statusFilter === 'incomplete' ? 'all' : 'incomplete')}
-            className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-              statusFilter === 'incomplete'
-                ? 'bg-danger border-4 ring-2 ring-danger text-white shadow-lg'
-                : calculateOverviewStatus.incompleteGroups > 0
-                ? 'bg-danger-bg border border-danger text-danger hover:bg-surface'
-                : 'bg-surface-raised border border-border text-text-muted'
-            }`}
-          >
-            <div className="text-center">
-              <div className="text-2xl mb-1">⚠️</div>
-              <div className="text-sm font-medium">Incomplete</div>
-              <div className="text-lg font-bold">{calculateOverviewStatus.incompleteGroups}</div>
-            </div>
-          </button>
-        </div>
-
-
-      </motion.div>
+      <AssetOverviewBar
+        calculateOverviewStatus={calculateOverviewStatus}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+      />
 
       {/* Search and Filters */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-4 mb-6"
-      >
-        {/* Search Bar */}
-        <div className="flex gap-4">
-          <div className="flex-1 relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search assets..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-surface rounded-lg border border-border focus:border-accent focus:outline-none"
-            />
-          </div>
-          
-          <div className="flex gap-2">
-            {selectedAssets.length > 0 && (
-              <>
-                <button
-                  onClick={handleDeleteSelected}
-                  className="px-4 py-2 bg-danger text-white hover:opacity-90 rounded-lg transition-colors"
-                >
-                  Delete ({selectedAssets.length})
-                </button>
-                <button
-                  onClick={handleDeselectAll}
-                  className="px-4 py-2 bg-surface-raised hover:bg-surface rounded-lg transition-colors"
-                >
-                  Deselect All
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Filter Bar */}
-        <div className="flex gap-4 items-center">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-text-muted">Channel:</span>
-            <select
-              value={selectedChannel}
-              onChange={(e) => setSelectedChannel(e.target.value)}
-              className="bg-surface text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none text-sm"
-            >
-              {channelOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-text-muted">Topic:</span>
-            <select
-              value={selectedTopic}
-              onChange={(e) => setSelectedTopic(e.target.value)}
-              className="bg-surface text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none text-sm"
-            >
-              {topicOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-text-muted">Sort by:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'name' | 'createDate')}
-              className="bg-surface text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none text-sm"
-            >
-              <option value="createDate">Creation Date</option>
-              <option value="name">Name</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-text-muted">Order:</span>
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-              className="bg-surface text-text rounded-lg px-3 py-2 border border-border focus:border-accent focus:outline-none text-sm"
-            >
-              <option value="asc">Ascending</option>
-              <option value="desc">Descending</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2 text-sm text-text-muted">
-            <span>📁</span>
-            <span>{selectedChannel}/{selectedTopic}</span>
-          </div>
-
-          {/* Sort indicator */}
-          <div className="flex items-center gap-2 text-sm text-accent bg-accent-muted bg-opacity-20 px-3 py-1 rounded-lg">
-            <span>🔄</span>
-            <span>
-              {sortBy === 'createDate' ? 'Date' : 'Name'} 
-              ({sortOrder === 'asc' ? 'A→Z' : 'Z→A'})
-            </span>
-          </div>
-        </div>
-      </motion.div>
+      <AssetSearchFilters
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
+        selectedChannel={selectedChannel}
+        setSelectedChannel={setSelectedChannel}
+        selectedTopic={selectedTopic}
+        setSelectedTopic={setSelectedTopic}
+        selectedAssets={selectedAssets}
+        handleDeleteSelected={handleDeleteSelected}
+        handleDeselectAll={handleDeselectAll}
+      />
 
       {/* Assets Display */}
       <motion.div layout className="space-y-6">
@@ -3423,94 +3136,12 @@ export default function AssetsPage() {
       {/* Asset Preview Modal */}
       <AnimatePresence>
         {showPreview && previewAsset && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-            onClick={handleClosePreview}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-surface rounded-lg p-6 w-full max-w-6xl max-h-[95vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-text">{previewAsset.name}</h3>
-                  <p className="text-sm text-text-muted">
-                    {previewAsset.type.toUpperCase()} • {formatFileSize(previewAsset.size || 0)}
-                  </p>
-                </div>
-                <button
-                  onClick={handleClosePreview}
-                  className="text-text-muted hover:text-text"
-                >
-                  <XCircleIcon className="w-6 h-6" />
-                </button>
-              </div>
-              
-              <div className="mb-4">
-                {getAssetPreviewContent(previewAsset)}
-              </div>
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    // Download functionality
-                    const link = document.createElement('a');
-                    link.href = `/api/assets/preview?path=${encodeURIComponent(previewAsset.path)}`;
-                    link.download = previewAsset.name;
-                    link.click();
-                  }}
-                  className="px-4 py-2 bg-info text-white hover:opacity-90 rounded transition-colors"
-                >
-                  Download
-                </button>
-                <button
-                  onClick={async () => {
-                    if (confirm(`Are you sure you want to delete "${previewAsset.name}"?`)) {
-                      try {
-                        const response = await fetch('/api/assets', {
-                          method: 'DELETE',
-                          headers: {
-                            'Content-Type': 'application/json',
-                          },
-                          body: JSON.stringify({ 
-                            assetIds: [previewAsset.id],
-                            paths: [previewAsset.path]
-                          }),
-                        });
-
-                        if (!response.ok) {
-                          throw new Error('Failed to delete asset');
-                        }
-
-                        // Close the preview and refresh assets
-                        handleClosePreview();
-                        fetchAssets();
-                        alert('Asset deleted successfully!');
-                      } catch (error) {
-                        logger.error('Error deleting asset:', error);
-                        alert('Failed to delete asset. Please try again.');
-                      }
-                    }
-                  }}
-                  className="px-4 py-2 bg-danger text-white hover:opacity-90 rounded transition-colors"
-                >
-                  Delete
-                </button>
-                <button
-                  onClick={handleClosePreview}
-                  className="px-4 py-2 bg-surface-raised hover:bg-surface rounded transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <AssetPreviewModal
+            previewAsset={previewAsset}
+            handleClosePreview={handleClosePreview}
+            getAssetPreviewContent={getAssetPreviewContent}
+            fetchAssets={fetchAssets}
+          />
         )}
       </AnimatePresence>
 
