@@ -1,96 +1,42 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  PlusIcon, 
-  MagnifyingGlassIcon, 
-  FunnelIcon,
-  ChevronUpIcon,
-  ChevronDownIcon
-} from "@heroicons/react/24/outline";
-import { 
-  ClockIcon,
-  ArrowPathIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  DocumentTextIcon,
-  ArrowUpTrayIcon,
-  ShieldCheckIcon,
-  GlobeAltIcon
-} from "@heroicons/react/24/solid";
-import CreateRenderDialog from './components/CreateRenderDialog';
-import { RenderStatus, RenderItem, TemplateAeRenderFormat } from './types/render';
-import RenderDetailsDialog from './components/RenderDetailsDialog';
-import MetadataDetailsDialog from './components/MetadataDetailsDialog';
-import TikTokAuthDialog from './components/TikTokAuthDialog';
-import ScheduleUploadDialog, { ScheduleConfig } from './components/ScheduleUploadDialog';
-import { Button, Card, Input, Select, Badge } from "@/app/components/ui";
-import { statusClass } from "@/app/theme/status";
-import { types as filterTypes, topics as filterTopics, channels as filterChannels } from "@/app/data/filters";
-import { YOUTUBE_CATEGORY_ID } from "@/app/lib/constants";
-
-// Custom debounce hook
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
+import { motion } from "framer-motion";
+import CreateRenderDialog from "./components/CreateRenderDialog";
+import {
+  RenderStatus,
+  RenderItem,
+  TemplateAeRenderFormat,
+} from "./types/render";
+import RenderDetailsDialog from "./components/RenderDetailsDialog";
+import MetadataDetailsDialog from "./components/MetadataDetailsDialog";
+import TikTokAuthDialog from "./components/TikTokAuthDialog";
+import ScheduleUploadDialog from "./components/ScheduleUploadDialog";
+import { Button } from "@/app/components/ui";
+import { logger } from "@/app/lib/logger";
+import { useDebounce } from "@/app/hooks/useDebounce";
+import {
+  types as filterTypes,
+  topics as filterTopics,
+  channels as filterChannels,
+} from "@/app/data/filters";
+import { useRenderActions } from "./renders/useRenderActions";
+import RenderHeader from "./renders/components/RenderHeader";
+import RenderStatusBar from "./renders/components/RenderStatusBar";
+import RenderFilterBar from "./renders/components/RenderFilterBar";
+import RenderCard from "./renders/components/RenderCard";
+import RenderPagination from "./renders/components/RenderPagination";
+import RenderSelectionToolbar from "./renders/components/RenderSelectionToolbar";
 
 // Filter option lists (single source of truth: app/data/filters.ts)
 const types = [...filterTypes];
 const topics = [...filterTopics];
 const channels = [...filterChannels];
 
-const statusGroups = {
-  render: {
-    title: "Render",
-    icon: DocumentTextIcon,
-    statuses: ['new', 'pending_render', 'rendering', 'rendered'] as RenderStatus[]
-  },
-  metadata: {
-    title: "Metadata",
-    icon: ArrowPathIcon,
-    statuses: ['pending_metadata', 'processing_metadata', 'processed_metadata'] as RenderStatus[]
-  },
-  upload: {
-    title: "Upload",
-    icon: ArrowUpTrayIcon,
-    statuses: ['pending_upload', 'processing_upload', 'uploaded'] as RenderStatus[]
-  },
-  owner: {
-    title: "Owner",
-    icon: ShieldCheckIcon,
-    statuses: ['declined', 'approved'] as RenderStatus[]
-  }
-};
-
-const getStatusIcon = (status: RenderStatus) => {
-  if (status.includes('pending')) return ClockIcon;
-  if (status.includes('ing')) return ArrowPathIcon;
-  if (status.includes('ed')) return CheckCircleIcon;
-  if (status === 'declined') return XCircleIcon;
-  if (status === 'approved') return CheckCircleIcon;
-  return ClockIcon;
-};
-
-// Add this at the top-level of the file, outside the Page component
-const renderStatusMap = new Map<string, RenderStatus>();
-
 export default function Page() {
   const [items, setItems] = useState<RenderItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -103,22 +49,35 @@ export default function Page() {
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [templates, setTemplates] = useState<{ id: string; path: string }[]>([]);
-  const [outputFolders, setOutputFolders] = useState<{ id: string; path: string }[]>([]);
-  const [renderFormats, setRenderFormats] = useState<TemplateAeRenderFormat[]>([]);
+  const [templates, setTemplates] = useState<{ id: string; path: string }[]>(
+    [],
+  );
+  const [outputFolders, setOutputFolders] = useState<
+    { id: string; path: string }[]
+  >([]);
+  const [renderFormats, setRenderFormats] = useState<TemplateAeRenderFormat[]>(
+    [],
+  );
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const [statusCounts, setStatusCounts] = useState<Partial<Record<RenderStatus, number>>>({});
+  const [statusCounts, setStatusCounts] = useState<
+    Partial<Record<RenderStatus, number>>
+  >({});
   const [loadingCounts, setLoadingCounts] = useState(true);
-  const [selectedRenderItem, setSelectedRenderItem] = useState<RenderItem | null>(null);
+  const [selectedRenderItem, setSelectedRenderItem] =
+    useState<RenderItem | null>(null);
   const [showRenderDetails, setShowRenderDetails] = useState(false);
   const [showMetadataDetails, setShowMetadataDetails] = useState(false);
   const [showTikTokAuth, setShowTikTokAuth] = useState(false);
   const [tiktokConnected, setTiktokConnected] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [pendingUploadItems, setPendingUploadItems] = useState<RenderItem[]>([]);
-  const [pendingUploadType, setPendingUploadType] = useState<'youtube' | 'tiktok'>('youtube');
-  const [createdItemsForScheduling, setCreatedItemsForScheduling] = useState<RenderItem[]>([]);
+  const [pendingUploadType, setPendingUploadType] = useState<
+    "youtube" | "tiktok"
+  >("youtube");
+  const [createdItemsForScheduling, setCreatedItemsForScheduling] = useState<
+    RenderItem[]
+  >([]);
   const [isCreatingMultipleItems, setIsCreatingMultipleItems] = useState(false);
 
   // Track items that just changed status in the last poll
@@ -144,14 +103,14 @@ export default function Page() {
   const fetchStatusCounts = useCallback(async () => {
     try {
       setLoadingCounts(true);
-      const response = await fetch('/api/renders/status-counts');
+      const response = await fetch("/api/renders/status-counts");
       if (!response.ok) {
-        throw new Error('Failed to fetch status counts');
+        throw new Error("Failed to fetch status counts");
       }
       const data = await response.json();
       setStatusCounts(data);
     } catch (error) {
-      console.error('Error fetching status counts:', error);
+      logger.error("Error fetching status counts:", error);
     } finally {
       setLoadingCounts(false);
     }
@@ -159,34 +118,34 @@ export default function Page() {
 
   const fetchTemplates = useCallback(async () => {
     try {
-      const response = await fetch('/api/templates');
-      if (!response.ok) throw new Error('Failed to fetch templates');
+      const response = await fetch("/api/templates");
+      if (!response.ok) throw new Error("Failed to fetch templates");
       const data = await response.json();
       setTemplates(data);
     } catch (error) {
-      console.error('Error fetching templates:', error);
+      logger.error("Error fetching templates:", error);
     }
   }, []);
 
   const fetchOutputFolders = useCallback(async () => {
     try {
-      const response = await fetch('/api/output-folders');
-      if (!response.ok) throw new Error('Failed to fetch output folders');
+      const response = await fetch("/api/output-folders");
+      if (!response.ok) throw new Error("Failed to fetch output folders");
       const data = await response.json();
       setOutputFolders(data);
     } catch (error) {
-      console.error('Error fetching output folders:', error);
+      logger.error("Error fetching output folders:", error);
     }
   }, []);
 
   const fetchRenderFormats = useCallback(async () => {
     try {
-      const response = await fetch('/api/render-formats');
-      if (!response.ok) throw new Error('Failed to fetch render formats');
+      const response = await fetch("/api/render-formats");
+      if (!response.ok) throw new Error("Failed to fetch render formats");
       const data = await response.json();
       setRenderFormats(data);
     } catch (error) {
-      console.error('Error fetching render formats:', error);
+      logger.error("Error fetching render formats:", error);
     }
   }, []);
 
@@ -197,7 +156,7 @@ export default function Page() {
         page: currentPage.toString(),
         sortBy,
         sortOrder,
-        limit: itemsPerPage.toString()
+        limit: itemsPerPage.toString(),
       });
 
       // If we have a search query, use the search endpoint
@@ -228,31 +187,66 @@ export default function Page() {
       setItems(data.items);
       setTotalPages(data.totalPages);
     } catch (error) {
-      console.error("Error fetching items:", error);
+      logger.error("Error fetching items:", error);
     } finally {
       setLoading(false);
     }
-  }, [currentPage, debouncedSearchQuery, selectedType, selectedTopic, selectedChannel, selectedStatus, sortBy, sortOrder, itemsPerPage]);
+  }, [
+    currentPage,
+    debouncedSearchQuery,
+    selectedType,
+    selectedTopic,
+    selectedChannel,
+    selectedStatus,
+    sortBy,
+    sortOrder,
+    itemsPerPage,
+  ]);
+
+  const {
+    handleUpload,
+    handleScheduledUpload,
+    handleMetadata,
+    handleRender,
+    handleCreateRender,
+    handleDeleteSelected,
+    handleActionClick,
+  } = useRenderActions({
+    items,
+    setItems,
+    setStatusCounts,
+    selectedItems,
+    setSelectedItems,
+    tiktokConnected,
+    setShowTikTokAuth,
+    setPendingUploadItems,
+    setPendingUploadType,
+    setShowScheduleDialog,
+    setCreatedItemsForScheduling,
+    setIsCreatingMultipleItems,
+    fetchItems,
+    fetchStatusCounts,
+  });
 
   // Check TikTok connection status on mount
   useEffect(() => {
-    const token = localStorage.getItem('tiktok_access_token');
-    const expiresAt = localStorage.getItem('tiktok_token_expires_at');
-    
+    const token = localStorage.getItem("tiktok_access_token");
+    const expiresAt = localStorage.getItem("tiktok_token_expires_at");
+
     if (token && expiresAt) {
       const expiryTime = parseInt(expiresAt);
       const now = Date.now();
-      
+
       if (now < expiryTime) {
         // Token is still valid
         setTiktokConnected(true);
-        console.log('TikTok token is valid, connected');
+        logger.debug("TikTok token is valid, connected");
       } else {
         // Token has expired, remove it
-        localStorage.removeItem('tiktok_access_token');
-        localStorage.removeItem('tiktok_token_expires_at');
+        localStorage.removeItem("tiktok_access_token");
+        localStorage.removeItem("tiktok_token_expires_at");
         setTiktokConnected(false);
-        console.log('TikTok token has expired, removed');
+        logger.debug("TikTok token has expired, removed");
       }
     } else {
       setTiktokConnected(false);
@@ -267,11 +261,17 @@ export default function Page() {
         fetchStatusCounts(),
         fetchTemplates(),
         fetchOutputFolders(),
-        fetchRenderFormats()
+        fetchRenderFormats(),
       ]);
     };
     fetchInitialData();
-  }, [fetchItems, fetchStatusCounts, fetchTemplates, fetchOutputFolders, fetchRenderFormats]);
+  }, [
+    fetchItems,
+    fetchStatusCounts,
+    fetchTemplates,
+    fetchOutputFolders,
+    fetchRenderFormats,
+  ]);
 
   // Effect for refreshing data when filters change
   useEffect(() => {
@@ -287,10 +287,12 @@ export default function Page() {
   useEffect(() => {
     if (isCreatingMultipleItems && createdItemsForScheduling.length > 0) {
       // Check if we have all the items we expect
-      const expectedCount = (createdItemsForScheduling[0] as any)?._fileCount || 0;
+      const expectedCount =
+        (createdItemsForScheduling[0] as { _fileCount?: number })?._fileCount ||
+        0;
       if (createdItemsForScheduling.length >= expectedCount) {
         setPendingUploadItems(createdItemsForScheduling);
-        setPendingUploadType('youtube');
+        setPendingUploadType("youtube");
         setShowScheduleDialog(true);
         setCreatedItemsForScheduling([]);
         setIsCreatingMultipleItems(false);
@@ -305,70 +307,50 @@ export default function Page() {
     setSearchQuery("");
   };
 
-  const formatDate = (dateString: string | number | Date | null | undefined) => {
-    if (!dateString) return '-';
-    const date = typeof dateString === 'number' ? new Date(dateString * 1000) : new Date(dateString);
-    return date.toLocaleString();
-  };
-
-  // Helper function to calculate scheduled date for an item
-  const calculateScheduledDate = (scheduleConfig: ScheduleConfig, itemIndex: number): string => {
-    const { startDate, timeSlots, videosPerDay } = scheduleConfig;
-    const start = new Date(startDate);
-    
-    // Calculate which day this item should be scheduled for
-    const dayOffset = Math.floor(itemIndex / videosPerDay);
-    const timeSlotIndex = itemIndex % videosPerDay;
-    
-    const scheduledDate = new Date(start);
-    scheduledDate.setDate(start.getDate() + dayOffset);
-    
-    // Get the time slot
-    const timeSlot = timeSlots[timeSlotIndex % timeSlots.length];
-    const [hours, minutes] = timeSlot.split(':').map(Number);
-    scheduledDate.setHours(hours, minutes, 0, 0);
-    
-    return scheduledDate.toISOString();
-  };
-
   // Add polling for render updates
   useEffect(() => {
     const pollRenderUpdates = async () => {
       // Only check items that are actively being processed, or just changed status
-      const itemsToCheck = items.filter(item => 
-        [
-          'pending_render',
-          'rendering',
-          'pending_metadata',
-          'processing_metadata',
-          'pending_upload',
-          'processing_upload'
-        ].includes(item.status) ||
-        recentlyChangedIds.includes(item.id)
+      const itemsToCheck = items.filter(
+        (item) =>
+          [
+            "pending_render",
+            "rendering",
+            "pending_metadata",
+            "processing_metadata",
+            "pending_upload",
+            "processing_upload",
+          ].includes(item.status) || recentlyChangedIds.includes(item.id),
       );
 
       if (itemsToCheck.length === 0) return;
 
       try {
         // Fetch updated items from the API
-        const response = await fetch(`/api/renders?ids=${itemsToCheck.map(item => item.id).join(',')}`);
-        if (!response.ok) throw new Error('Failed to fetch render updates');
-        
+        const response = await fetch(
+          `/api/renders?ids=${itemsToCheck.map((item) => item.id).join(",")}`,
+        );
+        if (!response.ok) throw new Error("Failed to fetch render updates");
+
         const data = await response.json();
-        
+
         // Refactored: Detect status changes synchronously and update state
         const updatedItems: RenderItem[] = [];
         let statusChanged = false;
         const statusChanges: Record<string, number> = {};
         const changedIds: string[] = [];
         for (const item of items) {
-          const updatedItem = data.items.find((i: RenderItem) => i.id === item.id);
+          const updatedItem = data.items.find(
+            (i: RenderItem) => i.id === item.id,
+          );
           if (updatedItem) {
             if (updatedItem.status !== item.status) {
               statusChanged = true;
               changedIds.push(item.id);
-              statusChanges[item.status] = (statusChanges[item.status] || 0) - 1;
-              statusChanges[updatedItem.status] = (statusChanges[updatedItem.status] || 0) + 1;
+              statusChanges[item.status] =
+                (statusChanges[item.status] || 0) - 1;
+              statusChanges[updatedItem.status] =
+                (statusChanges[updatedItem.status] || 0) + 1;
             }
             updatedItems.push(updatedItem);
           } else {
@@ -377,17 +359,22 @@ export default function Page() {
         }
         setItems(updatedItems);
         if (selectedRenderItem) {
-          const updatedSelectedItem = data.items.find((i: RenderItem) => i.id === selectedRenderItem.id);
+          const updatedSelectedItem = data.items.find(
+            (i: RenderItem) => i.id === selectedRenderItem.id,
+          );
           if (updatedSelectedItem) {
             setSelectedRenderItem(updatedSelectedItem);
           }
         }
         if (Object.keys(statusChanges).length > 0) {
-          setStatusCounts(prev => {
+          setStatusCounts((prev) => {
             const newCounts = { ...prev };
             Object.entries(statusChanges).forEach(([status, change]) => {
               const currentCount = newCounts[status as RenderStatus] || 0;
-              newCounts[status as RenderStatus] = Math.max(0, currentCount + change);
+              newCounts[status as RenderStatus] = Math.max(
+                0,
+                currentCount + change,
+              );
             });
             return newCounts;
           });
@@ -395,13 +382,16 @@ export default function Page() {
         setRecentlyChangedIds(changedIds);
         if (statusChanged) {
           fetchStatusCounts();
-          
+
           // Check for autoUpload after metadata processing
           for (const updatedItem of data.items) {
-            if (updatedItem.status === 'processed_metadata' && updatedItem.autoUpload) {
+            if (
+              updatedItem.status === "processed_metadata" &&
+              updatedItem.autoUpload
+            ) {
               // Find the original item to get the current state
-              const originalItem = items.find(i => i.id === updatedItem.id);
-              if (originalItem && originalItem.status !== 'processed_metadata') {
+              const originalItem = items.find((i) => i.id === updatedItem.id);
+              if (originalItem && originalItem.status !== "processed_metadata") {
                 // This item just changed to processed_metadata, trigger autoUpload
                 handleUpload(updatedItem);
               }
@@ -409,61 +399,14 @@ export default function Page() {
           }
         }
       } catch (error) {
-        console.error('Error polling render updates:', error);
+        logger.error("Error polling render updates:", error);
       }
     };
 
     const interval = setInterval(pollRenderUpdates, 2000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, selectedRenderItem, recentlyChangedIds]);
-
-  const handleCreateRender = async (data: any) => {
-    try {
-      const response = await fetch('/api/renders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        throw {
-          type: 'api',
-          message: responseData.error || 'Failed to create render item',
-          status: response.status,
-          details: responseData
-        };
-      }
-
-      // If autoRender is true, start the render immediately
-      if (data.autoRender) {
-        await handleRender(responseData);
-      }
-
-      // If we're creating multiple items with autoUpload, collect them
-      if (data._autoUpload && data._fileCount > 1) {
-        setCreatedItemsForScheduling(prev => [...prev, responseData]);
-        setIsCreatingMultipleItems(true);
-      }
-
-      // Refresh the list
-      fetchItems();
-      return true;
-    } catch (error: any) {
-      console.error('Error creating render item:', error);
-      if (!error?.type) {
-        throw {
-          type: 'network',
-          message: 'Network error occurred. Please try again.',
-          originalError: error
-        };
-      }
-      throw error;
-    }
-  };
 
   const handleStatusClick = (status: string) => {
     setSelectedStatus(selectedStatus === status ? null : status);
@@ -471,134 +414,15 @@ export default function Page() {
 
   const handleItemSelect = (itemId: string, event: React.MouseEvent) => {
     // Don't select if clicking on a button or link
-    if ((event.target as HTMLElement).closest('button, a')) {
+    if ((event.target as HTMLElement).closest("button, a")) {
       return;
     }
 
-    setSelectedItems(prev => 
-      prev.includes(itemId) 
-        ? prev.filter(id => id !== itemId)
-        : [...prev, itemId]
+    setSelectedItems((prev) =>
+      prev.includes(itemId)
+        ? prev.filter((id) => id !== itemId)
+        : [...prev, itemId],
     );
-  };
-
-  const handleDeleteSelected = async () => {
-    if (selectedItems.length === 0) return;
-    
-    // Add confirmation dialog
-    if (!confirm(`Are you sure you want to delete ${selectedItems.length} item(s)?`)) {
-      return;
-    }
-    
-    try {
-      const response = await fetch('/api/renders/batch', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ ids: selectedItems }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete items');
-      }
-
-      setSelectedItems([]);
-      await Promise.all([fetchItems(), fetchStatusCounts()]);
-    } catch (error) {
-      console.error('Error deleting items:', error);
-      alert('Failed to delete items. Please try again.');
-    }
-  };
-
-  const handleActionClick = async (action: string) => {
-    if (selectedItems.length === 0) return;
-
-    // Add confirmation dialog
-    const actionMap = {
-      render: 'render',
-      metadata: 'create metadata for',
-      upload: 'upload',
-      'tiktok-upload': 'upload to TikTok'
-    };
-    
-    if (!confirm(`Are you sure you want to ${actionMap[action as keyof typeof actionMap]} ${selectedItems.length} item(s)?`)) {
-      return;
-    }
-
-    try {
-      if (action === 'metadata') {
-        // For metadata, trigger handleMetadata for each selected item directly
-        const itemsToProcess = items.filter(i => selectedItems.includes(i.id));
-        for (const item of itemsToProcess) {
-          handleMetadata(item);
-        }
-        setSelectedItems([]);
-        return;
-      }
-
-      if (action === 'upload') {
-        // For upload, show scheduling dialog if multiple items selected
-        // Maintain selection order by using selectedItems array order
-        const itemsToProcess = selectedItems
-          .map(id => items.find(i => i.id === id))
-          .filter((item): item is RenderItem => item !== undefined && item.youtubeMetadata != null);
-        
-        if (itemsToProcess.length > 1) {
-          setPendingUploadItems(itemsToProcess);
-          setPendingUploadType('youtube');
-          setShowScheduleDialog(true);
-          return;
-        } else if (itemsToProcess.length === 1) {
-          // Single item upload without scheduling
-          await handleUpload(itemsToProcess[0]);
-        }
-        setSelectedItems([]);
-        return;
-      }
-
-      if (action === 'tiktok-upload') {
-        // For TikTok upload, show scheduling dialog if multiple items selected
-        // Maintain selection order by using selectedItems array order
-        const itemsToProcess = selectedItems
-          .map(id => items.find(i => i.id === id))
-          .filter((item): item is RenderItem => item !== undefined && item.youtubeMetadata != null);
-        
-        if (itemsToProcess.length > 1) {
-          setPendingUploadItems(itemsToProcess);
-          setPendingUploadType('tiktok');
-          setShowScheduleDialog(true);
-          return;
-        } else if (itemsToProcess.length === 1) {
-          // Single item upload without scheduling
-          await handleTikTokUpload(itemsToProcess[0]);
-        }
-        setSelectedItems([]);
-        return;
-      }
-
-      // For other actions, use the batch API
-      const response = await fetch('/api/renders/batch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          ids: selectedItems,
-          action 
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to ${action} items`);
-      }
-
-      setSelectedItems([]);
-      await Promise.all([fetchItems(), fetchStatusCounts()]);
-    } catch (error) {
-      console.error(`Error performing ${action}:`, error);
-      alert(`Failed to ${action} items. Please try again.`);
-    }
   };
 
   const handleSelectAll = () => {
@@ -609,7 +433,7 @@ export default function Page() {
       const dateB = new Date(b.createdAt).getTime();
       return dateA - dateB;
     });
-    setSelectedItems(sortedItems.map(item => item.id));
+    setSelectedItems(sortedItems.map((item) => item.id));
   };
 
   const handleDeselectAll = () => {
@@ -626,635 +450,28 @@ export default function Page() {
     setShowMetadataDetails(true);
   };
 
-  const handleRender = async (item: RenderItem) => {
-    try {
-      const response = await fetch(`/api/renders/${item.id}/render`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to start render');
-      }
-
-      // Update local state immediately
-      setItems(prev => prev.map(i => 
-        i.id === item.id ? { ...i, status: 'pending_render' } : i
-      ));
-      // Update status counts
-      setStatusCounts(prev => ({
-        ...prev,
-        new: (prev.new || 0) - 1,
-        pending_render: (prev.pending_render || 0) + 1
-      }));
-
-      // Track last known status for this item
-      renderStatusMap.set(item.id, 'pending_render');
-
-      // Start polling for render updates
-      const pollInterval = setInterval(async () => {
-        try {
-          const statusResponse = await fetch(`/api/renders/${item.id}`);
-          if (!statusResponse.ok) throw new Error('Failed to fetch render status');
-          
-          const updatedItem = await statusResponse.json();
-          const lastStatus = renderStatusMap.get(item.id);
-          
-          // Only update counts if status actually changed
-          if (updatedItem.status !== lastStatus) {
-            setStatusCounts(prevCounts => {
-              const newCounts = { ...prevCounts };
-              // Decrement previous status
-              if (lastStatus) {
-                newCounts[lastStatus] = Math.max(0, (newCounts[lastStatus] || 0) - 1);
-              }
-              // Increment new status
-              if (updatedItem.status) {
-                const newStatus = updatedItem.status as RenderStatus;
-                newCounts[newStatus] = (newCounts[newStatus] || 0) + 1;
-              }
-              return newCounts;
-            });
-            renderStatusMap.set(item.id, updatedItem.status);
-          }
-
-          // Update local state
-          setItems(prev => prev.map(i => i.id === item.id ? updatedItem : i));
-
-          // If render is complete and autoCreateMetadata is true, trigger metadata generation
-          if (updatedItem.status === 'rendered' && updatedItem.autoCreateMetadata) {
-            clearInterval(pollInterval);
-            renderStatusMap.delete(item.id);
-            await handleMetadata(updatedItem);
-          }
-          // If render failed or completed without auto metadata, stop polling
-          else if (['rendered', 'declined'].includes(updatedItem.status)) {
-            clearInterval(pollInterval);
-            renderStatusMap.delete(item.id);
-            // Ensure final status counts are correct
-            setStatusCounts(prevCounts => {
-              const newCounts = { ...prevCounts };
-              newCounts.rendering = 0;
-              return newCounts;
-            });
-          }
-        } catch (error) {
-          console.error('Error polling render status:', error);
-          clearInterval(pollInterval);
-          renderStatusMap.delete(item.id);
-        }
-      }, 2000); // Poll every 2 seconds
-
-      // Cleanup interval after 5 minutes (timeout)
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        renderStatusMap.delete(item.id);
-      }, 5 * 60 * 1000);
-
-    } catch (error) {
-      console.error('Error starting render:', error);
-      alert('Failed to start render. Please try again.');
-    }
-  };
-
-  const handleMetadata = async (item: RenderItem) => {
-    try {
-      // Always set to pending_metadata if not already
-      let latestStatus: RenderStatus | undefined;
-      setItems(prev => {
-        const found = prev.find(i => i.id === item.id);
-        latestStatus = found?.status;
-        return prev;
-      });
-
-      if (latestStatus !== 'pending_metadata') {
-        setItems(prev => prev.map(i =>
-          i.id === item.id ? { ...i, status: 'pending_metadata' } : i
-        ));
-        setStatusCounts(prev => ({
-          ...prev,
-          rendered: Math.max(0, (prev.rendered || 0) - 1),
-          pending_metadata: (prev.pending_metadata || 0) + 1
-        }));
-        await fetch(`/api/renders/${item.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'pending_metadata' }),
-        });
-      }
-
-      // Immediately proceed to processing_metadata
-      setItems(prev => prev.map(i =>
-        i.id === item.id ? { ...i, status: 'processing_metadata' } : i
-      ));
-      setStatusCounts(prev => ({
-        ...prev,
-        pending_metadata: Math.max(0, (prev.pending_metadata || 0) - 1),
-        processing_metadata: (prev.processing_metadata || 0) + 1
-      }));
-      await fetch(`/api/renders/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'processing_metadata' }),
-      });
-
-      // Call metadata API
-      const metadataResponse = await fetch('/api/youtube-metadata', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ json: item.jsonContent }),
-      });
-
-      if (!metadataResponse.ok) {
-        throw new Error('Failed to generate metadata');
-      }
-
-      const metadataResult = await metadataResponse.json();
-      
-      // Ensure we have title and description
-      if (!metadataResult.title || !metadataResult.description) {
-        throw new Error('Invalid metadata response: missing title or description');
-      }
-
-      // Preserve existing metadata fields and update with new ones
-      const updatedMetadata = {
-        ...item.youtubeMetadata, // Preserve existing metadata
-        title: metadataResult.title,
-        description: metadataResult.description,
-        tags: metadataResult.tags,
-        // Preserve other required fields if they exist
-        categoryId: item.youtubeMetadata?.categoryId || YOUTUBE_CATEGORY_ID,
-        defaultLanguage: item.youtubeMetadata?.defaultLanguage || "vi",
-        defaultAudioLanguage: item.youtubeMetadata?.defaultAudioLanguage || "vi",
-        playlistId: item.youtubeMetadata?.playlistId || "",
-        scheduleDate: item.youtubeMetadata?.scheduleDate || "",
-      };
-
-      // Update local state immediately
-      setItems(prev => prev.map(i => 
-        i.id === item.id ? { 
-          ...i, 
-          status: 'processed_metadata',
-          youtubeMetadata: updatedMetadata,
-          metadataTime: Math.floor(Date.now() / 1000)
-        } : i
-      ));
-      // Update status counts
-      setStatusCounts(prev => ({
-        ...prev,
-        processing_metadata: (prev.processing_metadata || 0) - 1,
-        processed_metadata: (prev.processed_metadata || 0) + 1
-      }));
-
-      // Update item with metadata
-      const updateResponse = await fetch(`/api/renders/${item.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          youtubeMetadata: updatedMetadata,
-          status: 'processed_metadata',
-          metadataTime: Math.floor(Date.now() / 1000),
-        }),
-      });
-
-      if (!updateResponse.ok) {
-        throw new Error('Failed to update metadata');
-      }
-
-      // If autoUpload is true, trigger upload immediately
-      if (item.autoUpload) {
-        await handleUpload({ ...item, status: 'processed_metadata', youtubeMetadata: updatedMetadata });
-      }
-
-    } catch (error) {
-      console.error('Error generating metadata:', error);
-      // Update local state immediately
-      setItems(prev => prev.map(i => 
-        i.id === item.id ? { ...i, status: 'declined' } : i
-      ));
-      // Update status counts
-      setStatusCounts(prev => ({
-        ...prev,
-        processing_metadata: (prev.processing_metadata || 0) - 1,
-        declined: (prev.declined || 0) + 1
-      }));
-
-      // Update status to error
-      await fetch(`/api/renders/${item.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          status: 'declined',
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }),
-      });
-    }
-  };
-
-  const handleUpload = async (item: RenderItem, scheduleConfig?: ScheduleConfig, itemIndex?: number) => {
-    if (!item.youtubeMetadata) {
-      console.error('Missing YouTube metadata');
-      return;
-    }
-
-    try {
-      // Update status to pending_upload and update local state immediately
-      await fetch(`/api/renders/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "pending_upload" }),
-      });
-      
-      // Update local state immediately
-      setItems(prev => prev.map(i =>
-        i.id === item.id ? { ...i, status: 'pending_upload' } : i
-      ));
-      setStatusCounts(prev => ({
-        ...prev,
-        processed_metadata: Math.max(0, (prev.processed_metadata || 0) - 1),
-        pending_upload: (prev.pending_upload || 0) + 1
-      }));
-
-      // Update status to processing_upload and update local state immediately
-      await fetch(`/api/renders/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "processing_upload" }),
-      });
-      
-      // Update local state immediately
-      setItems(prev => prev.map(i =>
-        i.id === item.id ? { ...i, status: 'processing_upload' } : i
-      ));
-      setStatusCounts(prev => ({
-        ...prev,
-        pending_upload: Math.max(0, (prev.pending_upload || 0) - 1),
-        processing_upload: (prev.processing_upload || 0) + 1
-      }));
-
-      // Get the video file
-      const videoResponse = await fetch(`/api/renders/${item.id}/video`);
-      if (!videoResponse.ok) {
-        throw new Error('Failed to fetch video file');
-      }
-      const videoBlob = await videoResponse.blob();
-      const videoFile = new File([videoBlob], `${item.fileName}.mp4`, { type: 'video/mp4' });
-
-      // Calculate scheduled date if provided
-      let scheduleDate = "";
-      if (scheduleConfig && itemIndex !== undefined) {
-        scheduleDate = calculateScheduledDate(scheduleConfig, itemIndex);
-      }
-
-      // Prepare form data
-      const form = new FormData();
-      form.append("mp4", videoFile);
-      form.append("title", item.youtubeMetadata.title);
-      form.append("description", item.youtubeMetadata.description);
-      form.append("playlistId", "");
-      form.append("tags", item.youtubeMetadata.tags);
-      form.append("categoryId", YOUTUBE_CATEGORY_ID);
-      form.append("defaultLanguage", "vi");
-      form.append("defaultAudioLanguage", "vi");
-      form.append("scheduleDate", scheduleDate);
-
-      // Upload to YouTube
-      const res = await fetch("/api/youtube-upload", {
-        method: "POST",
-        body: form,
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Upload failed');
-      }
-
-      // Update status to uploaded and store YouTube link and upload time
-      const uploadTime = Math.floor(Date.now() / 1000);
-      await fetch(`/api/renders/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "uploaded",
-          youtubeLink: `https://youtube.com/watch?v=${data.videoId}`,
-          uploadTime,
-        }),
-      });
-
-      // Update local state for this item and statusCounts
-      setItems(prev => prev.map(i =>
-        i.id === item.id
-          ? { ...i, status: 'uploaded', youtubeLink: `https://youtube.com/watch?v=${data.videoId}`, uploadTime }
-          : i
-      ));
-      setStatusCounts(prev => ({
-        ...prev,
-        processing_upload: Math.max(0, (prev.processing_upload || 0) - 1),
-        uploaded: (prev.uploaded || 0) + 1
-      }));
-
-    } catch (error) {
-      console.error('Upload failed:', error);
-      
-      // Update local state to declined immediately
-      setItems(prev => prev.map(i =>
-        i.id === item.id ? { ...i, status: 'declined' } : i
-      ));
-      setStatusCounts(prev => ({
-        ...prev,
-        processing_upload: Math.max(0, (prev.processing_upload || 0) - 1),
-        declined: (prev.declined || 0) + 1
-      }));
-      
-      // Update status to declined on error
-      await fetch(`/api/renders/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "declined" }),
-      });
-    }
-  };
-
-  const handleScheduledUpload = async (items: RenderItem[], scheduleConfig: ScheduleConfig, uploadType: 'youtube' | 'tiktok') => {
-    try {
-      // Process items in the order they were passed (maintaining selection order)
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (uploadType === 'youtube') {
-          await handleUpload(item, scheduleConfig, i);
-        } else {
-          await handleTikTokUpload(item, scheduleConfig, i);
-        }
-      }
-    } catch (error) {
-      console.error('Scheduled upload failed:', error);
-    }
-  };
-
-  const handleTikTokUpload = async (item: RenderItem, scheduleConfig?: ScheduleConfig, itemIndex?: number) => {
-    if (!item.youtubeMetadata) {
-      console.error('Missing YouTube metadata');
-      return;
-    }
-
-    // Check if TikTok is connected
-    if (!tiktokConnected) {
-      setShowTikTokAuth(true);
-      return;
-    }
-
-    try {
-      // Update status to pending_upload and update local state immediately
-      await fetch(`/api/renders/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "pending_upload" }),
-      });
-      
-      // Update local state immediately
-      setItems(prev => prev.map(i =>
-        i.id === item.id ? { ...i, status: 'pending_upload' } : i
-      ));
-      setStatusCounts(prev => ({
-        ...prev,
-        processed_metadata: Math.max(0, (prev.processed_metadata || 0) - 1),
-        pending_upload: (prev.pending_upload || 0) + 1
-      }));
-
-      // Update status to processing_upload and update local state immediately
-      await fetch(`/api/renders/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "processing_upload" }),
-      });
-      
-      // Update local state immediately
-      setItems(prev => prev.map(i =>
-        i.id === item.id ? { ...i, status: 'processing_upload' } : i
-      ));
-      setStatusCounts(prev => ({
-        ...prev,
-        pending_upload: Math.max(0, (prev.pending_upload || 0) - 1),
-        processing_upload: (prev.processing_upload || 0) + 1
-      }));
-
-      // Get the video file
-      const videoResponse = await fetch(`/api/renders/${item.id}/video`);
-      if (!videoResponse.ok) {
-        throw new Error('Failed to fetch video file');
-      }
-      const videoBlob = await videoResponse.blob();
-      const videoFile = new File([videoBlob], `${item.fileName}.mp4`, { type: 'video/mp4' });
-
-      // Prepare form data for TikTok
-      const form = new FormData();
-      form.append("mp4", videoFile);
-      form.append("title", item.youtubeMetadata.title);
-      form.append("description", item.youtubeMetadata.description);
-      form.append("tags", item.youtubeMetadata.tags);
-
-      // Upload to TikTok
-      const res = await fetch("/api/tiktok-upload", {
-        method: "POST",
-        body: form,
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'TikTok upload failed');
-      }
-
-      // Update status to uploaded and store TikTok link and upload time
-      const uploadTime = Math.floor(Date.now() / 1000);
-      await fetch(`/api/renders/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "uploaded",
-          tiktokLink: `https://www.tiktok.com/inbox?publish_id=${data.publishId}`,
-          tiktokPublishId: data.publishId,
-          uploadTime,
-        }),
-      });
-
-      // Update local state for this item and statusCounts
-      setItems(prev => prev.map(i =>
-        i.id === item.id
-                      ? { 
-                ...i, 
-                status: 'uploaded', 
-                tiktokLink: `https://www.tiktok.com/inbox?publish_id=${data.publishId}`,
-                tiktokPublishId: data.publishId,
-                uploadTime 
-              }
-          : i
-      ));
-      setStatusCounts(prev => ({
-        ...prev,
-        processing_upload: Math.max(0, (prev.processing_upload || 0) - 1),
-        uploaded: (prev.uploaded || 0) + 1
-      }));
-
-    } catch (error) {
-      console.error('TikTok upload failed:', error);
-      
-      // Update local state to declined immediately
-      setItems(prev => prev.map(i =>
-        i.id === item.id ? { ...i, status: 'declined' } : i
-      ));
-      setStatusCounts(prev => ({
-        ...prev,
-        processing_upload: Math.max(0, (prev.processing_upload || 0) - 1),
-        declined: (prev.declined || 0) + 1
-      }));
-      
-      // Update status to declined on error
-      await fetch(`/api/renders/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "declined" }),
-      });
-    }
+  const handleRequestSingleUpload = (
+    item: RenderItem,
+    type: "youtube" | "tiktok",
+  ) => {
+    setPendingUploadItems([item]);
+    setPendingUploadType(type);
+    setShowScheduleDialog(true);
   };
 
   return (
     <div className="min-h-screen bg-bg text-text p-8">
       {/* Header - Sticky */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex justify-between items-center mb-8 h-24 sticky top-0 z-40 bg-bg/95 backdrop-blur"
-        style={{ backdropFilter: 'blur(8px)' }}
-      >
-        <div>
-          <motion.h1
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-5xl font-bold text-accent"
-          >
-            Temlet
-          </motion.h1>
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="flex items-center gap-2 mt-1"
-          >
-            <span className="text-text-muted">made by</span>
-            <motion.span
-              animate={{
-                scale: [1, 1.1, 1],
-                rotate: [0, 5, -5, 0],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                repeatType: "reverse",
-              }}
-              className="text-accent font-medium"
-            >
-              rumitx
-            </motion.span>
-          </motion.div>
-        </div>
-
-        {/* Navigation Buttons */}
-        <div className="flex gap-4">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-surface-raised border border-border hover:border-border-strong text-text px-4 py-2 rounded-lg transition-colors"
-            onClick={() => window.location.href = '/assets'}
-          >
-            <DocumentTextIcon className="w-5 h-5" />
-            <span>Assets</span>
-          </motion.button>
-
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-surface-raised border border-border hover:border-border-strong text-text px-4 py-2 rounded-lg transition-colors"
-            onClick={() => window.location.href = '/crawlers'}
-          >
-            <ArrowPathIcon className="w-5 h-5" />
-            <span>Crawlers</span>
-          </motion.button>
-
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-accent-fg px-4 py-2 rounded-lg transition-colors"
-            onClick={() => setIsCreateDialogOpen(true)}
-          >
-            <PlusIcon className="w-5 h-5" />
-            <span>New Render</span>
-          </motion.button>
-        </div>
-      </motion.div>
+      <RenderHeader onCreate={() => setIsCreateDialogOpen(true)} />
 
       {/* Status Counts Bar (not sticky) */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div className="flex flex-col lg:flex-row gap-4">
-          {Object.entries(statusGroups).map(([groupKey, group]) => (
-            <Card key={groupKey} className="flex-1 p-3 mb-4 lg:mb-0">
-              <div className="flex items-center gap-2 mb-2">
-                <group.icon className="w-6 h-6 text-accent" />
-                <h3 className="text-2xl font-bold text-text flex items-center">
-                  {group.title}
-                  {loadingCounts && (
-                    <svg className="animate-spin ml-2 h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                    </svg>
-                  )}
-                </h3>
-                {/* Clear Status Filter Button */}
-                {selectedStatus && (
-                  <button
-                    onClick={() => setSelectedStatus(null)}
-                    className="ml-4 px-2 py-1 text-xs bg-surface-raised border border-border hover:border-border-strong rounded text-text-muted"
-                  >
-                    Clear Status Filter
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                {group.statuses.map((status) => {
-                  const Icon = getStatusIcon(status);
-                  const count = statusCounts[status] || 0;
-                  return (
-                    <motion.button
-                      key={status}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleStatusClick(status)}
-                      className={`flex items-center justify-between p-2 rounded-lg text-lg font-medium transition-all ${
-                        statusClass(status)
-                      } ${selectedStatus === status ? 'ring-2 ring-accent-ring' : ''}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Icon className="w-5 h-5" />
-                        <span>{status.replace(/_/g, ' ')}</span>
-                      </div>
-                      <span className="text-2xl font-extrabold">{count}</span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </Card>
-          ))}
-        </div>
-      </motion.div>
+      <RenderStatusBar
+        statusCounts={statusCounts}
+        loadingCounts={loadingCounts}
+        selectedStatus={selectedStatus}
+        onStatusClick={handleStatusClick}
+        onClearStatus={() => setSelectedStatus(null)}
+      />
 
       {/* Action Bar (remove Create New button) */}
       <motion.div
@@ -1267,16 +484,22 @@ export default function Page() {
             <Button variant="danger" onClick={handleDeleteSelected}>
               Delete ({selectedItems.length})
             </Button>
-            <Button variant="primary" onClick={() => handleActionClick('render')}>
+            <Button variant="primary" onClick={() => handleActionClick("render")}>
               Render ({selectedItems.length})
             </Button>
-            <Button variant="primary" onClick={() => handleActionClick('metadata')}>
+            <Button
+              variant="primary"
+              onClick={() => handleActionClick("metadata")}
+            >
               Metadata ({selectedItems.length})
             </Button>
-            <Button variant="primary" onClick={() => handleActionClick('upload')}>
+            <Button variant="primary" onClick={() => handleActionClick("upload")}>
               Upload ({selectedItems.length})
             </Button>
-            <Button variant="secondary" onClick={() => handleActionClick('tiktok-upload')}>
+            <Button
+              variant="secondary"
+              onClick={() => handleActionClick("tiktok-upload")}
+            >
               TikTok ({selectedItems.length})
             </Button>
           </>
@@ -1284,567 +507,68 @@ export default function Page() {
       </motion.div>
 
       {/* Search and Filter Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-4 mb-6"
-      >
-        <div className="flex gap-4">
-          <div className="flex-1 relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted w-5 h-5 z-10" />
-            <Input
-              type="text"
-              placeholder="Search renders..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              showFilters ? "bg-accent text-accent-fg" : "bg-surface-raised border border-border hover:border-border-strong text-text"
-            }`}
-          >
-            <FunnelIcon className="w-5 h-5" />
-            <span>Filters</span>
-            {getActiveFiltersCount() > 0 && (
-              <span className="bg-accent text-accent-fg px-2 py-0.5 rounded-full text-sm">
-                {getActiveFiltersCount()}
-              </span>
-            )}
-          </motion.button>
-        </div>
+      <RenderFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        showFilters={showFilters}
+        onToggleFilters={() => setShowFilters(!showFilters)}
+        activeFiltersCount={getActiveFiltersCount()}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSort={handleSort}
+        selectedType={selectedType}
+        selectedTopic={selectedTopic}
+        selectedChannel={selectedChannel}
+        onSelectType={setSelectedType}
+        onSelectTopic={setSelectedTopic}
+        onSelectChannel={setSelectedChannel}
+        onClearFilters={clearFilters}
+      />
 
-        {/* Sorting buttons */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => handleSort("createdAt")}
-            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-              sortBy === "createdAt"
-                ? "bg-accent text-accent-fg"
-                : "bg-surface-raised border border-border text-text-muted hover:border-border-strong"
-            }`}
-          >
-            Date
-            {sortBy === "createdAt" && (
-              <span className="ml-1">
-                {sortOrder === "asc" ? "↑" : "↓"}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => handleSort("fileName")}
-            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-              sortBy === "fileName"
-                ? "bg-accent text-accent-fg"
-                : "bg-surface-raised border border-border text-text-muted hover:border-border-strong"
-            }`}
-          >
-            Name
-            {sortBy === "fileName" && (
-              <span className="ml-1">
-                {sortOrder === "asc" ? "↑" : "↓"}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => handleSort("type")}
-            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-              sortBy === "type"
-                ? "bg-accent text-accent-fg"
-                : "bg-surface-raised border border-border text-text-muted hover:border-border-strong"
-            }`}
-          >
-            Type
-            {sortBy === "type" && (
-              <span className="ml-1">
-                {sortOrder === "asc" ? "↑" : "↓"}
-              </span>
-            )}
-          </button>
-        </div>
-
-        <AnimatePresence>
-          {showFilters && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="bg-surface border border-border rounded-lg p-4 space-y-4"
-            >
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Filters</h3>
-                <button
-                  onClick={clearFilters}
-                  className="text-text-muted hover:text-text"
-                >
-                  Clear All
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Type Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-text-muted mb-2">
-                    Type
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {types && types.map((type) => (
-                      <button
-                        key={type}
-                        onClick={(e) => setSelectedType(selectedType === type ? null : type)}
-                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                          selectedType === type
-                            ? "bg-accent text-accent-fg"
-                            : "bg-surface-raised border border-border text-text-muted hover:border-border-strong"
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Topic Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-text-muted mb-2">
-                    Topic
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {topics && topics.map((topic) => (
-                      <button
-                        key={topic}
-                        onClick={(e) => setSelectedTopic(selectedTopic === topic ? null : topic)}
-                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                          selectedTopic === topic
-                            ? "bg-accent text-accent-fg"
-                            : "bg-surface-raised border border-border text-text-muted hover:border-border-strong"
-                        }`}
-                      >
-                        {topic}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Channel Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-text-muted mb-2">
-                    Channel
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {channels && channels.map((channel) => (
-                      <button
-                        key={channel}
-                        onClick={(e) => setSelectedChannel(selectedChannel === channel ? null : channel)}
-                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                          selectedChannel === channel
-                            ? "bg-accent text-accent-fg"
-                            : "bg-surface-raised border border-border text-text-muted hover:border-border-strong"
-                        }`}
-                      >
-                        {channel}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-
-      {/* Main Content Area - No fixed height, scrolls with page */}
       {/* Render List */}
       <motion.div
         layout
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
       >
-        {items && items.map((item) => (
-          <motion.div
-            key={item.id}
-            layout
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className={`bg-surface border border-border shadow-card rounded-lg p-6 space-y-4 cursor-pointer transition-all ${
-              selectedItems.includes(item.id) ? 'ring-2 ring-accent-ring' : ''
-            }`}
-            onClick={(e) => handleItemSelect(item.id, e)}
-          >
-            {/* Row 1: Type, Channel, Created */}
-            <div className="flex justify-between items-center">
-              <span className="text-accent font-medium">{item.type}</span>
-              <span className="text-text-muted">{item.channelName}</span>
-              <span className="text-text-faint text-sm">{formatDate(item.createdAt)}</span>
-            </div>
-
-            {/* Row 2: File Name and Status */}
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-medium">{item.fileName}</h3>
-              <Badge status={item.status}>{item.status}</Badge>
-            </div>
-
-            {/* Row 3: Render Zone */}
-            <div className={`rounded-lg p-4 ${
-              ['rendered', 'pending_metadata', 'processing_metadata', 'processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status)
-                ? 'bg-success-bg border border-success/30'
-                : 'bg-surface-sunken'
-            }`}>
-              <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-medium text-text-muted">Render</h4>
-                  {['rendered', 'pending_metadata', 'processing_metadata', 'processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) && (
-                    <CheckCircleIcon className="w-4 h-4 text-success" />
-                  )}
-                </div>
-                <button
-                  className="text-accent hover:text-accent-hover"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRenderDetailsClick(item);
-                  }}
-                >
-                  View Details
-                </button>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-text-muted">{item.nexrenderUid}</span>
-                <span className="text-text-faint">{item.renderTime ? formatDate(item.renderTime) : '-'}</span>
-              </div>
-              {(item.status === 'rendering') && item.renderProgress !== undefined && (
-                <div className="mt-2">
-                  <div className="w-full bg-surface-raised rounded-full h-2">
-                    <div
-                      className="bg-accent h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${item.renderProgress}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-sm text-text-muted mt-1 text-right">
-                    {item.renderProgress}%
-                  </p>
-                </div>
-              )}
-              {item.status === 'new' && (
-                <button
-                  className="mt-2 w-full px-3 py-1 text-sm bg-accent hover:bg-accent-hover text-accent-fg rounded"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRender(item);
-                  }}
-                >
-                  Start Render
-                </button>
-              )}
-              {['rendered', 'pending_metadata', 'processing_metadata', 'processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) && (
-                <button
-                  className="mt-2 w-full px-3 py-1 text-sm bg-success-bg text-success hover:bg-success-bg/80 rounded flex items-center justify-center gap-2"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Open the video file in a new tab (restore old behavior)
-                    if (item.mp4Link) {
-                      window.open(item.mp4Link, '_blank');
-                    } else {
-                      window.open(`/api/renders/${item.id}/video`, '_blank');
-                    }
-                  }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                  </svg>
-                  Open Video
-                </button>
-              )}
-            </div>
-
-            {/* Row 4: Metadata Zone */}
-            <div className={`rounded-lg p-4 ${
-              ['processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status)
-                ? item.status === 'processed_metadata'
-                  ? 'bg-info-bg border border-info/30'
-                  : 'bg-success-bg border border-success/30'
-                : 'bg-surface-sunken'
-            }`}>
-              <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-medium text-text-muted">Metadata</h4>
-                  {['processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) && (
-                    <CheckCircleIcon className="w-4 h-4 text-info" />
-                  )}
-                </div>
-                <button
-                  className="text-accent hover:text-accent-hover"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleMetadataDetailsClick(item);
-                  }}
-                >
-                  View Details
-                </button>
-              </div>
-              <div className="flex flex-col gap-1 text-sm">
-                {item.youtubeMetadata ? (
-                  <>
-                    <span className="text-text-muted truncate">
-                      {item.youtubeMetadata.title}
-                    </span>
-                    <span className="text-text-muted truncate">
-                      {item.youtubeMetadata.description}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-text-faint">No metadata generated</span>
-                )}
-                <span className="text-text-faint">{item.metadataTime ? formatDate(item.metadataTime) : '-'}</span>
-              </div>
-              {item.status === 'rendered' && (
-                <button
-                  className="mt-2 w-full px-3 py-1 text-sm bg-accent hover:bg-accent-hover text-accent-fg rounded"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleMetadata(item);
-                  }}
-                >
-                  Generate Metadata
-                </button>
-              )}
-              {(item.status === 'pending_metadata' || item.status === 'processing_metadata') && (
-                <div className="mt-2">
-                  <div className="w-full bg-surface-raised rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-progress h-2 rounded-full transition-all duration-500 animate-[loading_2s_ease-in-out_infinite]"
-                      style={{
-                        width: '100%',
-                        transform: 'translateX(-100%)',
-                      }}
-                    ></div>
-                  </div>
-                  <p className="text-sm text-text-muted mt-1 text-right">
-                    {item.status === 'pending_metadata' ? 'Pending...' : 'Processing...'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Row 5: Upload Zone */}
-            <div className={`rounded-lg p-4 ${
-              ['uploaded', 'declined', 'approved'].includes(item.status)
-                ? 'bg-success-bg border border-success/30'
-                : 'bg-surface-sunken'
-            }`}>
-              <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-medium text-text-muted">Upload</h4>
-                  {['uploaded', 'declined', 'approved'].includes(item.status) && (
-                    <CheckCircleIcon className="w-4 h-4 text-success" />
-                  )}
-                </div>
-                <button
-                  className="text-accent hover:text-accent-hover"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (item.youtubeLink) {
-                      window.open(item.youtubeLink, '_blank');
-                    }
-                  }}
-                >
-                  View Details
-                </button>
-              </div>
-              <div className="flex flex-col gap-1 text-sm">
-                {item.youtubeLink && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-danger text-xs">YouTube:</span>
-                    <a
-                      href={item.youtubeLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-accent hover:underline break-all text-xs"
-                    >
-                      {item.youtubeLink}
-                    </a>
-                  </div>
-                )}
-                {item.tiktokLink && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-text bg-surface-raised border border-border px-1 rounded text-xs">TikTok:</span>
-                    <a
-                      href={item.tiktokLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-accent hover:underline break-all text-xs"
-                    >
-                      {item.tiktokLink}
-                    </a>
-                  </div>
-                )}
-                {!item.youtubeLink && !item.tiktokLink && (
-                  <span className="text-text-muted">-</span>
-                )}
-                <span className="text-text-faint">{item.uploadTime ? formatDate(item.uploadTime) : '-'}</span>
-              </div>
-              {item.status === 'processed_metadata' && (
-                <div className="mt-2 space-y-2">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="w-full"
-                    leftIcon={
-                      <svg height="20" viewBox="0 0 24 24" width="20" fill="currentColor">
-                        <path d="M23.498 6.186a2.994 2.994 0 0 0-2.112-2.12C19.228 3.5 12 3.5 12 3.5s-7.228 0-9.386.566A2.994 2.994 0 0 0 .502 6.186C0 8.344 0 12 0 12s0 3.656.502 5.814a2.994 2.994 0 0 0 2.112 2.12C4.772 20.5 12 20.5 12 20.5s7.228 0 9.386-.566a2.994 2.994 0 0 0 2.112-2.12C24 15.656 24 12 24 12s0-3.656-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                      </svg>
-                    }
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (!item.youtubeMetadata || !item.youtubeMetadata.title || !item.youtubeMetadata.title.trim()) {
-                        alert('Cannot upload: Missing or empty YouTube title.');
-                        return;
-                      }
-                      if ([...item.youtubeMetadata.title].length > 100) {
-                        alert('Cannot upload: YouTube title must be 100 characters or fewer. Current count: ' + [...item.youtubeMetadata.title].length);
-                        return;
-                      }
-                      // Show scheduling dialog for single item
-                      setPendingUploadItems([item]);
-                      setPendingUploadType('youtube');
-                      setShowScheduleDialog(true);
-                    }}
-                  >
-                    Upload to YouTube
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="w-full"
-                    leftIcon={
-                      <svg height="20" viewBox="0 0 24 24" width="20" fill="currentColor">
-                        <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
-                      </svg>
-                    }
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (!item.youtubeMetadata || !item.youtubeMetadata.title || !item.youtubeMetadata.title.trim()) {
-                        alert('Cannot upload: Missing or empty TikTok title.');
-                        return;
-                      }
-                      if ([...item.youtubeMetadata.title].length > 150) {
-                        alert('Cannot upload: TikTok title must be 150 characters or fewer. Current count: ' + [...item.youtubeMetadata.title].length);
-                        return;
-                      }
-                      // Show scheduling dialog for single item
-                      setPendingUploadItems([item]);
-                      setPendingUploadType('tiktok');
-                      setShowScheduleDialog(true);
-                    }}
-                  >
-                    Upload to TikTok
-                  </Button>
-                </div>
-              )}
-              {(item.status === 'pending_upload' || item.status === 'processing_upload') && (
-                <div className="mt-2">
-                  <div className="w-full bg-surface-raised rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-progress h-2 rounded-full transition-all duration-500 animate-[loading_2s_ease-in-out_infinite]"
-                      style={{
-                        width: '100%',
-                        transform: 'translateX(-100%)',
-                      }}
-                    ></div>
-                  </div>
-                  <p className="text-sm text-text-muted mt-1 text-right">
-                    {item.status === 'pending_upload' ? 'Pending...' : 'Uploading...'}
-                  </p>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        ))}
+        {items &&
+          items.map((item) => (
+            <RenderCard
+              key={item.id}
+              item={item}
+              isSelected={selectedItems.includes(item.id)}
+              onSelect={handleItemSelect}
+              onRender={handleRender}
+              onMetadata={handleMetadata}
+              onRenderDetails={handleRenderDetailsClick}
+              onMetadataDetails={handleMetadataDetailsClick}
+              onRequestSingleUpload={handleRequestSingleUpload}
+            />
+          ))}
       </motion.div>
 
       {/* Pagination */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-6 mb-6"
-      >
-        {/* Items per page selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-text-muted text-sm">Show:</span>
-          <Select
-            value={itemsPerPage}
-            onChange={(e) => setItemsPerPage(Number(e.target.value))}
-            className="w-auto px-3 py-1 text-sm"
-          >
-            <option value={20}>20</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </Select>
-          <span className="text-text-muted text-sm">per page</span>
-        </div>
-
-        {/* Page numbers */}
-        <div className="flex gap-2">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-            <motion.button
-              key={pageNum}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={() => setCurrentPage(pageNum)}
-              className={`w-10 h-10 rounded-lg ${
-                currentPage === pageNum
-                  ? "bg-accent text-accent-fg"
-                  : "bg-surface-raised border border-border text-text hover:border-border-strong"
-              }`}
-            >
-              {pageNum}
-            </motion.button>
-          ))}
-        </div>
-      </motion.div>
+      <RenderPagination
+        itemsPerPage={itemsPerPage}
+        onItemsPerPageChange={setItemsPerPage}
+        totalPages={totalPages}
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+      />
 
       {/* Selection Mode Toolbar - Fixed at bottom */}
-      {selectedItems.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-surface-raised border-t border-border shadow-overlay p-4 flex justify-between items-center z-50">
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-text-muted">
-              {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} selected
-            </span>
-            <Button variant="secondary" size="sm" onClick={handleSelectAll}>
-              Select All
-            </Button>
-            <Button variant="secondary" size="sm" onClick={handleDeselectAll}>
-              Deselect All
-            </Button>
-          </div>
-          <div className="flex space-x-2">
-            <Button variant="primary" size="sm" onClick={() => handleActionClick('render')}>
-              Render
-            </Button>
-            <Button variant="primary" size="sm" onClick={() => handleActionClick('metadata')}>
-              Metadata
-            </Button>
-            <Button variant="primary" size="sm" onClick={() => handleActionClick('upload')}>
-              Upload
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => handleActionClick('tiktok-upload')}>
-              TikTok
-            </Button>
-            <Button variant="danger" size="sm" onClick={handleDeleteSelected}>
-              Delete
-            </Button>
-          </div>
-        </div>
-      )}
+      <RenderSelectionToolbar
+        selectedCount={selectedItems.length}
+        onSelectAll={handleSelectAll}
+        onDeselectAll={handleDeselectAll}
+        onAction={handleActionClick}
+        onDelete={handleDeleteSelected}
+      />
 
       {/* Create Render Dialog */}
       <CreateRenderDialog
         isOpen={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
-        channels={channels.map(name => ({ id: name, name }))}
+        channels={channels.map((name) => ({ id: name, name }))}
         topics={topics}
         types={types}
         templates={templates}
@@ -1874,7 +598,11 @@ export default function Page() {
           setPendingUploadItems([]);
         }}
         onConfirm={(scheduleConfig) => {
-          handleScheduledUpload(pendingUploadItems, scheduleConfig, pendingUploadType);
+          handleScheduledUpload(
+            pendingUploadItems,
+            scheduleConfig,
+            pendingUploadType,
+          );
           setShowScheduleDialog(false);
           setPendingUploadItems([]);
           setSelectedItems([]);
@@ -1902,7 +630,9 @@ export default function Page() {
             }}
             renderItem={selectedRenderItem}
             onMetadataUpdate={(updated) => {
-              setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
+              setItems((prev) =>
+                prev.map((i) => (i.id === updated.id ? updated : i)),
+              );
               setSelectedRenderItem(updated);
             }}
           />
