@@ -19,204 +19,34 @@ import { config } from "../../lib/config";
 import ImageGenerationDialog from "../components/ImageGenerationDialog";
 import ProviderSelectionDialog from "../components/ProviderSelectionDialog";
 import ImageEditor from "../components/ImageEditor";
+import { logger } from "@/app/lib/logger";
 
-interface Asset {
-  id: string;
-  name: string;
-  type: 'voice' | 'image' | 'video' | 'json';
-  category: string;
-  path: string;
-  size?: number;
-  lastModified?: Date;
-  status: 'available' | 'missing' | 'processing';
-  key?: string; // Animal key like 'bear', 'cat', etc.
-  order?: number; // Order number for JSON files
-  rendered?: boolean; // Whether this asset has been rendered
-  renderJson?: string; // JSON file used for rendering
-}
-
-interface AssetCategory {
-  id: string;
-  name: string;
-  type: 'voice' | 'image' | 'video' | 'json';
-  count: number;
-  path: string;
-}
-
-// New interface for JSON-Voice pairs
-interface JSONVoicePair {
-  json: Asset;
-  voices: Asset[];
-  hasAllVoices: boolean;
-  missingVoices: string[];
-  voiceTypes: {
-    intro: boolean;
-    quiz1_question: boolean;
-    quiz1_answer: boolean;
-    quiz2_question: boolean;
-    quiz2_answer: boolean;
-    quiz3_question: boolean;
-    quiz3_answer: boolean;
-    lesson: boolean;
-    reward: boolean;
-  };
-}
-
-// Updated interface for JSON-Asset pairs (JSON, Voices, and Rewards)
-interface JSONAssetPair {
-  json: Asset;
-  voices: Asset[];
-  reward?: Asset;
-  hasAllVoices: boolean;
-  hasReward: boolean;
-  missingVoices: string[];
-  voiceTypes: {
-    intro: boolean;
-    quiz1_question: boolean;
-    quiz1_answer: boolean;
-    quiz2_question: boolean;
-    quiz2_answer: boolean;
-    quiz3_question: boolean;
-    quiz3_answer: boolean;
-    lesson: boolean;
-    reward: boolean;
-  };
-  // Quiz 3 image options status
-  quiz3ImageOptions: {
-    options: string[];
-    availableImages: string[];
-    missingImages: string[];
-    hasAllImages: boolean;
-    completionRate: number;
-  };
-}
-
-  interface AssetGroup {
-    key: string;
-    name: string;
-    assets: {
-      images: Asset[]; // Changed from single image to array to handle multiple orders
-      videos: Asset[];
-      voices: Asset[];
-      jsons: Asset[];
-      rewards: Asset[];
-      jsonAssetPairs: JSONAssetPair[]; // Updated field for organized JSON-Asset pairs
-    };
-    renderStatus: {
-      hasJson: boolean;
-      hasImage: boolean;
-      hasVideos: boolean;
-      hasVoices: boolean;
-      isComplete: boolean;
-      requiredVoices: number; // 9 voices per JSON
-      availableVoices: number;
-      requiredRewards: number; // 1 reward per JSON
-      availableRewards: number;
-      requiredImages: number; // 1 image per JSON (with order numbers)
-      availableImages: number;
-      requiredVideos: number; // 1 video per JSON (with order numbers)
-      availableVideos: number;
-      jsonOrders: number[]; // Which JSON orders exist (1, 2, 3, etc.)
-      imageOrders: number[]; // Which image orders exist (1, 2, 3, etc.)
-      videoOrders: number[]; // Which video orders exist (1, 2, 3, etc.)
-      // Quiz 3 image options status
-      hasQuiz3Images: boolean;
-      requiredQuiz3Images: number; // 4 images per JSON
-      availableQuiz3Images: number;
-    };
-  }
-
-interface SK3QLRContent {
-  id: string; // Add unique ID to prevent duplicate keys
-  key: string;
-  order: number;
-  intro: {
-    text: string;
-    voice: string;
-  };
-  quiz_1: {
-    question: {
-      text: string;
-      voice: string;
-    };
-    options: string[];
-    answer: {
-      position: number;
-      voice: string;
-    };
-  };
-  quiz_2: {
-    question: {
-      text: string;
-      voice: string;
-    };
-    options: string[];
-    answer: {
-      position: number;
-      voice: string;
-    };
-  };
-  quiz_3: {
-    question: {
-      text: string;
-      voice: string;
-    };
-    options: string[];
-    answer: {
-      position: number;
-      voice: string;
-    };
-  };
-  lesson: {
-    voice: string;
-  };
-  reward: {
-    voice: string;
-  };
-}
-
-interface OverviewStatus {
-  totalGroups: number;
-  completeGroups: number;
-  incompleteGroups: number;
-  missingJson: number;
-  missingImage: number;
-  missingVideos: number;
-  missingVoices: number;
-  missingRewards: number;
-  missingQuiz3Images: number;
-  completionRate: number;
-}
-
-// Interface for missing resource types
-interface MissingResource {
-  type: 'image' | 'quiz3-image' | 'video' | 'reward';
-  label: string;
-  icon: string;
-  color: string;
-  count: number;
-  description: string;
-  // For quiz3-image and reward, we need specific items
-  items?: MissingItem[];
-}
-
-// Interface for specific missing items
-interface MissingItem {
-  name: string;
-  key: string;
-  jsonOrder?: number; // For rewards
-  description: string;
-}
-
-// Interface for group upload item
-interface GroupUploadItem {
-  key: string;
-  name: string;
-  missingResources: MissingResource[];
-  priority: number; // Higher number = higher priority
-  jsonOrders: number[];
-}
-
+import type {
+  Asset,
+  AssetCategory,
+  JSONVoicePair,
+  JSONAssetPair,
+  AssetGroup,
+  SK3QLRContent,
+  OverviewStatus,
+  MissingResource,
+  MissingItem,
+  GroupUploadItem,
+  CrawlerResource,
+  ResourceType,
+  ApiResourceType,
+  ResourceTarget,
+} from "./types";
+import {
+  extractKeyAndOrder,
+  organizeJSONAssetPairs,
+  getValidOptionsForAvailableImages,
+  getEarliestJsonDate,
+  formatDate,
+  formatFileSize,
+  getUploadKey,
+  getSelectionKey,
+} from "./utils";
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetGroups, setAssetGroups] = useState<AssetGroup[]>([]);
@@ -281,7 +111,7 @@ export default function AssetsPage() {
 
   // Calculate missing resources for upload dialog
   const calculateMissingResources = useMemo((): GroupUploadItem[] => {
-    console.log('🔄 calculateMissingResources triggered - assetGroups changed');
+    logger.debug('🔄 calculateMissingResources triggered - assetGroups changed');
     const groups: GroupUploadItem[] = [];
     
     assetGroups.forEach(group => {
@@ -294,12 +124,12 @@ export default function AssetsPage() {
         
         // Debug logging for frog group
         if (group.key === 'frog') {
-          console.log(`🐸 Frog missing images calculation:`);
-          console.log(`  Required images: ${status.requiredImages}`);
-          console.log(`  Available images: ${status.availableImages}`);
-          console.log(`  JSON orders: ${status.jsonOrders}`);
-          console.log(`  Image orders: ${status.imageOrders}`);
-          console.log(`  Available images:`, group.assets.images.map(img => ({ name: img.name, order: img.order })));
+          logger.debug(`🐸 Frog missing images calculation:`);
+          logger.debug(`  Required images: ${status.requiredImages}`);
+          logger.debug(`  Available images: ${status.availableImages}`);
+          logger.debug(`  JSON orders: ${status.jsonOrders}`);
+          logger.debug(`  Image orders: ${status.imageOrders}`);
+          logger.debug(`  Available images:`, group.assets.images.map(img => ({ name: img.name, order: img.order })));
         }
         
         // Get specific missing images by JSON order
@@ -423,13 +253,13 @@ export default function AssetsPage() {
       
       // Debug logging for frog group
       if (group.key === 'frog') {
-        console.log(`🐸 Frog calculateMissingResources:`);
-        console.log(`  Required images: ${status.requiredImages}`);
-        console.log(`  Available images: ${status.availableImages}`);
-        console.log(`  Required videos: ${status.requiredVideos}`);
-        console.log(`  Available videos: ${status.availableVideos}`);
-        console.log(`  Missing resources count: ${missingResources.length}`);
-        console.log(`  Missing resources:`, missingResources.map(r => ({ type: r.type, count: r.count })));
+        logger.debug(`🐸 Frog calculateMissingResources:`);
+        logger.debug(`  Required images: ${status.requiredImages}`);
+        logger.debug(`  Available images: ${status.availableImages}`);
+        logger.debug(`  Required videos: ${status.requiredVideos}`);
+        logger.debug(`  Available videos: ${status.availableVideos}`);
+        logger.debug(`  Missing resources count: ${missingResources.length}`);
+        logger.debug(`  Missing resources:`, missingResources.map(r => ({ type: r.type, count: r.count })));
       }
       
       // Only add groups that have missing resources
@@ -470,14 +300,14 @@ export default function AssetsPage() {
 
   // Base missing resources (doesn't change with search) - memoized to prevent recalculation
   const baseMissingResources = useMemo((): GroupUploadItem[] => {
-    console.log('🔄 Recalculating base missing resources');
-    console.log('  - calculateMissingResources dependency changed');
+    logger.debug('🔄 Recalculating base missing resources');
+    logger.debug('  - calculateMissingResources dependency changed');
     return calculateMissingResources;
   }, [calculateMissingResources]);
 
   // Create search index for fast filtering
   const searchIndex = useMemo(() => {
-    console.log('🔍 Creating search index');
+    logger.debug('🔍 Creating search index');
     const index = new Map<string, Set<string>>();
     
     baseMissingResources.forEach(group => {
@@ -498,7 +328,7 @@ export default function AssetsPage() {
       });
     });
     
-    console.log('🔍 Search index created with', index.size, 'words');
+    logger.debug('🔍 Search index created with', index.size, 'words');
     return index;
   }, [baseMissingResources]);
 
@@ -514,7 +344,7 @@ export default function AssetsPage() {
 
   // Separate effect for filtering - runs only when needed
   useEffect(() => {
-    console.log('🔍 Starting filter operation');
+    logger.debug('🔍 Starting filter operation');
     const startTime = performance.now();
     
     let filtered = baseMissingResources;
@@ -569,7 +399,7 @@ export default function AssetsPage() {
     });
 
     const endTime = performance.now();
-    console.log(`🔍 Filter operation completed in ${endTime - startTime}ms`);
+    logger.debug(`🔍 Filter operation completed in ${endTime - startTime}ms`);
     
     setFilteredMissingResources(filtered);
   }, [baseMissingResources, uploadSearchQuery, uploadResourceFilter, uploadSortBy, uploadSortOrder]);
@@ -599,7 +429,7 @@ export default function AssetsPage() {
                                 status.availableRewards >= status.requiredRewards &&
                                 status.availableQuiz3Images >= status.requiredQuiz3Images;
         
-        console.log('🐊 Alligator Group Status:', {
+        logger.debug('🐊 Alligator Group Status:', {
           name: group.name,
           isComplete: status.isComplete,
           manualIsComplete: manualIsComplete,
@@ -644,7 +474,7 @@ export default function AssetsPage() {
 
     const completionRate = totalGroups > 0 ? Math.round((completeGroups / totalGroups) * 100) : 0;
 
-    console.log('📊 Overview Status Results:', {
+    logger.debug('📊 Overview Status Results:', {
       totalGroups,
       completeGroups,
       incompleteGroups,
@@ -738,250 +568,20 @@ export default function AssetsPage() {
   // Toast notification state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Helper function to extract key and order from filename
-  const extractKeyAndOrder = (filename: string, type: string, path?: string): { key: string; order?: number } => {
-    if (type === 'json') {
-      // Extract from format like "bear_1.json" or "blue_tang_1.json"
-      // Use a more robust regex that handles multi-word names
-      const match = filename.match(/^(.+?)_(\d+)\.json$/);
-      if (match) {
-        const key = match[1];
-        const order = parseInt(match[2]);
-        console.log(`Extracted from ${filename}: key="${key}", order=${order}`); // Debug log
-        return { key, order };
-      }
-    } else if (type === 'voice') {
-      // For voice files, extract the key from the directory path
-      // Voice files are in directories like "voice/buoyancy_1/voice_lesson.mp3"
-      if (path) {
-        // Extract the directory name from the path - handle both Windows and Unix separators
-        const pathParts = path.split(/[\/\\]/); // Split by both forward and backward slashes
-        const voiceDirIndex = pathParts.findIndex(part => part === 'voice');
-        if (voiceDirIndex !== -1 && voiceDirIndex + 1 < pathParts.length) {
-          const dirName = pathParts[voiceDirIndex + 1]; // This should be "buoyancy_1"
-          const dirMatch = dirName.match(/^(.+?)_(\d+)$/);
-          if (dirMatch) {
-            const key = dirMatch[1];
-            const order = parseInt(dirMatch[2]);
-            console.log(`Extracted from voice path ${path}: key="${key}", order=${order}`); // Debug log
-            return { key, order };
-          }
-        }
-      }
-      
-      // Fallback: extract from filename if path method fails
-      const match = filename.match(/voice_(.+?)\.mp3/);
-      if (match) {
-        return { key: 'voice_' + match[1] };
-      }
-    } else if (type === 'video' && path && path.includes('reward')) {
-      // For reward videos, extract key from the filename and order from the path
-      // Path format: reward/output/reward_1/hamster.mp4
-      const pathMatch = path.match(/reward[\/\\]output[\/\\]reward_(\d+)[\/\\]([^\/\\]+)\.mp4$/);
-      if (pathMatch) {
-        const order = parseInt(pathMatch[1]);
-        const key = pathMatch[2]; // The filename without extension is the key
-        console.log(`Extracted from reward video path ${path}: key="${key}", order=${order}`); // Debug log
-        return { key, order };
-      }
-      
-      // Fallback for reward videos without proper path structure
-      const filenameMatch = filename.match(/^(.+?)\.mp4$/);
-      if (filenameMatch) {
-        const key = filenameMatch[1];
-        console.log(`Extracted from reward video filename ${filename}: key="${key}"`); // Debug log
-        return { key };
-      }
-    } else if (type === 'image' || type === 'video') {
-      // Extract from format like "alligator_1.jpg", "alligator_2.mp4", "bear_1.png"
-      // This matches the new structure where images and videos include order numbers
-      const match = filename.match(/^(.+?)_(\d+)\.(jpg|mp4|png|gif)$/);
-      if (match) {
-        const key = match[1];
-        const order = parseInt(match[2]);
-        console.log(`Extracted from ${type} ${filename}: key="${key}", order=${order}`); // Debug log
-        return { key, order };
-      }
-      
-      // Files without order numbers should be ignored for images and videos
-      console.log(`Ignoring ${type} file without order number: ${filename}`);
-      return { key: 'ignored', order: undefined };
-    }
-    return { key: filename.split('.')[0] };
-  };
 
 
 
-  // Helper function to organize JSON files with their corresponding voices and rewards
-  const organizeJSONAssetPairs = (jsons: Asset[], voices: Asset[], rewards: Asset[], allImages: Asset[], jsonOptionsMap: Map<string, string[]> = new Map()): JSONAssetPair[] => {
-    console.log('🔧 organizeJSONAssetPairs called with:', jsons.length, 'JSONs');
-    console.log('🎁 Rewards array:', rewards.map(r => ({ name: r.name, path: r.path, key: r.key, order: r.order })));
-    return jsons.map(json => {
-      const jsonOrder = json.order;
-      const jsonKey = json.key;
-      
-      // Find voices that belong to this JSON file
-      const matchingVoices = voices.filter(voice => {
-        // Check if voice belongs to this JSON by matching key and order
-        if (voice.key === jsonKey && voice.order === jsonOrder) {
-          console.log(`Voice ${voice.name} matched by key/order: ${voice.key}_${voice.order}`); // Debug log
-          return true;
-        }
-        
-        // Check by path structure: voice/key_order/voice_type.mp3
-        if (voice.path) {
-          const pathMatch = voice.path.match(/voice[\/\\]([^\/\\]+)_(\d+)[\/\\]/);
-          if (pathMatch && pathMatch[1] === jsonKey && parseInt(pathMatch[2]) === jsonOrder) {
-            console.log(`Voice ${voice.name} matched by path: ${voice.path}`); // Debug log
-            return true;
-          }
-        }
-        
-        // Additional check for voice filename pattern: key_order_voice_type.mp3
-        const voiceNameMatch = voice.name.match(/^(.+?)_(\d+)_voice_/);
-        if (voiceNameMatch && voiceNameMatch[1] === jsonKey && parseInt(voiceNameMatch[2]) === jsonOrder) {
-          console.log(`Voice ${voice.name} matched by filename pattern`); // Debug log
-          return true;
-        }
-        
-        return false;
-      });
-
-      // Find reward that belongs to this JSON file
-      console.log(`🔍 Looking for reward for JSON ${json.name} (key: ${jsonKey}, order: ${jsonOrder})`);
-      const matchingReward = rewards.find(reward => {
-        console.log(`  Checking reward: ${reward.name} (path: ${reward.path}, key: ${reward.key}, order: ${reward.order})`);
-        
-        // Check by path structure: reward/output/reward_order/name.mp4
-        if (reward.path) {
-          const pathMatch = reward.path.match(/reward[\/\\]output[\/\\]reward_(\d+)[\/\\]([^\/\\]+)\.mp4$/);
-          if (pathMatch) {
-            console.log(`    Path match: order=${pathMatch[1]}, filename=${pathMatch[2]}`);
-            if (parseInt(pathMatch[1]) === jsonOrder) {
-              console.log(`    ✅ Reward ${reward.name} matched by path: ${reward.path} (order ${pathMatch[1]})`);
-              return true;
-            }
-          }
-        }
-        
-        // Check by filename pattern: key.mp4 (for reward videos)
-        if (reward.name && reward.name.toLowerCase() === `${jsonKey}.mp4`) {
-          console.log(`    ✅ Reward ${reward.name} matched by filename: ${reward.name}`);
-          return true;
-        }
-        
-        // Check by key and order if reward has order
-        if (reward.key === jsonKey && reward.order === jsonOrder) {
-          console.log(`    ✅ Reward ${reward.name} matched by key/order: ${reward.key}_${reward.order}`);
-          return true;
-        }
-        
-        console.log(`    ❌ No match for reward: ${reward.name}`);
-        return false;
-      });
-
-      // Determine which voice types are present based on the actual file naming pattern
-      const voiceTypes = {
-        intro: false,
-        quiz1_question: false,
-        quiz1_answer: false,
-        quiz2_question: false,
-        quiz2_answer: false,
-        quiz3_question: false,
-        quiz3_answer: false,
-        lesson: false,
-        reward: false
-      };
-
-      const missingVoices: string[] = [];
-
-      console.log(`🔍 Checking voices for ${json.name} (${jsonKey}_${jsonOrder}):`, matchingVoices.map(v => v.name));
-      
-      matchingVoices.forEach(voice => {
-        const voiceName = voice.name.toLowerCase();
-        console.log(`🎵 Processing voice: ${voice.name} (${voiceName})`);
-        
-        // EXACT filename matching - no partial matches allowed
-        if (voiceName === 'voice_title.mp3') {
-          voiceTypes.intro = true;
-          console.log(`  ✅ Matched intro (exact match)`);
-        } else if (voiceName === 'voice_q1_title.mp3') {
-          voiceTypes.quiz1_question = true;
-          console.log(`  ✅ Matched quiz1_question (exact match)`);
-        } else if (voiceName === 'voice_q1_ans.mp3') {
-          voiceTypes.quiz1_answer = true;
-          console.log(`  ✅ Matched quiz1_answer (exact match)`);
-        } else if (voiceName === 'voice_q2_title.mp3') {
-          voiceTypes.quiz2_question = true;
-          console.log(`  ✅ Matched quiz2_question (exact match)`);
-        } else if (voiceName === 'voice_q2_ans.mp3') {
-          voiceTypes.quiz2_answer = true;
-          console.log(`  ✅ Matched quiz2_answer (exact match)`);
-        } else if (voiceName === 'voice_q3_title.mp3') {
-          voiceTypes.quiz3_question = true;
-          console.log(`  ✅ Matched quiz3_question (exact match)`);
-        } else if (voiceName === 'voice_q3_ans.mp3') {
-          voiceTypes.quiz3_answer = true;
-          console.log(`  ✅ Matched quiz3_answer (exact match)`);
-        } else if (voiceName === 'voice_lesson.mp3') {
-          voiceTypes.lesson = true;
-          console.log(`  ✅ Matched lesson (exact match)`);
-        } else if (voiceName === 'voice_reward.mp3') {
-          voiceTypes.reward = true;
-          console.log(`  ✅ Matched reward (exact match)`);
-        } else {
-          console.log(`  ❌ No exact match for voice: ${voice.name} (expected exact filename)`);
-        }
-      });
-
-      // Check for missing voice types
-      if (!voiceTypes.intro) missingVoices.push('intro');
-      if (!voiceTypes.quiz1_question) missingVoices.push('quiz1_question');
-      if (!voiceTypes.quiz1_answer) missingVoices.push('quiz1_answer');
-      if (!voiceTypes.quiz2_question) missingVoices.push('quiz2_question');
-      if (!voiceTypes.quiz2_answer) missingVoices.push('quiz2_answer');
-      if (!voiceTypes.quiz3_question) missingVoices.push('quiz3_question');
-      if (!voiceTypes.quiz3_answer) missingVoices.push('quiz3_answer');
-      if (!voiceTypes.lesson) missingVoices.push('lesson');
-      if (!voiceTypes.reward) missingVoices.push('reward');
-
-      console.log(`📊 Voice types status for ${json.name}:`, voiceTypes);
-      console.log(`❌ Missing voices for ${json.name}:`, missingVoices);
-
-      const hasAllVoices = missingVoices.length === 0;
-      const hasReward = !!matchingReward;
-
-      // Check quiz 3 image options using pre-loaded JSON content
-      const normalizedPath = json.path.replace(/\\/g, '/');
-      const jsonOptions = jsonOptionsMap.get(normalizedPath) || [];
-      console.log(`🔍 Looking for options for ${json.name} at path: ${normalizedPath}`);
-      console.log(`📋 Found options:`, jsonOptions);
-      console.log(`🔑 JSON key: ${json.key}, order: ${json.order}`);
-      const quiz3ImageOptions = checkQuiz3ImageOptions(json, allImages, jsonOptions);
-
-      return {
-        json,
-        voices: matchingVoices,
-        reward: matchingReward,
-        hasAllVoices,
-        hasReward,
-        missingVoices,
-        voiceTypes,
-        quiz3ImageOptions
-      };
-    });
-  };
 
   // Function to pre-load JSON content for quiz 3 options
   const loadJSONContentBatch = async (jsonAssets: Asset[]) => {
-    console.log('🔧 loadJSONContentBatch called for:', jsonAssets.length, 'files');
+    logger.debug('🔧 loadJSONContentBatch called for:', jsonAssets.length, 'files');
     try {
       if (jsonAssets.length === 0) {
         return new Map<string, string[]>();
       }
 
       const paths = jsonAssets.map(asset => asset.path);
-      console.log(`📄 Loading JSON content for ${jsonAssets.length} files`);
+      logger.debug(`📄 Loading JSON content for ${jsonAssets.length} files`);
       
       const response = await fetch('/api/assets/json-content', {
         method: 'POST',
@@ -995,11 +595,11 @@ export default function AssetsPage() {
         })
       });
       
-      console.log(`📡 Response status: ${response.status}, ok: ${response.ok}`);
+      logger.debug(`📡 Response status: ${response.status}, ok: ${response.ok}`);
       
       if (response.ok) {
         const result = await response.json();
-        console.log(`✅ Batch loaded JSON content for ${Object.keys(result).length} files`);
+        logger.debug(`✅ Batch loaded JSON content for ${Object.keys(result).length} files`);
         
         // Convert the result to a Map for easier lookup
         const jsonOptionsMap = new Map<string, string[]>();
@@ -1016,132 +616,37 @@ export default function AssetsPage() {
               // Get valid options without modifying the JSON file
               const optionsInfo = getValidOptionsForAvailableImages(jsonAsset, assets, typedData.options);
               jsonOptionsMap.set(normalizedPath, optionsInfo.originalOptions);
-              console.log(`🎯 Quiz 3 options for ${path}:`, optionsInfo.originalOptions);
+              logger.debug(`🎯 Quiz 3 options for ${path}:`, optionsInfo.originalOptions);
               if (optionsInfo.hasMismatch) {
-                console.log(`⚠️ Warning: JSON has ${optionsInfo.originalOptions.length - optionsInfo.validOptions.length} invalid options`);
+                logger.debug(`⚠️ Warning: JSON has ${optionsInfo.originalOptions.length - optionsInfo.validOptions.length} invalid options`);
               }
             } else {
               jsonOptionsMap.set(normalizedPath, typedData.options);
-              console.log(`🎯 Quiz 3 options for ${path}:`, typedData.options);
+              logger.debug(`🎯 Quiz 3 options for ${path}:`, typedData.options);
             }
           } else if ('error' in typedData) {
-            console.error(`❌ Error loading ${path}:`, typedData.error);
+            logger.error(`❌ Error loading ${path}:`, typedData.error);
             jsonOptionsMap.set(normalizedPath, []);
           }
         }
         
-        console.log('📊 Final JSON options map size:', jsonOptionsMap.size);
-        console.log('📊 JSON options map keys:', Array.from(jsonOptionsMap.keys()));
+        logger.debug('📊 Final JSON options map size:', jsonOptionsMap.size);
+        logger.debug('📊 JSON options map keys:', Array.from(jsonOptionsMap.keys()));
         
         return jsonOptionsMap;
       } else {
-        console.error(`❌ Failed to load JSON content batch:`, response.status, response.statusText);
+        logger.error(`❌ Failed to load JSON content batch:`, response.status, response.statusText);
       }
     } catch (error) {
-      console.error('❌ Error loading JSON content batch:', error);
+      logger.error('❌ Error loading JSON content batch:', error);
     }
     return new Map<string, string[]>();
   };
 
-  // Function to check quiz 3 image options availability (synchronous version)
-  const checkQuiz3ImageOptions = (jsonAsset: Asset, allImages: Asset[], jsonOptions: string[] = []) => {
-    console.log('🔧 checkQuiz3ImageOptions called for:', jsonAsset.name, 'with options:', jsonOptions);
-    console.log('🔍 Available images in options folder:', allImages.filter(img => img.path.includes('options')).map(img => img.name));
-    try {
-      const options = jsonOptions.length > 0 ? jsonOptions : [];
-      
-      // Check which images are available in the options folder
-      const availableImages: string[] = [];
-      const missingImages: string[] = [];
 
-      options.forEach((option: string) => {
-        // Look for images in the options folder with exact name matching
-        const optionImage = allImages.find(img => {
-          if (img.type !== 'image' || !img.path.includes('options')) {
-            return false;
-          }
-          
-          // Get the filename without extension
-          const fileNameWithoutExt = img.name.replace(/\.(jpg|jpeg|png|gif|bmp)$/i, '');
-          
-          // Check for exact match (case-insensitive)
-          return fileNameWithoutExt.toLowerCase() === option.toLowerCase();
-        });
-        
-        if (optionImage) {
-          availableImages.push(option);
-          console.log(`✅ Found image for option "${option}": ${optionImage.name}`);
-        } else {
-          missingImages.push(option);
-          console.log(`❌ Missing image for option "${option}"`);
-        }
-      });
-
-      const hasAllImages = missingImages.length === 0;
-      const completionRate = options.length > 0 ? (availableImages.length / options.length) * 100 : 0;
-
-      console.log(`📊 Quiz 3 image options summary for ${jsonAsset.name}:`);
-      console.log(`  Available: ${availableImages.length}/${options.length}`);
-      console.log(`  Missing: ${missingImages.length}`);
-      console.log(`  Available images:`, availableImages);
-      console.log(`  Missing images:`, missingImages);
-
-      return {
-        options,
-        availableImages,
-        missingImages,
-        hasAllImages,
-        completionRate
-      };
-    } catch (error) {
-      console.error('Error checking quiz 3 image options:', error);
-      return {
-        options: [],
-        availableImages: [],
-        missingImages: [],
-        hasAllImages: false,
-        completionRate: 0
-      };
-    }
-  };
-
-  const getValidOptionsForAvailableImages = (jsonAsset: Asset, allImages: Asset[], jsonOptions: string[]) => {
-    console.log('🔧 getValidOptionsForAvailableImages called for:', jsonAsset.name);
-    
-    // Get available images in options folder
-    const availableOptionImages = allImages.filter(img => 
-      img.type === 'image' && img.path.includes('options')
-    );
-    
-    console.log('📸 Available option images:', availableOptionImages.map(img => img.name));
-    
-    // Get the base names of available images (without extension)
-    const availableOptions = availableOptionImages.map(img => 
-      img.name.replace(/\.(jpg|jpeg|png|gif|bmp)$/i, '').toLowerCase()
-    );
-    
-    console.log('📋 Available options (base names):', availableOptions);
-    
-    // Filter JSON options to only include those that have corresponding images
-    const validOptions = jsonOptions.filter(option => 
-      availableOptions.includes(option.toLowerCase())
-    );
-    
-    console.log('✅ Valid options (with images):', validOptions);
-    console.log('❌ Invalid options (no images):', jsonOptions.filter(option => 
-      !availableOptions.includes(option.toLowerCase())
-    ));
-    
-    // Return the original options but mark which ones are valid
-    return {
-      originalOptions: jsonOptions,
-      validOptions: validOptions,
-      hasMismatch: validOptions.length !== jsonOptions.length
-    };
-  };
 
   const fetchAssets = useCallback(async (searchTerm?: string, isSearch = false) => {
-    console.log('🚀 fetchAssets called with:', { searchTerm, isSearch, selectedChannel, selectedTopic });
+    logger.debug('🚀 fetchAssets called with:', { searchTerm, isSearch, selectedChannel, selectedTopic });
     try {
       if (isSearch) {
         setSearching(true);
@@ -1162,17 +667,17 @@ export default function AssetsPage() {
       // Process assets to add key and order information
       const processedAssets = data.assets.map((asset: Asset) => {
         const { key, order } = extractKeyAndOrder(asset.name, asset.type, asset.path);
-        console.log(`Processing asset: ${asset.name} -> key: "${key}", order: ${order}, path: ${asset.path}`); // Debug log
+        logger.debug(`Processing asset: ${asset.name} -> key: "${key}", order: ${order}, path: ${asset.path}`); // Debug log
         return { ...asset, key, order };
       });
       
-      console.log('=== ASSET PROCESSING DEBUG ===');
-      console.log('Total assets:', processedAssets.length);
-      console.log('JSON files:', processedAssets.filter((a: Asset) => a.type === 'json').map((a: Asset) => a.name));
-      console.log('Voice files:', processedAssets.filter((a: Asset) => a.type === 'voice').map((a: Asset) => a.name));
-      console.log('Image files:', processedAssets.filter((a: Asset) => a.type === 'image').map((a: Asset) => a.name));
-      console.log('Video files:', processedAssets.filter((a: Asset) => a.type === 'video').map((a: Asset) => a.name));
-      console.log('Video files with categories:', processedAssets.filter((a: Asset) => a.type === 'video').map((a: Asset) => ({ name: a.name, category: a.category, path: a.path })));
+      logger.debug('=== ASSET PROCESSING DEBUG ===');
+      logger.debug('Total assets:', processedAssets.length);
+      logger.debug('JSON files:', processedAssets.filter((a: Asset) => a.type === 'json').map((a: Asset) => a.name));
+      logger.debug('Voice files:', processedAssets.filter((a: Asset) => a.type === 'voice').map((a: Asset) => a.name));
+      logger.debug('Image files:', processedAssets.filter((a: Asset) => a.type === 'image').map((a: Asset) => a.name));
+      logger.debug('Video files:', processedAssets.filter((a: Asset) => a.type === 'video').map((a: Asset) => a.name));
+      logger.debug('Video files with categories:', processedAssets.filter((a: Asset) => a.type === 'video').map((a: Asset) => ({ name: a.name, category: a.category, path: a.path })));
       
       setAssets(processedAssets);
       
@@ -1203,11 +708,11 @@ export default function AssetsPage() {
                 
                 if (matchingJson) {
                   key = voiceKey;
-                  console.log(`Grouping voice file ${asset.name} with JSON key: "${key}" (matched by directory: ${dirName})`);
+                  logger.debug(`Grouping voice file ${asset.name} with JSON key: "${key}" (matched by directory: ${dirName})`);
                 } else {
                   // If no matching JSON found, use the voice key
                   key = voiceKey;
-                  console.log(`No matching JSON found for voice file ${asset.name}, using key: "${key}"`);
+                  logger.debug(`No matching JSON found for voice file ${asset.name}, using key: "${key}"`);
                 }
               } else {
                 // Fallback: use the first available JSON file
@@ -1220,10 +725,10 @@ export default function AssetsPage() {
                 
                 if (firstJson) {
                   key = firstJson.key;
-                  console.log(`Grouping voice file ${asset.name} with JSON key: "${key}" (fallback)`);
+                  logger.debug(`Grouping voice file ${asset.name} with JSON key: "${key}" (fallback)`);
                 } else {
                   key = 'voice_files';
-                  console.log(`No JSON files found, grouping voice file ${asset.name} as: "${key}"`);
+                  logger.debug(`No JSON files found, grouping voice file ${asset.name} as: "${key}"`);
                 }
               }
             } else {
@@ -1237,10 +742,10 @@ export default function AssetsPage() {
               
               if (firstJson) {
                 key = firstJson.key;
-                console.log(`Grouping voice file ${asset.name} with JSON key: "${key}" (fallback)`);
+                logger.debug(`Grouping voice file ${asset.name} with JSON key: "${key}" (fallback)`);
               } else {
                 key = 'voice_files';
-                console.log(`No JSON files found, grouping voice file ${asset.name} as: "${key}"`);
+                logger.debug(`No JSON files found, grouping voice file ${asset.name} as: "${key}"`);
               }
             }
           } else {
@@ -1254,10 +759,10 @@ export default function AssetsPage() {
             
             if (firstJson) {
               key = firstJson.key;
-              console.log(`Grouping voice file ${asset.name} with JSON key: "${key}" (fallback)`);
+              logger.debug(`Grouping voice file ${asset.name} with JSON key: "${key}" (fallback)`);
             } else {
               key = 'voice_files';
-              console.log(`No JSON files found, grouping voice file ${asset.name} as: "${key}"`);
+              logger.debug(`No JSON files found, grouping voice file ${asset.name} as: "${key}"`);
             }
           }
         }
@@ -1267,7 +772,7 @@ export default function AssetsPage() {
           return groups;
         }
         
-        console.log(`Grouping asset ${asset.name} (${asset.type}) with key: "${key}"`); // Debug log
+        logger.debug(`Grouping asset ${asset.name} (${asset.type}) with key: "${key}"`); // Debug log
         
         if (!groups[key]) {
           groups[key] = {
@@ -1317,25 +822,25 @@ export default function AssetsPage() {
             // Track image orders
             if (asset.order && !groups[key].renderStatus.imageOrders.includes(asset.order)) {
               groups[key].renderStatus.imageOrders.push(asset.order);
-              console.log(`📸 Added image order ${asset.order} for group ${key} (${asset.name})`);
+              logger.debug(`📸 Added image order ${asset.order} for group ${key} (${asset.name})`);
             }
             
             // Debug logging for frog group
             if (key === 'frog') {
-              console.log(`🐸 Frog image processing: ${asset.name}, order: ${asset.order}, category: ${asset.category}, key: ${asset.key}`);
-              console.log(`🐸 Current frog image orders:`, groups[key].renderStatus.imageOrders);
+              logger.debug(`🐸 Frog image processing: ${asset.name}, order: ${asset.order}, category: ${asset.category}, key: ${asset.key}`);
+              logger.debug(`🐸 Current frog image orders:`, groups[key].renderStatus.imageOrders);
             }
           }
         } else if (asset.type === 'video') {
-          console.log(`🎬 Processing video asset: ${asset.name} (category: ${asset.category}, path: ${asset.path})`);
+          logger.debug(`🎬 Processing video asset: ${asset.name} (category: ${asset.category}, path: ${asset.path})`);
           if (asset.category === 'reward') {
-            console.log(`🎁 Adding reward video: ${asset.name} (path: ${asset.path}) to group ${key}`);
+            logger.debug(`🎁 Adding reward video: ${asset.name} (path: ${asset.path}) to group ${key}`);
             groups[key].assets.rewards.push(asset);
           } else if (asset.key !== 'ignored') {
-            console.log(`📹 Adding regular video: ${asset.name} to group ${key}`);
+            logger.debug(`📹 Adding regular video: ${asset.name} to group ${key}`);
             groups[key].assets.videos.push(asset);
           } else {
-            console.log(`❌ Ignoring video: ${asset.name} (category: ${asset.category}, key: ${asset.key})`);
+            logger.debug(`❌ Ignoring video: ${asset.name} (category: ${asset.category}, key: ${asset.key})`);
           }
         } else if (asset.type === 'voice') {
           groups[key].assets.voices.push(asset);
@@ -1397,44 +902,44 @@ export default function AssetsPage() {
         
                 // Debug logging for frog group
         if (group.key === 'frog') {
-          console.log(`🐸 Frog hasImage/hasVideos flags:`);
-          console.log(`  hasImage: ${group.renderStatus.hasImage} (${group.renderStatus.availableImages}/${group.renderStatus.requiredImages})`);
-          console.log(`  hasVideos: ${group.renderStatus.hasVideos} (${group.renderStatus.availableVideos}/${group.renderStatus.requiredVideos})`);
-          console.log(`🐸 Frog final calculation:`);
-          console.log(`  JSON orders: ${group.renderStatus.jsonOrders}`);
-          console.log(`  Image orders: ${group.renderStatus.imageOrders}`);
-          console.log(`  Video orders: ${group.renderStatus.videoOrders}`);
-          console.log(`  Matching image orders: ${matchingImageOrders}`);
-          console.log(`  Available images: ${group.renderStatus.availableImages}/${group.renderStatus.requiredImages}`);
-          console.log(`  Available videos: ${group.renderStatus.availableVideos}/${group.renderStatus.requiredVideos}`);
+          logger.debug(`🐸 Frog hasImage/hasVideos flags:`);
+          logger.debug(`  hasImage: ${group.renderStatus.hasImage} (${group.renderStatus.availableImages}/${group.renderStatus.requiredImages})`);
+          logger.debug(`  hasVideos: ${group.renderStatus.hasVideos} (${group.renderStatus.availableVideos}/${group.renderStatus.requiredVideos})`);
+          logger.debug(`🐸 Frog final calculation:`);
+          logger.debug(`  JSON orders: ${group.renderStatus.jsonOrders}`);
+          logger.debug(`  Image orders: ${group.renderStatus.imageOrders}`);
+          logger.debug(`  Video orders: ${group.renderStatus.videoOrders}`);
+          logger.debug(`  Matching image orders: ${matchingImageOrders}`);
+          logger.debug(`  Available images: ${group.renderStatus.availableImages}/${group.renderStatus.requiredImages}`);
+          logger.debug(`  Available videos: ${group.renderStatus.availableVideos}/${group.renderStatus.requiredVideos}`);
         }
       });
       
       // Pre-load JSON content for quiz 3 options
       const jsonAssets = processedAssets.filter((asset: Asset) => asset.type === 'json');
       
-      console.log('=== JSON LOADING DEBUG ===');
-      console.log('Search term:', searchTerm);
-      console.log('Total JSON assets found:', jsonAssets.length);
-      console.log('JSON assets:', jsonAssets.map((a: Asset) => ({ name: a.name, path: a.path, key: a.key })));
+      logger.debug('=== JSON LOADING DEBUG ===');
+      logger.debug('Search term:', searchTerm);
+      logger.debug('Total JSON assets found:', jsonAssets.length);
+      logger.debug('JSON assets:', jsonAssets.map((a: Asset) => ({ name: a.name, path: a.path, key: a.key })));
       
       // Load JSON content for all JSON files in a single batch request
       const jsonOptionsMap = await loadJSONContentBatch(jsonAssets);
 
-      console.log('=== JSON OPTIONS MAP ===');
-      console.log('Map size:', jsonOptionsMap.size);
+      logger.debug('=== JSON OPTIONS MAP ===');
+      logger.debug('Map size:', jsonOptionsMap.size);
       for (const [path, options] of jsonOptionsMap.entries()) {
-        console.log(`Path: ${path} -> Options:`, options);
+        logger.debug(`Path: ${path} -> Options:`, options);
       }
       
       // Debug: Show what paths we're looking for
-      console.log('=== PATH DEBUG ===');
+      logger.debug('=== PATH DEBUG ===');
       jsonAssets.forEach((asset: Asset) => {
         const normalizedPath = asset.path.replace(/\\/g, '/');
-        console.log(`Asset: ${asset.name}`);
-        console.log(`  Original path: ${asset.path}`);
-        console.log(`  Normalized path: ${normalizedPath}`);
-        console.log(`  In map: ${jsonOptionsMap.has(normalizedPath)}`);
+        logger.debug(`Asset: ${asset.name}`);
+        logger.debug(`  Original path: ${asset.path}`);
+        logger.debug(`  Normalized path: ${normalizedPath}`);
+        logger.debug(`  In map: ${jsonOptionsMap.has(normalizedPath)}`);
       });
 
       // For quiz 3 image checking and voice checking, we need ALL available assets, not just search results
@@ -1457,7 +962,7 @@ export default function AssetsPage() {
             allVoicesForChecking = allAssets.filter((asset: Asset) => asset.type === 'voice');
           }
         } catch (error) {
-          console.error('Error loading all assets for checking:', error);
+          logger.error('Error loading all assets for checking:', error);
           allImagesForChecking = processedAssets.filter((asset: Asset) => asset.type === 'image');
           allVoicesForChecking = processedAssets.filter((asset: Asset) => asset.type === 'voice');
         }
@@ -1467,8 +972,8 @@ export default function AssetsPage() {
         allVoicesForChecking = processedAssets.filter((asset: Asset) => asset.type === 'voice');
       }
       
-      console.log('🔍 Images available for quiz 3 checking:', allImagesForChecking.length);
-      console.log('🎵 Voices available for checking:', allVoicesForChecking.length);
+      logger.debug('🔍 Images available for quiz 3 checking:', allImagesForChecking.length);
+      logger.debug('🎵 Voices available for checking:', allVoicesForChecking.length);
       
       // Now calculate the complete render status using the complete asset lists
       Object.values(groupedAssets).forEach((group) => {
@@ -1514,7 +1019,7 @@ export default function AssetsPage() {
                                  (group as AssetGroup).renderStatus.availableQuiz3Images >= (group as AssetGroup).renderStatus.requiredQuiz3Images;
         (group as AssetGroup).renderStatus.isComplete = hasRequiredAssets;
         
-        console.log(`📊 Render status for ${groupKey}:`, {
+        logger.debug(`📊 Render status for ${groupKey}:`, {
           totalVoices: groupVoices.length,
           validVoices: validVoiceCount,
           requiredVoices: (group as AssetGroup).renderStatus.requiredVoices,
@@ -1526,11 +1031,11 @@ export default function AssetsPage() {
       // Organize JSON-Asset pairs for each group
       Object.values(groupedAssets).forEach((group) => {
         const groupAsAssetGroup = group as AssetGroup;
-        console.log(`🔧 Organizing pairs for group ${groupAsAssetGroup.key}:`);
-        console.log(`  JSONs: ${groupAsAssetGroup.assets.jsons.length}`);
-        console.log(`  Voices: ${groupAsAssetGroup.assets.voices.length}`);
-        console.log(`  Rewards: ${groupAsAssetGroup.assets.rewards.length}`);
-        console.log(`  Rewards details:`, groupAsAssetGroup.assets.rewards.map(r => ({ name: r.name, path: r.path, category: r.category })));
+        logger.debug(`🔧 Organizing pairs for group ${groupAsAssetGroup.key}:`);
+        logger.debug(`  JSONs: ${groupAsAssetGroup.assets.jsons.length}`);
+        logger.debug(`  Voices: ${groupAsAssetGroup.assets.voices.length}`);
+        logger.debug(`  Rewards: ${groupAsAssetGroup.assets.rewards.length}`);
+        logger.debug(`  Rewards details:`, groupAsAssetGroup.assets.rewards.map(r => ({ name: r.name, path: r.path, category: r.category })));
         
         groupAsAssetGroup.assets.jsonAssetPairs = organizeJSONAssetPairs(
           groupAsAssetGroup.assets.jsons, 
@@ -1569,7 +1074,7 @@ export default function AssetsPage() {
       
       setAssetGroups(Object.values(groupedAssets));
     } catch (error) {
-      console.error('Error fetching assets:', error);
+      logger.error('Error fetching assets:', error);
     } finally {
       if (isSearch) {
         setSearching(false);
@@ -1582,16 +1087,16 @@ export default function AssetsPage() {
   // Debounced search effect - only when upload dialog is not open
   useEffect(() => {
     if (isUploadDialogOpen) {
-      console.log('🚫 Skipping main search - upload dialog is open');
+      logger.debug('🚫 Skipping main search - upload dialog is open');
       return;
     }
     
     const timer = setTimeout(() => {
       if (searchQuery.trim()) {
-        console.log('🔍 Triggering server-side search for:', searchQuery);
+        logger.debug('🔍 Triggering server-side search for:', searchQuery);
         fetchAssets(searchQuery, true); // isSearch = true
       } else {
-        console.log('🔄 Resetting to all assets');
+        logger.debug('🔄 Resetting to all assets');
         fetchAssets('', true); // Reset to all assets, but still use search state
       }
     }, 500); // Increased delay to 500ms for better typing experience
@@ -1630,7 +1135,7 @@ export default function AssetsPage() {
 
     // Apply status filter first
     if (statusFilter !== 'all') {
-      console.log('🔍 Applying status filter:', statusFilter);
+      logger.debug('🔍 Applying status filter:', statusFilter);
       filtered = filtered.filter(group => {
         const status = group.renderStatus;
         
@@ -1660,23 +1165,23 @@ export default function AssetsPage() {
             return true;
         }
       });
-      console.log('📊 Status filter applied, filtered groups:', filtered.length);
+      logger.debug('📊 Status filter applied, filtered groups:', filtered.length);
     }
 
     // Apply search filter if there's a search query
     if (searchQuery.trim()) {
-      console.log('🔍 Applying search filter for query:', searchQuery);
+      logger.debug('🔍 Applying search filter for query:', searchQuery);
       filtered = filtered.filter(group => 
         group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         group.assets.jsons.some(json => json.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         group.assets.videos.some(video => video.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         group.assets.voices.some(voice => voice.name.toLowerCase().includes(searchQuery.toLowerCase()))
       );
-      console.log('📊 Search filter applied, filtered groups:', filtered.length);
+      logger.debug('📊 Search filter applied, filtered groups:', filtered.length);
     }
 
     // Sort the filtered groups
-    console.log(`Sorting filtered groups by: ${sortBy}, Order: ${sortOrder}, Groups: ${filtered.length}`);
+    logger.debug(`Sorting filtered groups by: ${sortBy}, Order: ${sortOrder}, Groups: ${filtered.length}`);
     filtered.sort((a, b) => {
       if (sortBy === 'createDate') {
         // Get the earliest JSON file creation date for each group
@@ -1706,7 +1211,7 @@ export default function AssetsPage() {
         }
       } else {
         // Sort by name
-        console.log(`Comparing names: "${a.name}" vs "${b.name}"`);
+        logger.debug(`Comparing names: "${a.name}" vs "${b.name}"`);
         if (sortOrder === 'asc') {
           return a.name.localeCompare(b.name);
         } else {
@@ -1804,41 +1309,8 @@ export default function AssetsPage() {
     };
   };
 
-  // Helper function to get the earliest JSON creation date for a group
-  const getEarliestJsonDate = (group: AssetGroup): Date | null => {
-    if (group.assets.jsons.length === 0) {
-      return null;
-    }
-    
-    // Find the JSON with the earliest lastModified date
-    const earliestJson = group.assets.jsons.reduce((earliest, current) => {
-      const earliestDate = earliest.lastModified ? new Date(earliest.lastModified) : new Date(0);
-      const currentDate = current.lastModified ? new Date(current.lastModified) : new Date(0);
-      return earliestDate < currentDate ? earliest : current;
-    });
-    
-    return earliestJson.lastModified ? new Date(earliestJson.lastModified) : null;
-  };
 
-  // Helper function to format date for display
-  const formatDate = (date: Date | null): string => {
-    if (!date) return 'No date';
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
 
   const handleAssetSelect = (assetId: string) => {
     setSelectedAssets(prev => 
@@ -1884,7 +1356,7 @@ export default function AssetsPage() {
       setSelectedAssets([]);
       alert(`Successfully deleted ${data.deleted.length} asset(s)`);
     } catch (error) {
-      console.error('Error deleting assets:', error);
+      logger.error('Error deleting assets:', error);
       alert('Failed to delete assets. Please try again.');
     }
   };
@@ -1893,10 +1365,6 @@ export default function AssetsPage() {
     alert('Upload functionality requires category selection. Please implement category selection first.');
   };
 
-  // Helper function to get upload key for state management
-  const getUploadKey = (groupKey: string, resourceType: MissingResource['type'], jsonOrder?: number, imageName?: string) => {
-    return `${groupKey}-${resourceType}${jsonOrder ? `-${jsonOrder}` : ''}${imageName ? `-${imageName}` : ''}`;
-  };
 
   // Upload specific asset types
   const handleUploadSpecificAsset = async (
@@ -1954,7 +1422,7 @@ export default function AssetsPage() {
       updateGroupAfterUpload(groupKey, resourceType, files, jsonOrder, imageName);
       
     } catch (error) {
-      console.error('Upload error:', error);
+      logger.error('Upload error:', error);
       setToast({
         type: 'error',
         message: `Failed to upload files: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -2128,11 +1596,11 @@ export default function AssetsPage() {
         
         // Debug logging for frog group
         if (groupKey === 'frog') {
-          console.log(`🐸 Frog after upload update:`);
-          console.log(`  JSON orders: ${updatedGroup.renderStatus.jsonOrders}`);
-          console.log(`  Image orders: ${updatedGroup.renderStatus.imageOrders}`);
-          console.log(`  Available images: ${updatedGroup.renderStatus.availableImages}/${updatedGroup.renderStatus.requiredImages}`);
-          console.log(`  Available videos: ${updatedGroup.renderStatus.availableVideos}/${updatedGroup.renderStatus.requiredVideos}`);
+          logger.debug(`🐸 Frog after upload update:`);
+          logger.debug(`  JSON orders: ${updatedGroup.renderStatus.jsonOrders}`);
+          logger.debug(`  Image orders: ${updatedGroup.renderStatus.imageOrders}`);
+          logger.debug(`  Available images: ${updatedGroup.renderStatus.availableImages}/${updatedGroup.renderStatus.requiredImages}`);
+          logger.debug(`  Available videos: ${updatedGroup.renderStatus.availableVideos}/${updatedGroup.renderStatus.requiredVideos}`);
         }
         
         return updatedGroup;
@@ -2248,7 +1716,7 @@ export default function AssetsPage() {
             });
           }
         } catch (error) {
-          console.error(`Error reading JSON file ${json.name}:`, error);
+          logger.error(`Error reading JSON file ${json.name}:`, error);
         }
       }
       
@@ -2298,7 +1766,7 @@ export default function AssetsPage() {
       setExistingOrders(prev => [...prev, nextOrder].sort((a, b) => a - b));
       
     } catch (error) {
-      console.error('Error generating AI content:', error);
+      logger.error('Error generating AI content:', error);
       alert('Failed to generate content. Please try again.');
     } finally {
       setAiGenerating(false);
@@ -2306,11 +1774,11 @@ export default function AssetsPage() {
   };
 
   const generateBatchAIContent = async () => {
-    console.log('🔥 BATCH GENERATION FUNCTION CALLED 🔥');
+    logger.debug('🔥 BATCH GENERATION FUNCTION CALLED 🔥');
     
     // Prevent multiple simultaneous batch generations
     if (batchGenerating) {
-      console.log('Batch generation already in progress, ignoring duplicate call');
+      logger.debug('Batch generation already in progress, ignoring duplicate call');
       return;
     }
 
@@ -2325,10 +1793,10 @@ export default function AssetsPage() {
       return;
     }
 
-    console.log('=== STARTING BATCH GENERATION ===');
-    console.log('Subjects:', subjects);
-    console.log('Batch size:', batchSize);
-    console.log('Current preview items count:', previewItems.length);
+    logger.debug('=== STARTING BATCH GENERATION ===');
+    logger.debug('Subjects:', subjects);
+    logger.debug('Batch size:', batchSize);
+    logger.debug('Current preview items count:', previewItems.length);
 
     setBatchGenerating(true);
     setBatchProgress({ current: 0, total: subjects.length * batchSize, subject: '' });
@@ -2357,12 +1825,12 @@ export default function AssetsPage() {
         const existingPreviewItems = currentPreviewItems.filter(item => item.key.toLowerCase() === normalizedSubject);
         const existingPreviewOrders = existingPreviewItems.map(item => item.order);
         
-        console.log(`🔍 KEY MATCHING DEBUG for ${subject}:`);
-        console.log('Subject (original):', subject);
-        console.log('Subject (normalized):', normalizedSubject);
-        console.log('All preview items keys:', previewItems.map(item => item.key));
-        console.log('Matching preview items:', existingPreviewItems);
-        console.log('Found orders:', existingPreviewOrders);
+        logger.debug(`🔍 KEY MATCHING DEBUG for ${subject}:`);
+        logger.debug('Subject (original):', subject);
+        logger.debug('Subject (normalized):', normalizedSubject);
+        logger.debug('All preview items keys:', previewItems.map(item => item.key));
+        logger.debug('Matching preview items:', existingPreviewItems);
+        logger.debug('Found orders:', existingPreviewOrders);
         
         // Combine existing orders from both sources
         const allExistingOrders = [...existingOrders, ...existingPreviewOrders];
@@ -2371,12 +1839,12 @@ export default function AssetsPage() {
         // Track the current highest order for this subject within this batch
         let currentBatchMaxOrder = maxExistingOrder;
         
-        console.log(`=== BATCH GENERATION DEBUG for ${subject} ===`);
-        console.log('Existing orders from disk:', existingOrders);
-        console.log('Existing preview orders:', existingPreviewOrders);
-        console.log('All existing orders:', allExistingOrders);
-        console.log('Max existing order:', maxExistingOrder);
-        console.log('Starting currentBatchMaxOrder:', currentBatchMaxOrder);
+        logger.debug(`=== BATCH GENERATION DEBUG for ${subject} ===`);
+        logger.debug('Existing orders from disk:', existingOrders);
+        logger.debug('Existing preview orders:', existingPreviewOrders);
+        logger.debug('All existing orders:', allExistingOrders);
+        logger.debug('Max existing order:', maxExistingOrder);
+        logger.debug('Starting currentBatchMaxOrder:', currentBatchMaxOrder);
         
         for (let batchIndex = 0; batchIndex < batchSize; batchIndex++) {
           const currentProgress = subjectIndex * batchSize + batchIndex + 1;
@@ -2389,9 +1857,9 @@ export default function AssetsPage() {
           // Calculate next order number for this subject
           const nextOrder = currentBatchMaxOrder + 1;
           
-          console.log(`--- Generating item ${batchIndex + 1} for ${subject} ---`);
-          console.log('Current batch max order:', currentBatchMaxOrder);
-          console.log('Calculated next order:', nextOrder);
+          logger.debug(`--- Generating item ${batchIndex + 1} for ${subject} ---`);
+          logger.debug('Current batch max order:', currentBatchMaxOrder);
+          logger.debug('Calculated next order:', nextOrder);
           
           // Get existing content for this subject to avoid repetition
           const existingJsons = assetGroups
@@ -2418,7 +1886,7 @@ export default function AssetsPage() {
                 });
               }
             } catch (error) {
-              console.error(`Error reading JSON file ${json.name}:`, error);
+              logger.error(`Error reading JSON file ${json.name}:`, error);
             }
           }
           
@@ -2472,24 +1940,24 @@ export default function AssetsPage() {
             // Update both the React state and local array immediately so subsequent generations can see this content
             setPreviewItems(prev => {
               const newPreviewItems = [...prev, newContent];
-              console.log(`✓ Updated previewItems for ${subject} order ${nextOrder}`);
-              console.log('Current previewItems count:', newPreviewItems.length);
+              logger.debug(`✓ Updated previewItems for ${subject} order ${nextOrder}`);
+              logger.debug('Current previewItems count:', newPreviewItems.length);
               return newPreviewItems;
             });
             
             // Update local array synchronously for next iteration
             currentPreviewItems.push(newContent);
-            console.log(`✓ Updated local currentPreviewItems for ${subject} order ${nextOrder}`);
-            console.log('Local currentPreviewItems count:', currentPreviewItems.length);
+            logger.debug(`✓ Updated local currentPreviewItems for ${subject} order ${nextOrder}`);
+            logger.debug('Local currentPreviewItems count:', currentPreviewItems.length);
             
-            console.log(`✓ Successfully generated ${subject} order ${nextOrder}`);
-            console.log('New content added:', newContent);
+            logger.debug(`✓ Successfully generated ${subject} order ${nextOrder}`);
+            logger.debug('New content added:', newContent);
             
             // Update the current batch max order for the next iteration
             currentBatchMaxOrder = nextOrder;
-            console.log('Updated currentBatchMaxOrder to:', currentBatchMaxOrder);
+            logger.debug('Updated currentBatchMaxOrder to:', currentBatchMaxOrder);
           } catch (error) {
-            console.error(`Error generating content for ${subject}_${nextOrder}:`, error);
+            logger.error(`Error generating content for ${subject}_${nextOrder}:`, error);
             // Continue with other items even if one fails
           }
         }
@@ -2503,7 +1971,7 @@ export default function AssetsPage() {
       setTimeout(() => setToast(null), 5000);
       
     } catch (error) {
-      console.error('Error in batch generation:', error);
+      logger.error('Error in batch generation:', error);
       setToast({ 
         message: `Batch generation failed: ${(error as Error).message}`, 
         type: 'error' 
@@ -2578,7 +2046,7 @@ export default function AssetsPage() {
       setShowAIGenerator(false);
       
     } catch (error) {
-      console.error('Error creating render files:', error);
+      logger.error('Error creating render files:', error);
       alert('Failed to create render files. Please try again.');
     }
   };
@@ -2715,7 +2183,7 @@ export default function AssetsPage() {
           setParsedJson(parsed);
         }
       } catch (error) {
-        console.error('Error reloading JSON content:', error);
+        logger.error('Error reloading JSON content:', error);
       }
     };
 
@@ -2782,7 +2250,7 @@ export default function AssetsPage() {
         });
         
       } catch (error) {
-        console.error('Error saving JSON content:', error);
+        logger.error('Error saving JSON content:', error);
         alert('Failed to save JSON content. Please try again.');
       } finally {
         setSaving(false);
@@ -2853,7 +2321,7 @@ export default function AssetsPage() {
       // Auto-play lesson and reward videos when section changes
       useEffect(() => {
         if ((currentSection === 4 || currentSection === 5) && videoRef.current) {
-          videoRef.current.play().catch((e: any) => console.log('Auto-play failed:', e));
+          videoRef.current.play().catch((e: any) => logger.debug('Auto-play failed:', e));
         }
       }, [currentSection]);
 
@@ -2936,7 +2404,7 @@ export default function AssetsPage() {
       const content = getCurrentSectionContent();
       
       // Debug log to see if currentSection is updating
-      console.log('VideoPreview - currentSection:', currentSection, 'currentTime:', currentTime, 'content:', content);
+      logger.debug('VideoPreview - currentSection:', currentSection, 'currentTime:', currentTime, 'content:', content);
 
       return (
         <div className="bg-surface rounded-lg p-6 space-y-6 min-h-[600px]">
@@ -3057,7 +2525,7 @@ export default function AssetsPage() {
                              <div className="mt-2">
                                {(() => {
                                  const imagePath = `${config.workingDirectory}/${selectedChannel}/${selectedTopic}/image/options/${option.toLowerCase()}.png`;
-                                 console.log('Quiz 3 Image Path:', imagePath);
+                                 logger.debug('Quiz 3 Image Path:', imagePath);
                                  return (
                                    <img 
                                      src={`/api/assets/preview?path=${encodeURIComponent(imagePath)}&channel=${selectedChannel}&topic=${selectedTopic}`}
@@ -3065,7 +2533,7 @@ export default function AssetsPage() {
                                      className="w-full aspect-square object-cover rounded"
                                      onError={(e) => {
                                        const img = e.currentTarget as HTMLImageElement;
-                                       console.log('Image failed to load:', img.src);
+                                       logger.debug('Image failed to load:', img.src);
                                        // Try jpg if png fails
                                        if (img.src.includes('.png')) {
                                          img.src = img.src.replace('.png', '.jpg');
@@ -3292,7 +2760,7 @@ export default function AssetsPage() {
           results.push({ success: true, file: voiceItem.name, path: voiceResult.path });
           
         } catch (error) {
-          console.error(`Error generating ${voiceItem.name}:`, error);
+          logger.error(`Error generating ${voiceItem.name}:`, error);
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           results.push({ success: false, file: voiceItem.name, error: errorMessage });
         }
@@ -3402,7 +2870,7 @@ export default function AssetsPage() {
         // Show success notification without blocking UI
         const successMessage = `✅ Generated ${successful} voice files for ${jsonAsset.name}`;
         if (failed > 0) {
-          console.warn(`❌ Failed to generate ${failed} files. Check console for details.`);
+          logger.warn(`❌ Failed to generate ${failed} files. Check console for details.`);
         }
         
         // Show toast notification
@@ -3414,7 +2882,7 @@ export default function AssetsPage() {
       }
       
     } catch (error) {
-      console.error('Error generating voice files:', error);
+      logger.error('Error generating voice files:', error);
       // Show error toast notification
       setToast({ message: `Failed to generate voice files: ${(error as Error).message}`, type: 'error' });
       setTimeout(() => setToast(null), 5000);
@@ -3457,7 +2925,7 @@ export default function AssetsPage() {
       // fetchAssets();
       
     } catch (error) {
-      console.error('Error generating reward video:', error);
+      logger.error('Error generating reward video:', error);
       alert('Failed to generate reward video. Please try again.');
     }
   };
@@ -3554,7 +3022,7 @@ export default function AssetsPage() {
         throw new Error('Image generation failed');
       }
     } catch (error) {
-      console.error('Error generating topic image:', error);
+      logger.error('Error generating topic image:', error);
       setToast({
         message: error instanceof Error ? error.message : 'Failed to generate image. Please try again.',
         type: 'error'
@@ -3617,15 +3085,15 @@ export default function AssetsPage() {
       const data = await response.json();
 
       if (data.success && data.savedAsset) {
-        console.log('🎨 Generated image data:', data.savedAsset);
-        console.log('📄 JSON asset:', jsonAsset);
+        logger.debug('🎨 Generated image data:', data.savedAsset);
+        logger.debug('📄 JSON asset:', jsonAsset);
         
         // Update only the specific asset group instead of refreshing all assets
         setAssetGroups(prevGroups => {
           return prevGroups.map(group => {
             if (group.key === jsonAsset.key) {
-              console.log('🔧 Updating group:', group.key);
-              console.log('📸 Current images:', group.assets.images.length);
+              logger.debug('🔧 Updating group:', group.key);
+              logger.debug('📸 Current images:', group.assets.images.length);
               
               // Create the new image asset with proper structure
               const newImageAsset = {
@@ -3634,7 +3102,7 @@ export default function AssetsPage() {
                 order: jsonAsset.order
               };
               
-              console.log('🆕 New image asset:', newImageAsset);
+              logger.debug('🆕 New image asset:', newImageAsset);
               
               // Add the new image to the group's images array
               const updatedGroup = {
@@ -3651,7 +3119,7 @@ export default function AssetsPage() {
                 }
               };
               
-              console.log('✅ Updated group render status:', updatedGroup.renderStatus);
+              logger.debug('✅ Updated group render status:', updatedGroup.renderStatus);
               
               return updatedGroup;
             }
@@ -3671,7 +3139,7 @@ export default function AssetsPage() {
         throw new Error('Image generation failed');
       }
     } catch (error) {
-      console.error('Error generating main image:', error);
+      logger.error('Error generating main image:', error);
       setToast({
         message: error instanceof Error ? error.message : 'Failed to generate image. Please try again.',
         type: 'error'
@@ -3750,7 +3218,7 @@ export default function AssetsPage() {
             throw new Error(`Image generation failed for ${missingImage}`);
           }
         } catch (error) {
-          console.error(`Error generating image for ${missingImage}:`, error);
+          logger.error(`Error generating image for ${missingImage}:`, error);
           throw error;
         }
       }
@@ -3806,7 +3274,7 @@ export default function AssetsPage() {
       setTimeout(() => setToast(null), 3000);
       
     } catch (error) {
-      console.error('Error generating missing quiz 3 images:', error);
+      logger.error('Error generating missing quiz 3 images:', error);
       setToast({
         message: error instanceof Error ? error.message : 'Failed to generate missing images. Please try again.',
         type: 'error'
@@ -3868,7 +3336,7 @@ export default function AssetsPage() {
         throw new Error(data.error || 'Failed to save image');
       }
     } catch (error) {
-      console.error('Error saving edited image:', error);
+      logger.error('Error saving edited image:', error);
       setToast({
         message: error instanceof Error ? error.message : 'Failed to save edited image',
         type: 'error'
@@ -3886,12 +3354,6 @@ export default function AssetsPage() {
 
   const [showCrawlerDialog, setShowCrawlerDialog] = useState(false);
   const [selectedJsonAsset, setSelectedJsonAsset] = useState<Asset | null>(null);
-  interface CrawlerResource {
-    name: string;
-    path: string;
-    url: string;
-  }
-
   interface SelectionState {
     [key: string]: {
       isSelected: boolean;
@@ -3965,7 +3427,7 @@ export default function AssetsPage() {
       
       setShowCrawlerDialog(true);
     } catch (error) {
-      console.error('Error fetching crawler resources:', error);
+      logger.error('Error fetching crawler resources:', error);
       // Show error toast or notification
     }
   };
@@ -3977,13 +3439,6 @@ export default function AssetsPage() {
     filename: string;
   }
 
-  type ResourceType = 'image' | 'video' | 'quiz3-image';
-  type ApiResourceType = 'image' | 'video';
-  type ResourceTarget = 'main' | 'quiz3';
-  
-  const getSelectionKey = (resource: CrawlerResource, type: ResourceType, target: ResourceTarget, optionName?: string) => {
-    return `${resource.path}_${type}_${target}${optionName ? `_${optionName}` : ''}`;
-  };
 
   const SelectionButton = ({ 
     resource, 
@@ -4083,7 +3538,7 @@ export default function AssetsPage() {
         topic: selectedTopic
       };
 
-      console.log('Copying resource:', payload);
+      logger.debug('Copying resource:', payload);
 
       const response = await fetch('/api/crawlers/copy', {
         method: 'POST',
@@ -4108,7 +3563,7 @@ export default function AssetsPage() {
         itemElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     } catch (error) {
-      console.error('Error copying crawler resource:', error);
+      logger.error('Error copying crawler resource:', error);
       // Show error toast or notification
     }
   };
@@ -5684,7 +5139,7 @@ export default function AssetsPage() {
                         fetchAssets();
                         alert('Asset deleted successfully!');
                       } catch (error) {
-                        console.error('Error deleting asset:', error);
+                        logger.error('Error deleting asset:', error);
                         alert('Failed to delete asset. Please try again.');
                       }
                     }
