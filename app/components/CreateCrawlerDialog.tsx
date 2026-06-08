@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { XMarkIcon } from "@heroicons/react/24/solid";
-import { 
+import {
   PhotoIcon,
   VideoCameraIcon,
   GlobeAltIcon,
   ArrowDownTrayIcon,
-  CogIcon
+  CogIcon,
+  XMarkIcon
 } from "@heroicons/react/24/solid";
+import { Button, Input, Select, Label, Dialog } from "@/app/components/ui";
 
 interface Site {
   id: string;
@@ -321,13 +321,11 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
     return (
       <div>
         <div className="flex justify-between items-center mb-2">
-          <label className="text-sm font-medium text-gray-300">
-            Source Websites *
-          </label>
+          <Label>Source Websites *</Label>
           <button
             type="button"
             onClick={handleSelectAll}
-            className="text-sm text-purple-400 hover:text-purple-300"
+            className="text-sm text-accent hover:text-accent-hover"
           >
             {allSelected ? 'Deselect All' : 'Select All'}
           </button>
@@ -344,310 +342,258 @@ export default function CreateCrawlerDialog({ isOpen, onClose, onSubmit }: Creat
                     : formData.sites.filter(s => s !== site.id);
                   handleInputChange("sites", newSites);
                 }}
-                className="rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                className="rounded border-border bg-surface-sunken accent-accent"
               />
-              <span className="text-gray-300">{site.name}</span>
+              <span className="text-text-muted">{site.name}</span>
             </label>
           ))}
         </div>
         {errors.sites && (
-          <p className="mt-1 text-sm text-red-400">{errors.sites}</p>
+          <p className="mt-1 text-sm text-danger">{errors.sites}</p>
         )}
       </div>
     );
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    <Dialog isOpen={isOpen} onClose={onClose} size="lg" showClose={false} className="p-0">
+      {/* Header */}
+      <div className="flex items-center justify-between p-6 border-b border-border">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-accent rounded-lg">
+            <GlobeAltIcon className="w-6 h-6 text-accent-fg" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-text">Create New Crawler</h2>
+            <p className="text-text-muted">Download images and videos from websites</p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-2 hover:bg-surface-raised rounded-lg transition-colors"
         >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-gray-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-700">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-600 rounded-lg">
-                  <GlobeAltIcon className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Create New Crawler</h2>
-                  <p className="text-gray-400">Download images and videos from websites</p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                <XMarkIcon className="w-6 h-6 text-gray-400" />
-              </button>
+          <XMarkIcon className="w-6 h-6 text-text-muted" />
+        </button>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        {/* Basic Information */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-text flex items-center gap-2">
+            <CogIcon className="w-5 h-5 text-accent" />
+            Basic Information
+          </h3>
+
+          {/* Move keyword field before name */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Keyword */}
+            <div>
+              <Label className="mb-2">Search Keyword *</Label>
+              <Input
+                type="text"
+                value={formData.keyword}
+                onChange={(e) => handleInputChange("keyword", e.target.value)}
+                error={!!errors.keyword}
+                placeholder="e.g., capybara"
+                autoFocus
+              />
+              {errors.keyword && (
+                <p className="mt-1 text-sm text-danger">{errors.keyword}</p>
+              )}
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Basic Information */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <CogIcon className="w-5 h-5 text-purple-400" />
-                  Basic Information
-                </h3>
-                
-                {/* Move keyword field before name */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Keyword */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Search Keyword *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.keyword}
-                      onChange={(e) => handleInputChange("keyword", e.target.value)}
-                      className={`w-full px-3 py-2 bg-gray-700 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                        errors.keyword ? "border-red-500" : "border-gray-600"
-                      }`}
-                      placeholder="e.g., capybara"
-                      autoFocus
-                    />
-                    {errors.keyword && (
-                      <p className="mt-1 text-sm text-red-400">{errors.keyword}</p>
-                    )}
-                  </div>
+            {/* Name */}
+            <div>
+              <Label className="mb-2">Crawler Name *</Label>
+              <Input
+                type="text"
+                value={formData.name}
+                onChange={(e) => handleInputChange("name", e.target.value)}
+                error={!!errors.name}
+                placeholder="Auto-generated from keyword"
+              />
+              {errors.name && (
+                <p className="mt-1 text-sm text-danger">{errors.name}</p>
+              )}
+            </div>
+          </div>
 
-                  {/* Name */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Crawler Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => handleInputChange("name", e.target.value)}
-                      className={`w-full px-3 py-2 bg-gray-700 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                        errors.name ? "border-red-500" : "border-gray-600"
-                      }`}
-                      placeholder="Auto-generated from keyword"
-                    />
-                    {errors.name && (
-                      <p className="mt-1 text-sm text-red-400">{errors.name}</p>
-                    )}
-                  </div>
-                </div>
+          {/* Type Selection */}
+          <div>
+            <Label className="mb-3">Content Type *</Label>
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  console.log('Setting type to image'); // Add logging
+                  handleInputChange("type", "image");
+                }}
+                className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
+                  formData.type === "image"
+                    ? "border-accent bg-accent-muted text-accent"
+                    : "border-border bg-surface-raised text-text-muted hover:border-border-strong"
+                }`}
+              >
+                <PhotoIcon className="w-5 h-5" />
+                <span>Images</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  console.log('Setting type to video'); // Add logging
+                  handleInputChange("type", "video");
+                }}
+                className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
+                  formData.type === "video"
+                    ? "border-accent bg-accent-muted text-accent"
+                    : "border-border bg-surface-raised text-text-muted hover:border-border-strong"
+                }`}
+              >
+                <VideoCameraIcon className="w-5 h-5" />
+                <span>Videos</span>
+              </button>
+            </div>
+          </div>
+        </div>
 
-                {/* Type Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">
-                    Content Type *
-                  </label>
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        console.log('Setting type to image'); // Add logging
-                        handleInputChange("type", "image");
-                      }}
-                      className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                        formData.type === "image"
-                          ? "border-purple-500 bg-purple-500/20 text-purple-400"
-                          : "border-gray-600 bg-gray-700 text-gray-300 hover:border-gray-500"
-                      }`}
-                    >
-                      <PhotoIcon className="w-5 h-5" />
-                      <span>Images</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        console.log('Setting type to video'); // Add logging
-                        handleInputChange("type", "video");
-                      }}
-                      className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                        formData.type === "video"
-                          ? "border-purple-500 bg-purple-500/20 text-purple-400"
-                          : "border-gray-600 bg-gray-700 text-gray-300 hover:border-gray-500"
-                      }`}
-                    >
-                      <VideoCameraIcon className="w-5 h-5" />
-                      <span>Videos</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
+        {/* Site and Channel Selection */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-text flex items-center gap-2">
+            <GlobeAltIcon className="w-5 h-5 text-info" />
+            Source & Destination
+          </h3>
 
-              {/* Site and Channel Selection */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <GlobeAltIcon className="w-5 h-5 text-blue-400" />
-                  Source & Destination
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Replace site dropdown with SiteSelection component */}
-                  <SiteSelection />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Replace site dropdown with SiteSelection component */}
+            <SiteSelection />
 
-                  {/* Channel Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Channel *
-                    </label>
-                    <select
-                      value={formData.channel}
-                      onChange={(e) => handleInputChange("channel", e.target.value)}
-                      className={`w-full px-3 py-2 bg-gray-700 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                        errors.channel ? "border-red-500" : "border-gray-600"
-                      }`}
-                    >
-                      <option value="">Select a channel</option>
-                      {defaultChannels.map((channel) => (
-                        <option key={channel} value={channel}>
-                          {channel}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.channel && (
-                      <p className="mt-1 text-sm text-red-400">{errors.channel}</p>
-                    )}
-                  </div>
-                </div>
+            {/* Channel Selection */}
+            <div>
+              <Label className="mb-2">Channel *</Label>
+              <Select
+                value={formData.channel}
+                onChange={(e) => handleInputChange("channel", e.target.value)}
+                error={!!errors.channel}
+              >
+                <option value="">Select a channel</option>
+                {defaultChannels.map((channel) => (
+                  <option key={channel} value={channel}>
+                    {channel}
+                  </option>
+                ))}
+              </Select>
+              {errors.channel && (
+                <p className="mt-1 text-sm text-danger">{errors.channel}</p>
+              )}
+            </div>
+          </div>
 
-                {/* Topic Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Topic *
-                  </label>
-                  <select
-                    value={formData.topic}
-                    onChange={(e) => handleInputChange("topic", e.target.value)}
-                    className={`w-full px-3 py-2 bg-gray-700 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                      errors.topic ? "border-red-500" : "border-gray-600"
-                    }`}
-                  >
-                    <option value="">Select a topic</option>
-                    {defaultTopics.map((topic) => (
-                      <option key={topic} value={topic}>
-                        {topic}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.topic && (
-                    <p className="mt-1 text-sm text-red-400">{errors.topic}</p>
-                  )}
-                </div>
-              </div>
+          {/* Topic Selection */}
+          <div>
+            <Label className="mb-2">Topic *</Label>
+            <Select
+              value={formData.topic}
+              onChange={(e) => handleInputChange("topic", e.target.value)}
+              error={!!errors.topic}
+            >
+              <option value="">Select a topic</option>
+              {defaultTopics.map((topic) => (
+                <option key={topic} value={topic}>
+                  {topic}
+                </option>
+              ))}
+            </Select>
+            {errors.topic && (
+              <p className="mt-1 text-sm text-danger">{errors.topic}</p>
+            )}
+          </div>
+        </div>
 
-              {/* Download Settings */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <ArrowDownTrayIcon className="w-5 h-5 text-green-400" />
-                  Download Settings
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Max Items */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Max Items
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={formData.settings.maxItems}
-                      onChange={(e) => handleSettingsChange("maxItems", parseInt(e.target.value))}
-                      className={`w-full px-3 py-2 bg-gray-700 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                        errors.settings?.maxItems ? "border-red-500" : "border-gray-600"
-                      }`}
-                    />
-                    {errors.settings?.maxItems && (
-                      <p className="mt-1 text-sm text-red-400">{errors.settings.maxItems}</p>
-                    )}
-                  </div>
+        {/* Download Settings */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-text flex items-center gap-2">
+            <ArrowDownTrayIcon className="w-5 h-5 text-success" />
+            Download Settings
+          </h3>
 
-                  {/* Quality */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Quality
-                    </label>
-                    <select
-                      value={formData.settings.quality}
-                      onChange={(e) => handleSettingsChange("quality", e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Max Items */}
+            <div>
+              <Label className="mb-2">Max Items</Label>
+              <Input
+                type="number"
+                min="1"
+                max="100"
+                value={formData.settings.maxItems}
+                onChange={(e) => handleSettingsChange("maxItems", parseInt(e.target.value))}
+                error={!!errors.settings?.maxItems}
+              />
+              {errors.settings?.maxItems && (
+                <p className="mt-1 text-sm text-danger">{errors.settings.maxItems}</p>
+              )}
+            </div>
 
-                  {/* Format */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Format
-                    </label>
-                    <select
-                      value={formData.settings.format}
-                      onChange={(e) => handleSettingsChange("format", e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                      {getFormatOptions().map((format) => (
-                        <option key={format} value={format}>
-                          {format.toUpperCase()}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+            {/* Quality */}
+            <div>
+              <Label className="mb-2">Quality</Label>
+              <Select
+                value={formData.settings.quality}
+                onChange={(e) => handleSettingsChange("quality", e.target.value)}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </Select>
+            </div>
 
-                {/* Output Path Preview */}
-                <div className="bg-gray-700/50 rounded-lg p-4">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Output Path
-                  </label>
-                  <div className="text-sm text-gray-400 font-mono bg-gray-800 px-3 py-2 rounded border border-gray-600">
-                    /{formData.channel?.toLowerCase().replace(/\s+/g, '') || 'channel'}/{formData.topic?.toLowerCase() || 'topic'}/crawler/{formData.type}
-                  </div>
-                </div>
-              </div>
+            {/* Format */}
+            <div>
+              <Label className="mb-2">Format</Label>
+              <Select
+                value={formData.settings.format}
+                onChange={(e) => handleSettingsChange("format", e.target.value)}
+              >
+                {getFormatOptions().map((format) => (
+                  <option key={format} value={format}>
+                    {format.toUpperCase()}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-gray-700">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <GlobeAltIcon className="w-5 h-5" />
-                      Create Crawler
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          {/* Output Path Preview */}
+          <div className="bg-surface-raised rounded-lg p-4">
+            <Label className="mb-2">Output Path</Label>
+            <div className="text-sm text-text-muted font-mono bg-bg px-3 py-2 rounded border border-border">
+              /{formData.channel?.toLowerCase().replace(/\s+/g, '') || 'channel'}/{formData.topic?.toLowerCase() || 'topic'}/crawler/{formData.type}
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 pt-4 border-t border-border">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={isSubmitting}
+            loading={isSubmitting}
+            className="flex-1"
+            leftIcon={<GlobeAltIcon className="w-5 h-5" />}
+          >
+            {isSubmitting ? 'Creating...' : 'Create Crawler'}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 } 

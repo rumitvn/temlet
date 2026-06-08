@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import JobTable from "../components/JobTable";
 import JobDetail from "../components/JobDetail";
+import { Button } from "@/app/components/ui";
 
 export default function Page() {
   // List state
@@ -141,14 +142,16 @@ export default function Page() {
   };
 
   return (
-    <div style={{ padding: "1rem" }}>
-      <h1>Auto Render AE Tools - made by rumitx</h1>
+    <div className="p-4 bg-bg text-text min-h-screen">
+      <h1 className="text-2xl font-bold text-accent">
+        Auto Render AE Tools - made by rumitx
+      </h1>
 
       {/* "Delete All" button */}
-      <div style={{ marginBottom: "1rem" }}>
-        <button onClick={handleDeleteAllJobs} style={styles.deleteAllButton}>
+      <div className="my-4">
+        <Button variant="danger" onClick={handleDeleteAllJobs}>
           Delete All Jobs
-        </button>
+        </Button>
       </div>
 
       {/* Job Table */}
@@ -179,15 +182,3 @@ export default function Page() {
     </div>
   );
 }
-
-const styles = {
-  deleteAllButton: {
-    backgroundColor: "red",
-    color: "#fff",
-    padding: "6px 12px",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontWeight: 500,
-  },
-};

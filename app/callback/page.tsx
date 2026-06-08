@@ -77,12 +77,12 @@ function Callback() {
   }, [searchParams]);
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-      <div className="text-center text-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+    <div className="min-h-screen bg-bg flex items-center justify-center">
+      <div className="text-center text-text">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
         <h1 className="text-xl font-bold mb-2">Connecting to TikTok...</h1>
-        <p className="text-gray-400">Please wait while we complete the authentication.</p>
-        <p className="text-gray-500 text-sm mt-4">This window will close automatically.</p>
+        <p className="text-text-muted">Please wait while we complete the authentication.</p>
+        <p className="text-text-faint text-sm mt-4">This window will close automatically.</p>
       </div>
     </div>
   );

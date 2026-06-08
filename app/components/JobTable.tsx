@@ -1,16 +1,42 @@
 "use client";
 import React from "react";
+import {
+  Badge,
+  Button,
+  Input,
+  Label,
+  Table,
+  THead,
+  TBody,
+  TR,
+  TH,
+  TD,
+} from "./ui";
+
+type Job = {
+  uid: string;
+  state: string;
+  output?: string;
+  renderProgress?: number;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  template?: { composition?: string };
+  actions?: { postrender?: Array<{ output?: string }> };
+};
 
 type JobTableProps = {
-  jobs: any[];                     // array of job objects
-  loading: boolean;               // are we loading the jobs?
-  filter: string;                 // current filter value
-  setFilter: (val: string) => void; 
+  jobs: Job[];
+  loading: boolean;
+  filter: string;
+  setFilter: (val: string) => void;
   sortOrder: "asc" | "desc";
   toggleSortOrder: () => void;
-  onSelectJob: (uid: string) => void;  // user clicks "View Detail"
-  onDeleteJob: (uid: string) => void;  // user clicks "Delete"
+  onSelectJob: (uid: string) => void;
+  onDeleteJob: (uid: string) => void;
 };
+
+const RENDER_BASE_URL = "http://localhost:3001";
 
 export default function JobTable({
   jobs,
@@ -24,7 +50,7 @@ export default function JobTable({
 }: JobTableProps) {
   // Filtering
   const filteredJobs = jobs.filter((job) =>
-    filter ? job.state.toLowerCase().includes(filter.toLowerCase()) : true
+    filter ? job.state.toLowerCase().includes(filter.toLowerCase()) : true,
   );
 
   // Sorting by createdAt
@@ -35,7 +61,7 @@ export default function JobTable({
   });
 
   // Helper: if job.output is blank, read from first postrender action
-  const getJobOutput = (job: any): string => {
+  const getJobOutput = (job: Job): string => {
     const directOutput = (job.output || "").trim();
     if (directOutput) return directOutput;
 
@@ -48,7 +74,7 @@ export default function JobTable({
   };
 
   // Duration helper
-  const getRenderDuration = (job: any): string => {
+  const getRenderDuration = (job: Job): string => {
     if (!job.startedAt || !job.finishedAt) return "-";
     const startMs = new Date(job.startedAt).getTime();
     const finishMs = new Date(job.finishedAt).getTime();
@@ -64,185 +90,125 @@ export default function JobTable({
 
   return (
     <div>
-      <h2>All Jobs</h2>
+      <h2 className="mb-4 text-xl font-semibold text-text">All Jobs</h2>
 
       {/* Filter, Sort, Create New Job controls */}
-      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
+      <div className="mb-4 flex flex-wrap items-end gap-4">
         {/* Filter input */}
         <div>
-          <label htmlFor="filter">Filter by state:</label>
-          <input
+          <Label htmlFor="filter" className="mb-1">
+            Filter by state:
+          </Label>
+          <Input
             id="filter"
-            style={{ marginLeft: "0.5rem" }}
             type="text"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="e.g. finished, error"
+            className="w-56"
           />
         </div>
 
         {/* Sort button */}
-        <div>
-          <button onClick={toggleSortOrder} style={styles.sortButton}>
-            Sort by Created At ({sortOrder})
-          </button>
-        </div>
+        <Button variant="secondary" onClick={toggleSortOrder}>
+          Sort by Created At ({sortOrder})
+        </Button>
 
-        {/* Create New Job button */}
-        <div>
-          <button
-            style={styles.createButton}
-            onClick={() => window.open("http://localhost:3001/render_reward_image", "_blank")}
-          >
-            Render Reward Image
-          </button>
-        </div>
-
-        <div>
-          <button
-            style={styles.createButton}
-            onClick={() => window.open("http://localhost:3001/render_quiz_animals", "_blank")}
-          >
-            Render Quiz Animals
-          </button>
-        </div>
+        {/* Create New Job buttons */}
+        <Button
+          variant="primary"
+          onClick={() =>
+            window.open(`${RENDER_BASE_URL}/render_reward_image`, "_blank")
+          }
+        >
+          Render Reward Image
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() =>
+            window.open(`${RENDER_BASE_URL}/render_quiz_animals`, "_blank")
+          }
+        >
+          Render Quiz Animals
+        </Button>
       </div>
 
       {/* Loading or empty */}
-      {loading && <p>Loading job list...</p>}
-      {!loading && sortedJobs.length === 0 && <p>No jobs found.</p>}
+      {loading && <p className="text-text-muted">Loading job list...</p>}
+      {!loading && sortedJobs.length === 0 && (
+        <p className="text-text-muted">No jobs found.</p>
+      )}
 
       {/* Table */}
       {!loading && sortedJobs.length > 0 && (
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>UID</th>
-              <th style={styles.th}>Composition</th>
-              <th style={styles.th}>State</th>
-              <th style={styles.th}>Progress</th>
-              <th style={styles.th}>Duration</th>
-              <th style={styles.th}>Created</th>
-              <th style={styles.th}>Output</th>
-              <th style={styles.th} colSpan={2}>
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <THead>
+            <TR>
+              <TH>UID</TH>
+              <TH>Composition</TH>
+              <TH>State</TH>
+              <TH>Progress</TH>
+              <TH>Duration</TH>
+              <TH>Created</TH>
+              <TH>Output</TH>
+              <TH colSpan={2}>Action</TH>
+            </TR>
+          </THead>
+          <TBody>
             {sortedJobs.map((job) => {
-              // Conditional background color for error/finished
-              const stateStyle = {
-                ...styles.td,
-                backgroundColor:
-                  job.state === "error"
-                    ? "red"
-                    : job.state === "finished"
-                    ? "green"
-                    : "inherit",
-                color:
-                  job.state === "error" || job.state === "finished"
-                    ? "#fff"
-                    : "inherit",
-              };
-
               const outputPath = getJobOutput(job);
               const durationStr = getRenderDuration(job);
 
               return (
-                <tr key={job.uid}>
-                  <td style={styles.td}>{job.uid}</td>
-                  <td style={styles.td}>{job.template?.composition || "-"}</td>
-                  <td style={stateStyle}>{job.state}</td>
-                  <td style={styles.td}>
-                    <progress
-                      value={job.renderProgress}
-                      max={100}
-                      style={{ width: "80px" }}
-                    />
-                    &nbsp;{job.renderProgress}%
-                  </td>
-                  <td style={styles.td}>{durationStr}</td>
-                  <td style={styles.td}>
+                <TR key={job.uid}>
+                  <TD className="font-mono text-text-muted">{job.uid}</TD>
+                  <TD>{job.template?.composition || "-"}</TD>
+                  <TD>
+                    <Badge status={job.state}>{job.state}</Badge>
+                  </TD>
+                  <TD>
+                    <div className="flex items-center gap-2">
+                      <progress
+                        value={job.renderProgress}
+                        max={100}
+                        className="h-2 w-20 overflow-hidden rounded-full"
+                      />
+                      <span className="text-text-muted">
+                        {job.renderProgress}%
+                      </span>
+                    </div>
+                  </TD>
+                  <TD>{durationStr}</TD>
+                  <TD className="text-text-muted">
                     {new Date(job.createdAt).toLocaleString()}
-                  </td>
-                  <td style={styles.td}>{outputPath}</td>
-                  <td style={styles.td}>
-                    <button
-                      style={styles.detailButton}
+                  </TD>
+                  <TD className="max-w-xs truncate text-text-muted">
+                    {outputPath}
+                  </TD>
+                  <TD>
+                    <Button
+                      size="sm"
+                      variant="secondary"
                       onClick={() => onSelectJob(job.uid)}
                     >
                       View Detail
-                    </button>
-                  </td>
-                  <td style={styles.td}>
-                    <button
-                      style={styles.deleteButton}
+                    </Button>
+                  </TD>
+                  <TD>
+                    <Button
+                      size="sm"
+                      variant="danger"
                       onClick={() => onDeleteJob(job.uid)}
                     >
                       Delete
-                    </button>
-                  </td>
-                </tr>
+                    </Button>
+                  </TD>
+                </TR>
               );
             })}
-          </tbody>
-        </table>
+          </TBody>
+        </Table>
       )}
     </div>
   );
 }
-
-const styles = {
-  table: {
-    width: "100%",
-    borderCollapse: "collapse" as const,
-  },
-  th: {
-    border: "1px solid #fff",
-    padding: "8px",
-    backgroundColor: "#222",
-    color: "#fff",
-    textAlign: "left" as const,
-  },
-  td: {
-    border: "1px solid #fff",
-    padding: "8px",
-  },
-  detailButton: {
-    backgroundColor: "#0275d8",
-    color: "#fff",
-    padding: "6px 12px",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontWeight: 500,
-  },
-  deleteButton: {
-    backgroundColor: "#d9534f",
-    color: "#fff",
-    padding: "6px 12px",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontWeight: 500,
-  },
-  sortButton: {
-    backgroundColor: "#5cb85c",
-    color: "#fff",
-    padding: "6px 12px",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontWeight: 500,
-  },
-  createButton: {
-    backgroundColor: "#f0ad4e",
-    color: "#fff",
-    padding: "6px 12px",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontWeight: 500,
-  },
-};

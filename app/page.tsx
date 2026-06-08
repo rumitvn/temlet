@@ -25,6 +25,8 @@ import RenderDetailsDialog from './components/RenderDetailsDialog';
 import MetadataDetailsDialog from './components/MetadataDetailsDialog';
 import TikTokAuthDialog from './components/TikTokAuthDialog';
 import ScheduleUploadDialog, { ScheduleConfig } from './components/ScheduleUploadDialog';
+import { Button, Card, Input, Select, Badge } from "@/app/components/ui";
+import { statusClass } from "@/app/theme/status";
 
 // Custom debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -78,21 +80,6 @@ try {
 } catch (error) {
   console.warn("Failed to load filters from file, using defaults:", error);
 }
-
-const statusColors = {
-  new: "bg-blue-500/20 text-blue-400",
-  pending_render: "bg-orange-500/20 text-orange-400",
-  rendering: "bg-yellow-500/20 text-yellow-400",
-  rendered: "bg-green-500/20 text-green-400",
-  pending_metadata: "bg-purple-500/20 text-purple-400",
-  processing_metadata: "bg-indigo-500/20 text-indigo-400",
-  processed_metadata: "bg-teal-500/20 text-teal-400",
-  pending_upload: "bg-pink-500/20 text-pink-400",
-  processing_upload: "bg-rose-500/20 text-rose-400",
-  uploaded: "bg-emerald-500/20 text-emerald-400",
-  declined: "bg-red-500/20 text-red-400",
-  approved: "bg-teal-500/20 text-teal-400"
-};
 
 const statusGroups = {
   render: {
@@ -1165,12 +1152,12 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8">
+    <div className="min-h-screen bg-bg text-text p-8">
       {/* Header - Sticky */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex justify-between items-center mb-8 h-24 sticky top-0 z-40 bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-95 backdrop-blur"
+        className="flex justify-between items-center mb-8 h-24 sticky top-0 z-40 bg-bg/95 backdrop-blur"
         style={{ backdropFilter: 'blur(8px)' }}
       >
         <div>
@@ -1178,7 +1165,7 @@ export default function Page() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
-            className="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 bg-clip-text text-transparent"
+            className="text-5xl font-bold text-accent"
           >
             Temlet
           </motion.h1>
@@ -1188,7 +1175,7 @@ export default function Page() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="flex items-center gap-2 mt-1"
           >
-            <span className="text-gray-400">made by</span>
+            <span className="text-text-muted">made by</span>
             <motion.span
               animate={{
                 scale: [1, 1.1, 1],
@@ -1199,7 +1186,7 @@ export default function Page() {
                 repeat: Infinity,
                 repeatType: "reverse",
               }}
-              className="text-purple-400 font-medium"
+              className="text-accent font-medium"
             >
               rumitx
             </motion.span>
@@ -1211,27 +1198,27 @@ export default function Page() {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-surface-raised border border-border hover:border-border-strong text-text px-4 py-2 rounded-lg transition-colors"
             onClick={() => window.location.href = '/assets'}
           >
             <DocumentTextIcon className="w-5 h-5" />
             <span>Assets</span>
           </motion.button>
-          
+
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-surface-raised border border-border hover:border-border-strong text-text px-4 py-2 rounded-lg transition-colors"
             onClick={() => window.location.href = '/crawlers'}
           >
             <ArrowPathIcon className="w-5 h-5" />
             <span>Crawlers</span>
           </motion.button>
-          
+
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-accent-fg px-4 py-2 rounded-lg transition-colors"
             onClick={() => setIsCreateDialogOpen(true)}
           >
             <PlusIcon className="w-5 h-5" />
@@ -1248,13 +1235,13 @@ export default function Page() {
       >
         <div className="flex flex-col lg:flex-row gap-4">
           {Object.entries(statusGroups).map(([groupKey, group]) => (
-            <div key={groupKey} className="flex-1 bg-gray-800/50 rounded-xl p-3 mb-4 lg:mb-0">
+            <Card key={groupKey} className="flex-1 p-3 mb-4 lg:mb-0">
               <div className="flex items-center gap-2 mb-2">
-                <group.icon className="w-6 h-6 text-purple-400" />
-                <h3 className="text-2xl font-bold text-gray-200 flex items-center">
+                <group.icon className="w-6 h-6 text-accent" />
+                <h3 className="text-2xl font-bold text-text flex items-center">
                   {group.title}
                   {loadingCounts && (
-                    <svg className="animate-spin ml-2 h-4 w-4 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin ml-2 h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
                     </svg>
@@ -1264,7 +1251,7 @@ export default function Page() {
                 {selectedStatus && (
                   <button
                     onClick={() => setSelectedStatus(null)}
-                    className="ml-4 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded text-gray-200"
+                    className="ml-4 px-2 py-1 text-xs bg-surface-raised border border-border hover:border-border-strong rounded text-text-muted"
                   >
                     Clear Status Filter
                   </button>
@@ -1281,8 +1268,8 @@ export default function Page() {
                       whileTap={{ scale: 0.98 }}
                       onClick={() => handleStatusClick(status)}
                       className={`flex items-center justify-between p-2 rounded-lg text-lg font-medium transition-all ${
-                        statusColors[status]
-                      } ${selectedStatus === status ? 'ring-2 ring-white' : ''}`}
+                        statusClass(status)
+                      } ${selectedStatus === status ? 'ring-2 ring-accent-ring' : ''}`}
                     >
                       <div className="flex items-center gap-2">
                         <Icon className="w-5 h-5" />
@@ -1293,7 +1280,7 @@ export default function Page() {
                   );
                 })}
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       </motion.div>
@@ -1306,36 +1293,21 @@ export default function Page() {
       >
         {selectedItems.length > 0 && (
           <>
-            <button
-              onClick={handleDeleteSelected}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
-            >
+            <Button variant="danger" onClick={handleDeleteSelected}>
               Delete ({selectedItems.length})
-            </button>
-            <button
-              onClick={() => handleActionClick('render')}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-            >
+            </Button>
+            <Button variant="primary" onClick={() => handleActionClick('render')}>
               Render ({selectedItems.length})
-            </button>
-            <button
-              onClick={() => handleActionClick('metadata')}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition-colors"
-            >
+            </Button>
+            <Button variant="primary" onClick={() => handleActionClick('metadata')}>
               Metadata ({selectedItems.length})
-            </button>
-            <button
-              onClick={() => handleActionClick('upload')}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
-            >
+            </Button>
+            <Button variant="primary" onClick={() => handleActionClick('upload')}>
               Upload ({selectedItems.length})
-            </button>
-            <button
-              onClick={() => handleActionClick('tiktok-upload')}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-black text-white hover:bg-gray-800 transition-colors"
-            >
+            </Button>
+            <Button variant="secondary" onClick={() => handleActionClick('tiktok-upload')}>
               TikTok ({selectedItems.length})
-            </button>
+            </Button>
           </>
         )}
       </motion.div>
@@ -1348,13 +1320,13 @@ export default function Page() {
       >
         <div className="flex gap-4">
           <div className="flex-1 relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted w-5 h-5 z-10" />
+            <Input
               type="text"
               placeholder="Search renders..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
+              className="pl-10"
             />
           </div>
           <motion.button
@@ -1362,13 +1334,13 @@ export default function Page() {
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              showFilters ? "bg-purple-600" : "bg-gray-800 hover:bg-gray-700"
+              showFilters ? "bg-accent text-accent-fg" : "bg-surface-raised border border-border hover:border-border-strong text-text"
             }`}
           >
             <FunnelIcon className="w-5 h-5" />
             <span>Filters</span>
             {getActiveFiltersCount() > 0 && (
-              <span className="bg-purple-500 text-white px-2 py-0.5 rounded-full text-sm">
+              <span className="bg-accent text-accent-fg px-2 py-0.5 rounded-full text-sm">
                 {getActiveFiltersCount()}
               </span>
             )}
@@ -1381,8 +1353,8 @@ export default function Page() {
             onClick={() => handleSort("createdAt")}
             className={`px-3 py-1 rounded-lg text-sm transition-colors ${
               sortBy === "createdAt"
-                ? "bg-purple-600 text-white"
-                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                ? "bg-accent text-accent-fg"
+                : "bg-surface-raised border border-border text-text-muted hover:border-border-strong"
             }`}
           >
             Date
@@ -1396,8 +1368,8 @@ export default function Page() {
             onClick={() => handleSort("fileName")}
             className={`px-3 py-1 rounded-lg text-sm transition-colors ${
               sortBy === "fileName"
-                ? "bg-purple-600 text-white"
-                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                ? "bg-accent text-accent-fg"
+                : "bg-surface-raised border border-border text-text-muted hover:border-border-strong"
             }`}
           >
             Name
@@ -1411,8 +1383,8 @@ export default function Page() {
             onClick={() => handleSort("type")}
             className={`px-3 py-1 rounded-lg text-sm transition-colors ${
               sortBy === "type"
-                ? "bg-purple-600 text-white"
-                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                ? "bg-accent text-accent-fg"
+                : "bg-surface-raised border border-border text-text-muted hover:border-border-strong"
             }`}
           >
             Type
@@ -1430,13 +1402,13 @@ export default function Page() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="bg-gray-800 rounded-lg p-4 space-y-4"
+              className="bg-surface border border-border rounded-lg p-4 space-y-4"
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium">Filters</h3>
                 <button
                   onClick={clearFilters}
-                  className="text-gray-400 hover:text-gray-300"
+                  className="text-text-muted hover:text-text"
                 >
                   Clear All
                 </button>
@@ -1445,7 +1417,7 @@ export default function Page() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Type Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                  <label className="block text-sm font-medium text-text-muted mb-2">
                     Type
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -1455,8 +1427,8 @@ export default function Page() {
                         onClick={(e) => setSelectedType(selectedType === type ? null : type)}
                         className={`px-3 py-1 rounded-full text-sm transition-colors ${
                           selectedType === type
-                            ? "bg-purple-600 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            ? "bg-accent text-accent-fg"
+                            : "bg-surface-raised border border-border text-text-muted hover:border-border-strong"
                         }`}
                       >
                         {type}
@@ -1467,7 +1439,7 @@ export default function Page() {
 
                 {/* Topic Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                  <label className="block text-sm font-medium text-text-muted mb-2">
                     Topic
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -1477,8 +1449,8 @@ export default function Page() {
                         onClick={(e) => setSelectedTopic(selectedTopic === topic ? null : topic)}
                         className={`px-3 py-1 rounded-full text-sm transition-colors ${
                           selectedTopic === topic
-                            ? "bg-purple-600 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            ? "bg-accent text-accent-fg"
+                            : "bg-surface-raised border border-border text-text-muted hover:border-border-strong"
                         }`}
                       >
                         {topic}
@@ -1489,7 +1461,7 @@ export default function Page() {
 
                 {/* Channel Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                  <label className="block text-sm font-medium text-text-muted mb-2">
                     Channel
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -1499,8 +1471,8 @@ export default function Page() {
                         onClick={(e) => setSelectedChannel(selectedChannel === channel ? null : channel)}
                         className={`px-3 py-1 rounded-full text-sm transition-colors ${
                           selectedChannel === channel
-                            ? "bg-purple-600 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            ? "bg-accent text-accent-fg"
+                            : "bg-surface-raised border border-border text-text-muted hover:border-border-strong"
                         }`}
                       >
                         {channel}
@@ -1527,41 +1499,39 @@ export default function Page() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className={`bg-gray-800 rounded-lg p-6 space-y-4 cursor-pointer transition-all ${
-              selectedItems.includes(item.id) ? 'ring-2 ring-blue-500' : ''
+            className={`bg-surface border border-border shadow-card rounded-lg p-6 space-y-4 cursor-pointer transition-all ${
+              selectedItems.includes(item.id) ? 'ring-2 ring-accent-ring' : ''
             }`}
             onClick={(e) => handleItemSelect(item.id, e)}
           >
             {/* Row 1: Type, Channel, Created */}
             <div className="flex justify-between items-center">
-              <span className="text-purple-400 font-medium">{item.type}</span>
-              <span className="text-gray-400">{item.channelName}</span>
-              <span className="text-gray-500 text-sm">{formatDate(item.createdAt)}</span>
+              <span className="text-accent font-medium">{item.type}</span>
+              <span className="text-text-muted">{item.channelName}</span>
+              <span className="text-text-faint text-sm">{formatDate(item.createdAt)}</span>
             </div>
 
             {/* Row 2: File Name and Status */}
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">{item.fileName}</h3>
-              <span className={`px-3 py-1 rounded-full text-sm ${statusColors[item.status as keyof typeof statusColors]}`}>
-                {item.status}
-              </span>
+              <Badge status={item.status}>{item.status}</Badge>
             </div>
 
             {/* Row 3: Render Zone */}
             <div className={`rounded-lg p-4 ${
-              ['rendered', 'pending_metadata', 'processing_metadata', 'processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) 
-                ? 'bg-green-900/30 border border-green-500/30' 
-                : 'bg-gray-700/50'
+              ['rendered', 'pending_metadata', 'processing_metadata', 'processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status)
+                ? 'bg-success-bg border border-success/30'
+                : 'bg-surface-sunken'
             }`}>
               <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-medium text-gray-400">Render</h4>
+                  <h4 className="text-sm font-medium text-text-muted">Render</h4>
                   {['rendered', 'pending_metadata', 'processing_metadata', 'processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) && (
-                    <CheckCircleIcon className="w-4 h-4 text-green-500" />
+                    <CheckCircleIcon className="w-4 h-4 text-success" />
                   )}
                 </div>
-                <button 
-                  className="text-purple-400 hover:text-purple-300"
+                <button
+                  className="text-accent hover:text-accent-hover"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleRenderDetailsClick(item);
@@ -1571,25 +1541,25 @@ export default function Page() {
                 </button>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-300">{item.nexrenderUid}</span>
-                <span className="text-gray-500">{item.renderTime ? formatDate(item.renderTime) : '-'}</span>
+                <span className="text-text-muted">{item.nexrenderUid}</span>
+                <span className="text-text-faint">{item.renderTime ? formatDate(item.renderTime) : '-'}</span>
               </div>
               {(item.status === 'rendering') && item.renderProgress !== undefined && (
                 <div className="mt-2">
-                  <div className="w-full bg-gray-700 rounded-full h-2">
-                    <div 
-                      className="bg-purple-600 h-2 rounded-full transition-all duration-500"
+                  <div className="w-full bg-surface-raised rounded-full h-2">
+                    <div
+                      className="bg-accent h-2 rounded-full transition-all duration-500"
                       style={{ width: `${item.renderProgress}%` }}
                     ></div>
                   </div>
-                  <p className="text-sm text-gray-400 mt-1 text-right">
+                  <p className="text-sm text-text-muted mt-1 text-right">
                     {item.renderProgress}%
                   </p>
                 </div>
               )}
               {item.status === 'new' && (
                 <button
-                  className="mt-2 w-full px-3 py-1 text-sm bg-blue-600 hover:bg-blue-500 rounded"
+                  className="mt-2 w-full px-3 py-1 text-sm bg-accent hover:bg-accent-hover text-accent-fg rounded"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleRender(item);
@@ -1600,7 +1570,7 @@ export default function Page() {
               )}
               {['rendered', 'pending_metadata', 'processing_metadata', 'processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) && (
                 <button
-                  className="mt-2 w-full px-3 py-1 text-sm bg-green-600 hover:bg-green-500 rounded flex items-center justify-center gap-2"
+                  className="mt-2 w-full px-3 py-1 text-sm bg-success-bg text-success hover:bg-success-bg/80 rounded flex items-center justify-center gap-2"
                   onClick={(e) => {
                     e.stopPropagation();
                     // Open the video file in a new tab (restore old behavior)
@@ -1621,21 +1591,21 @@ export default function Page() {
 
             {/* Row 4: Metadata Zone */}
             <div className={`rounded-lg p-4 ${
-              ['processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) 
+              ['processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status)
                 ? item.status === 'processed_metadata'
-                  ? 'bg-teal-900/30 border border-teal-500/30'
-                  : 'bg-green-900/30 border border-green-500/30'
-                : 'bg-gray-700/50'
+                  ? 'bg-info-bg border border-info/30'
+                  : 'bg-success-bg border border-success/30'
+                : 'bg-surface-sunken'
             }`}>
               <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-medium text-gray-400">Metadata</h4>
+                  <h4 className="text-sm font-medium text-text-muted">Metadata</h4>
                   {['processed_metadata', 'pending_upload', 'processing_upload', 'uploaded', 'declined', 'approved'].includes(item.status) && (
-                    <CheckCircleIcon className="w-4 h-4 text-teal-500" />
+                    <CheckCircleIcon className="w-4 h-4 text-info" />
                   )}
                 </div>
-                <button 
-                  className="text-purple-400 hover:text-purple-300"
+                <button
+                  className="text-accent hover:text-accent-hover"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleMetadataDetailsClick(item);
@@ -1647,21 +1617,21 @@ export default function Page() {
               <div className="flex flex-col gap-1 text-sm">
                 {item.youtubeMetadata ? (
                   <>
-                    <span className="text-gray-300 truncate">
+                    <span className="text-text-muted truncate">
                       {item.youtubeMetadata.title}
                     </span>
-                    <span className="text-gray-400 truncate">
+                    <span className="text-text-muted truncate">
                       {item.youtubeMetadata.description}
                     </span>
                   </>
                 ) : (
-                  <span className="text-gray-500">No metadata generated</span>
+                  <span className="text-text-faint">No metadata generated</span>
                 )}
-                <span className="text-gray-500">{item.metadataTime ? formatDate(item.metadataTime) : '-'}</span>
+                <span className="text-text-faint">{item.metadataTime ? formatDate(item.metadataTime) : '-'}</span>
               </div>
               {item.status === 'rendered' && (
                 <button
-                  className="mt-2 w-full px-3 py-1 text-sm bg-purple-600 hover:bg-purple-500 rounded"
+                  className="mt-2 w-full px-3 py-1 text-sm bg-accent hover:bg-accent-hover text-accent-fg rounded"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleMetadata(item);
@@ -1672,17 +1642,16 @@ export default function Page() {
               )}
               {(item.status === 'pending_metadata' || item.status === 'processing_metadata') && (
                 <div className="mt-2">
-                  <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="bg-purple-600 h-2 rounded-full transition-all duration-500 animate-[loading_2s_ease-in-out_infinite]"
-                      style={{ 
+                  <div className="w-full bg-surface-raised rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-progress h-2 rounded-full transition-all duration-500 animate-[loading_2s_ease-in-out_infinite]"
+                      style={{
                         width: '100%',
                         transform: 'translateX(-100%)',
-                        background: 'linear-gradient(90deg, transparent, rgba(147, 51, 234, 0.8), transparent)',
                       }}
                     ></div>
                   </div>
-                  <p className="text-sm text-gray-400 mt-1 text-right">
+                  <p className="text-sm text-text-muted mt-1 text-right">
                     {item.status === 'pending_metadata' ? 'Pending...' : 'Processing...'}
                   </p>
                 </div>
@@ -1691,19 +1660,19 @@ export default function Page() {
 
             {/* Row 5: Upload Zone */}
             <div className={`rounded-lg p-4 ${
-              ['uploaded', 'declined', 'approved'].includes(item.status) 
-                ? 'bg-green-900/30 border border-green-500/30'
-                : 'bg-gray-700/50'
+              ['uploaded', 'declined', 'approved'].includes(item.status)
+                ? 'bg-success-bg border border-success/30'
+                : 'bg-surface-sunken'
             }`}>
               <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-medium text-gray-400">Upload</h4>
+                  <h4 className="text-sm font-medium text-text-muted">Upload</h4>
                   {['uploaded', 'declined', 'approved'].includes(item.status) && (
-                    <CheckCircleIcon className="w-4 h-4 text-green-500" />
+                    <CheckCircleIcon className="w-4 h-4 text-success" />
                   )}
                 </div>
-                <button 
-                  className="text-purple-400 hover:text-purple-300"
+                <button
+                  className="text-accent hover:text-accent-hover"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (item.youtubeLink) {
@@ -1717,12 +1686,12 @@ export default function Page() {
               <div className="flex flex-col gap-1 text-sm">
                 {item.youtubeLink && (
                   <div className="flex items-center gap-2">
-                    <span className="text-red-400 text-xs">YouTube:</span>
+                    <span className="text-danger text-xs">YouTube:</span>
                     <a
                       href={item.youtubeLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-400 hover:underline break-all text-xs"
+                      className="text-accent hover:underline break-all text-xs"
                     >
                       {item.youtubeLink}
                     </a>
@@ -1730,29 +1699,33 @@ export default function Page() {
                 )}
                 {item.tiktokLink && (
                   <div className="flex items-center gap-2">
-                    <span className="text-black bg-white px-1 rounded text-xs">TikTok:</span>
+                    <span className="text-text bg-surface-raised border border-border px-1 rounded text-xs">TikTok:</span>
                     <a
                       href={item.tiktokLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-400 hover:underline break-all text-xs"
+                      className="text-accent hover:underline break-all text-xs"
                     >
                       {item.tiktokLink}
                     </a>
                   </div>
                 )}
                 {!item.youtubeLink && !item.tiktokLink && (
-                  <span className="text-gray-300">-</span>
+                  <span className="text-text-muted">-</span>
                 )}
-                <span className="text-gray-500">{item.uploadTime ? formatDate(item.uploadTime) : '-'}</span>
+                <span className="text-text-faint">{item.uploadTime ? formatDate(item.uploadTime) : '-'}</span>
               </div>
               {item.status === 'processed_metadata' && (
                 <div className="mt-2 space-y-2">
-                  <button
-                    className="w-full px-3 py-2 text-sm font-semibold rounded flex items-center justify-center gap-2 transition-colors"
-                    style={{ background: '#FF0000', color: '#fff' }}
-                    onMouseOver={e => e.currentTarget.style.background = '#ff4d4d'}
-                    onMouseOut={e => e.currentTarget.style.background = '#FF0000'}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="w-full"
+                    leftIcon={
+                      <svg height="20" viewBox="0 0 24 24" width="20" fill="currentColor">
+                        <path d="M23.498 6.186a2.994 2.994 0 0 0-2.112-2.12C19.228 3.5 12 3.5 12 3.5s-7.228 0-9.386.566A2.994 2.994 0 0 0 .502 6.186C0 8.344 0 12 0 12s0 3.656.502 5.814a2.994 2.994 0 0 0 2.112 2.12C4.772 20.5 12 20.5 12 20.5s7.228 0 9.386-.566a2.994 2.994 0 0 0 2.112-2.12C24 15.656 24 12 24 12s0-3.656-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                      </svg>
+                    }
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (!item.youtubeMetadata || !item.youtubeMetadata.title || !item.youtubeMetadata.title.trim()) {
@@ -1769,16 +1742,17 @@ export default function Page() {
                       setShowScheduleDialog(true);
                     }}
                   >
-                    <svg height="20" viewBox="0 0 24 24" width="20" fill="#fff" style={{ marginRight: 6 }}>
-                      <path d="M23.498 6.186a2.994 2.994 0 0 0-2.112-2.12C19.228 3.5 12 3.5 12 3.5s-7.228 0-9.386.566A2.994 2.994 0 0 0 .502 6.186C0 8.344 0 12 0 12s0 3.656.502 5.814a2.994 2.994 0 0 0 2.112 2.12C4.772 20.5 12 20.5 12 20.5s7.228 0 9.386-.566a2.994 2.994 0 0 0 2.112-2.12C24 15.656 24 12 24 12s0-3.656-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                    </svg>
                     Upload to YouTube
-                  </button>
-                  <button
-                    className="w-full px-3 py-2 text-sm font-semibold rounded flex items-center justify-center gap-2 transition-colors"
-                    style={{ background: '#000000', color: '#fff' }}
-                    onMouseOver={e => e.currentTarget.style.background = '#333333'}
-                    onMouseOut={e => e.currentTarget.style.background = '#000000'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
+                    leftIcon={
+                      <svg height="20" viewBox="0 0 24 24" width="20" fill="currentColor">
+                        <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+                      </svg>
+                    }
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (!item.youtubeMetadata || !item.youtubeMetadata.title || !item.youtubeMetadata.title.trim()) {
@@ -1795,26 +1769,22 @@ export default function Page() {
                       setShowScheduleDialog(true);
                     }}
                   >
-                    <svg height="20" viewBox="0 0 24 24" width="20" fill="#fff" style={{ marginRight: 6 }}>
-                      <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
-                    </svg>
                     Upload to TikTok
-                  </button>
+                  </Button>
                 </div>
               )}
               {(item.status === 'pending_upload' || item.status === 'processing_upload') && (
                 <div className="mt-2">
-                  <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="bg-green-600 h-2 rounded-full transition-all duration-500 animate-[loading_2s_ease-in-out_infinite]"
-                      style={{ 
+                  <div className="w-full bg-surface-raised rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-progress h-2 rounded-full transition-all duration-500 animate-[loading_2s_ease-in-out_infinite]"
+                      style={{
                         width: '100%',
                         transform: 'translateX(-100%)',
-                        background: 'linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.8), transparent)',
                       }}
                     ></div>
                   </div>
-                  <p className="text-sm text-gray-400 mt-1 text-right">
+                  <p className="text-sm text-text-muted mt-1 text-right">
                     {item.status === 'pending_upload' ? 'Pending...' : 'Uploading...'}
                   </p>
                 </div>
@@ -1832,17 +1802,17 @@ export default function Page() {
       >
         {/* Items per page selector */}
         <div className="flex items-center gap-2">
-          <span className="text-gray-400 text-sm">Show:</span>
-          <select
+          <span className="text-text-muted text-sm">Show:</span>
+          <Select
             value={itemsPerPage}
             onChange={(e) => setItemsPerPage(Number(e.target.value))}
-            className="bg-gray-700 text-white rounded-lg px-3 py-1 text-sm border border-gray-600 focus:border-purple-500 focus:outline-none"
+            className="w-auto px-3 py-1 text-sm"
           >
             <option value={20}>20</option>
             <option value={50}>50</option>
             <option value={100}>100</option>
-          </select>
-          <span className="text-gray-400 text-sm">per page</span>
+          </Select>
+          <span className="text-text-muted text-sm">per page</span>
         </div>
 
         {/* Page numbers */}
@@ -1855,8 +1825,8 @@ export default function Page() {
               onClick={() => setCurrentPage(pageNum)}
               className={`w-10 h-10 rounded-lg ${
                 currentPage === pageNum
-                  ? "bg-purple-600"
-                  : "bg-gray-800 hover:bg-gray-700"
+                  ? "bg-accent text-accent-fg"
+                  : "bg-surface-raised border border-border text-text hover:border-border-strong"
               }`}
             >
               {pageNum}
@@ -1867,55 +1837,34 @@ export default function Page() {
 
       {/* Selection Mode Toolbar - Fixed at bottom */}
       {selectedItems.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-4 flex justify-between items-center z-50">
+        <div className="fixed bottom-0 left-0 right-0 bg-surface-raised border-t border-border shadow-overlay p-4 flex justify-between items-center z-50">
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-400">
+            <span className="text-sm text-text-muted">
               {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} selected
             </span>
-            <button
-              onClick={handleSelectAll}
-              className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded"
-            >
+            <Button variant="secondary" size="sm" onClick={handleSelectAll}>
               Select All
-            </button>
-            <button
-              onClick={handleDeselectAll}
-              className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded"
-            >
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleDeselectAll}>
               Deselect All
-            </button>
+            </Button>
           </div>
           <div className="flex space-x-2">
-            <button
-              onClick={() => handleActionClick('render')}
-              className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-500 rounded"
-            >
+            <Button variant="primary" size="sm" onClick={() => handleActionClick('render')}>
               Render
-            </button>
-            <button
-              onClick={() => handleActionClick('metadata')}
-              className="px-3 py-1 text-sm bg-purple-600 hover:bg-purple-500 rounded"
-            >
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => handleActionClick('metadata')}>
               Metadata
-            </button>
-            <button
-              onClick={() => handleActionClick('upload')}
-              className="px-3 py-1 text-sm bg-green-600 hover:bg-green-500 rounded"
-            >
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => handleActionClick('upload')}>
               Upload
-            </button>
-            <button
-              onClick={() => handleActionClick('tiktok-upload')}
-              className="px-3 py-1 text-sm bg-black hover:bg-gray-700 rounded"
-            >
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleActionClick('tiktok-upload')}>
               TikTok
-            </button>
-            <button
-              onClick={handleDeleteSelected}
-              className="px-3 py-1 text-sm bg-red-600 hover:bg-red-500 rounded"
-            >
+            </Button>
+            <Button variant="danger" size="sm" onClick={handleDeleteSelected}>
               Delete
-            </button>
+            </Button>
           </div>
         </div>
       )}

@@ -83,7 +83,7 @@ export default function SuccessDialog({
               numberOfPieces={200}
               gravity={0.3}
               initialVelocityY={10}
-              colors={['#22c55e', '#ffffff', '#86efac']}
+              colors={['#4ade80', '#60a5fa', '#F5A623']}
             />
           )}
           <motion.div
@@ -112,13 +112,13 @@ export default function SuccessDialog({
             }}
             className="fixed bottom-4 right-4 z-50"
           >
-            <div className="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex flex-col gap-2 relative overflow-hidden">
+            <div className="bg-success-bg text-success px-6 py-3 rounded-lg shadow-raised flex flex-col gap-2 relative overflow-hidden">
               {/* Sparkles */}
               <motion.div
                 variants={sparkleVariants}
                 initial="initial"
                 animate="animate"
-                className="absolute -top-2 -right-2 text-yellow-300"
+                className="absolute -top-2 -right-2 text-warning"
               >
                 <SparklesIcon className="w-4 h-4" />
               </motion.div>
@@ -126,7 +126,7 @@ export default function SuccessDialog({
                 variants={sparkleVariants}
                 initial="initial"
                 animate="animate"
-                className="absolute -bottom-2 -left-2 text-yellow-300"
+                className="absolute -bottom-2 -left-2 text-warning"
                 style={{ animationDelay: '0.5s' }}
               >
                 <SparklesIcon className="w-4 h-4" />
@@ -162,9 +162,9 @@ export default function SuccessDialog({
                   {message}
                 </motion.span>
               </div>
-              <div className="h-1 w-full bg-green-400/30 rounded-full overflow-hidden">
+              <div className="h-1 w-full bg-success/30 rounded-full overflow-hidden">
                 <motion.div
-                  className="h-full bg-white"
+                  className="h-full bg-accent"
                   initial={{ width: '100%' }}
                   animate={{ width: `${progress}%` }}
                   transition={{ duration: 0.1, ease: 'linear' }}
