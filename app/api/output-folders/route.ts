@@ -58,11 +58,8 @@ export async function POST(req: NextRequest) {
     }
 }
 
-// DELETE /api/output-folders/[id] - Delete an output folder
-export async function DELETE(
-    req: NextRequest,
-    { params }: { params: { id: string } }
-) {
+// DELETE /api/output-folders?id=<id> - Delete an output folder
+export async function DELETE(req: NextRequest) {
     try {
         const id = req.nextUrl.searchParams.get('id');
         if (!id) {

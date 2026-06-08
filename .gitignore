@@ -41,3 +41,14 @@ yarn-error.log*
 next-env.d.ts
 
 google-cloud-key.json
+
+# uploaded After Effects templates (user-supplied, often licensed assets — do not commit)
+/public/templates/*
+!/public/templates/.gitkeep
+
+# render output
+/render_output/
+*.aep
+
+# local Claude Code agent config
+/.claude/

@@ -110,8 +110,10 @@ export async function GET(req: NextRequest) {
       : Object.keys(assetPaths);
     
     for (const cat of categoriesToScan) {
-      if (assetPaths[cat as keyof typeof assetPaths]) {
-        const assets = await scanDirectory(assetPaths[cat as keyof typeof assetPaths], cat);
+      const dir = assetPaths[cat as keyof typeof assetPaths];
+      // Skip non-string entries (e.g. the nested `crawler` paths object)
+      if (typeof dir === 'string') {
+        const assets = await scanDirectory(dir, cat);
         allAssets.push(...assets);
       }
     }
@@ -159,6 +161,12 @@ export async function POST(req: NextRequest) {
     }
     
     const uploadPath = assetPaths[category as keyof typeof assetPaths];
+    if (typeof uploadPath !== 'string') {
+      return NextResponse.json(
+        { error: 'Invalid category' },
+        { status: 400 }
+      );
+    }
     const uploadedAssets: Asset[] = [];
     
     for (const file of files) {

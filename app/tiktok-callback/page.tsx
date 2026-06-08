@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function TikTokCallbackPage() {
+function TikTokCallback() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -79,5 +79,13 @@ export default function TikTokCallbackPage() {
         <p className="text-gray-400">Please wait while we complete the authentication.</p>
       </div>
     </div>
+  );
+}
+
+export default function TikTokCallbackPage() {
+  return (
+    <Suspense>
+      <TikTokCallback />
+    </Suspense>
   );
 } 

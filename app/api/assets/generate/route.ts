@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazily create the OpenAI client so the module can be imported during build
+// without the API key. The key is only required when OpenAI is actually used.
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is not configured');
+  }
+  return new OpenAI({ apiKey });
+}
 
 // Grok API configuration
 const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
@@ -1057,6 +1063,7 @@ CRITICAL: Return ONLY the JSON object. Do not include any other text, explanatio
       content = grokData.choices[0].message.content || "";
     } else {
       // Use OpenAI (default)
+      const openai = getOpenAIClient();
       const chat = await openai.chat.completions.create({
         model: "gpt-4",
         messages: [

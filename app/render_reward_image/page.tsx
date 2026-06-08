@@ -296,6 +296,7 @@ export default function CreateJobPage() {
         <input
           type="file"
           multiple
+          // @ts-expect-error `webkitdirectory` is a valid DOM attribute missing from React's input types
           webkitdirectory="true"
           onChange={handleImagesFolderChange}
           disabled={loadingImages}

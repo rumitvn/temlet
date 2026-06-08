@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function CallbackPage() {
+function Callback() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -85,5 +85,13 @@ export default function CallbackPage() {
         <p className="text-gray-500 text-sm mt-4">This window will close automatically.</p>
       </div>
     </div>
+  );
+}
+
+export default function CallbackPage() {
+  return (
+    <Suspense>
+      <Callback />
+    </Suspense>
   );
 } 

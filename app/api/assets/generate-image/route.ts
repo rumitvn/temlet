@@ -4,16 +4,25 @@ import path from "path";
 import OpenAI from "openai";
 import { config } from "../../../../lib/config";
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazily create the OpenAI client so the module can be imported (e.g. during
+// `next build`) without the API key being present. The key is only required
+// when the OpenAI model is actually used.
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is not configured');
+  }
+  return new OpenAI({ apiKey });
+}
 
-// Initialize Grok client
-const grok = new OpenAI({
-  apiKey: process.env.GROK_API_KEY,
-  baseURL: "https://api.x.ai/v1",
-});
+// Lazily create the Grok client for the same reason.
+function getGrokClient(): OpenAI {
+  const apiKey = process.env.GROK_API_KEY;
+  if (!apiKey) {
+    throw new Error('GROK_API_KEY is not configured');
+  }
+  return new OpenAI({ apiKey, baseURL: 'https://api.x.ai/v1' });
+}
 
 interface GenerateImageRequest {
   prompt: string;
@@ -37,6 +46,7 @@ interface ComfyUIWorkflow {
 // Helper function to generate image using OpenAI
 async function generateImageWithOpenAI(params: GenerateImageRequest) {
   try {
+    const openai = getOpenAIClient();
     const response = await openai.images.generate({
       model: "dall-e-3",
       prompt: params.prompt,
@@ -64,6 +74,7 @@ async function generateImageWithOpenAI(params: GenerateImageRequest) {
 // Helper function to generate image using Grok
 async function generateImageWithGrok(params: GenerateImageRequest) {
   try {
+    const grok = getGrokClient();
     const response = await grok.images.generate({
       model: "grok-2-image",
       prompt: params.prompt,

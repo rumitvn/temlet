@@ -4,7 +4,7 @@ import { prisma } from "@/app/lib/db";
 // GET /api/renders/[id] - Get a single render item
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
@@ -32,7 +32,7 @@ export async function GET(
 // PATCH /api/renders/[id] - Update a render item
 export async function PATCH(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
@@ -103,7 +103,7 @@ export async function PATCH(
 // DELETE /api/renders/[id] - Delete a render item
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;

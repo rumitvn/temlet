@@ -4,10 +4,10 @@ import { prisma } from "@/app/lib/db";
 // DELETE /api/render-formats/[id] - Delete a render format
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Check if format exists
     const format = await prisma.renderFormat.findUnique({

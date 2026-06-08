@@ -95,11 +95,8 @@ export async function POST(req: NextRequest) {
     }
 }
 
-// DELETE /api/templates/[id] - Delete a template
-export async function DELETE(
-    req: NextRequest,
-    { params }: { params: { id: string } }
-) {
+// DELETE /api/templates?id=<id> - Delete a template
+export async function DELETE(req: NextRequest) {
     try {
         const id = req.nextUrl.searchParams.get('id');
         if (!id) {
