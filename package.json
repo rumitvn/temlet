@@ -50,7 +50,7 @@
     "open": "^10.1.2",
     "openai": "^5.1.1",
     "puppeteer": "^24.15.0",
-    "react": "^19.0.0",
+    "react": "^19.2.7",
     "react-confetti": "^6.4.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0",
