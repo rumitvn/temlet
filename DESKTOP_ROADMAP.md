@@ -1,0 +1,162 @@
+# Temlet Desktop — Improvement Roadmap
+
+Tracking doc for turning the working desktop POC into a real, distributable
+desktop product (not just the web app in a window).
+
+**Status legend:** `[ ]` todo · `[~]` in progress · `[x]` done
+**Tags:** 🔴 blocker · 🟠 high · 🟡 medium · ⚪ nice-to-have · ⏱ effort (S/M/L)
+
+> Already done (POC): Tauri v2 shell, Postgres→SQLite, embedded standalone
+> server sidecar (dev wraps `next dev`, release boots bundled server), in-process
+> render monitor, seed DB on first run, secrets via `temlet.env`. See `DESKTOP.md`.
+
+---
+
+## Phase A — Make the packaged app self-contained 🔴
+*Without this, `tauri:build` output only runs on a machine that already has Node +
+ffmpeg + Chrome. This is the gap between "POC" and "ships to a user."*
+
+- [ ] 🔴 ⏱M **Bundle a Node runtime as a Tauri sidecar binary**
+  - Ship `node` as `externalBin` named `node-<target-triple>`; spawn via the
+    bundled path instead of `resolve_node()` PATH probing in `src-tauri/src/lib.rs`.
+  - Fixes the Finder/Explorer launch (no inherited `PATH`).
+  - Alt: compile server to a single binary (Node SEA / `@yao-pkg/pkg`) — harder
+    with native modules; sidecar-node is the safer first step.
+- [ ] 🔴 ⏱M **Bundle ffmpeg** — `ffmpeg-static` ships a binary, but verify it's
+  packaged and resolvable in `app/api/youtube-upload/route.ts`; set the path
+  explicitly via `ffmpeg.setFfmpegPath(...)` from a bundled resource.
+- [ ] 🔴 ⏱L **Handle Chromium for Puppeteer** (`app/services/crawlerService.ts`)
+  - Options: bundle a browser + set `PUPPETEER_EXECUTABLE_PATH`; OR detect the
+    user's installed Chrome; OR download-on-first-run with progress UI.
+  - Largest single size cost (~150–300MB) — decide per product need.
+- [ ] 🟠 ⏱M **Native-module ABI matrix** — `sharp`, `better-sqlite3` prebuilds must
+  match the bundled Node ABI for each target (macOS arm64 + x64, Windows x64).
+  Verify staged `node_modules` carry the right `.node` binaries per platform build.
+- [ ] 🟡 ⏱S **Trim bundle** — prune unused traced `node_modules`; confirm the
+  135MB server has no dev-only deps. Consider `outputFileTracingExcludes` additions.
+
+---
+
+## Phase B — Backend robustness for embedded use 🟠
+*The server is now a child process, not a managed deployment. Treat it like one.*
+
+- [ ] 🟠 ⏱S **Dynamic free port** — replace the fixed `SERVER_PORT = 38211` in
+  `lib.rs` with an OS-assigned free port (bind `:0`, read it back), passed to the
+  server and used for the navigate URL. Avoids clashes with other apps / Temlet web.
+- [ ] 🟠 ⏱S **Pipe sidecar logs to a file** — capture server stdout/stderr to
+  `<app-data>/logs/server.log` for debugging field issues (currently discarded).
+- [ ] 🟠 ⏱M **Crash recovery** — detect sidecar exit; show an error state in the
+  webview and offer restart, instead of a hung loading splash.
+- [ ] 🟠 ⏱S **Readiness via `/api/health`** — upgrade the bare TCP poll in `lib.rs`
+  to hit `/api/health` so we navigate only when the app (not just the port) is ready.
+- [ ] 🟡 ⏱S **Orphan prevention** — ensure the child dies if the shell is SIGKILLed
+  or panics (process group / job object), not only on clean `ExitRequested`.
+- [ ] 🔴 ⏱M **DB migrations on app update** — the seed-copy only runs on *first*
+  launch. When a new app version ships a schema change, the user's existing
+  `<app-data>/temlet.db` must be migrated. Bundle migrations + run
+  `prisma migrate deploy` (or an embedded migrator) on startup against the live DB.
+
+---
+
+## Phase C — Desktop-native UX 🟠
+*What makes it feel like an app instead of a tab.*
+
+- [ ] 🟠 ⏱S **Native folder/file pickers** (`tauri-plugin-dialog`) for
+  `WORKING_DIRECTORY`, template `.aep` selection, and output folders — replace
+  typed paths in the create/template/output-folder dialogs.
+- [ ] 🟠 ⏱S **Reveal in file manager** (`tauri-plugin-opener`) — open rendered
+  videos / asset folders in Finder/Explorer from the render cards.
+- [ ] 🟠 ⏱S **Native notifications** (`tauri-plugin-notification`) — render
+  complete, upload done/failed. High value given the long-running monitor loop.
+- [ ] 🟡 ⏱S **System tray** (`tauri-plugin-tray` / core tray) — let the monitor run
+  in the background with a tray icon + quick status; close-to-tray.
+- [ ] 🟡 ⏱S **Window state persistence** (`tauri-plugin-window-state`) — remember
+  size/position across launches.
+- [ ] 🟡 ⏱S **Single instance** (`tauri-plugin-single-instance`) — prevent two
+  copies fighting over the same SQLite DB / port.
+- [ ] 🟡 ⏱M **Native app menu** — File/Edit/Window/Help with real actions
+  (open working dir, settings, logs, about, check for updates).
+- [ ] ⚪ ⏱M **Drag-and-drop** assets/templates into the app.
+
+---
+
+## Phase D — Configuration, secrets & onboarding 🟠
+*Desktop users don't edit env files in app-config dirs by hand.*
+
+- [ ] 🟠 ⏱M **In-app Settings screen** — edit API keys, Nexrender URL/secret,
+  working directory; write through to the config the shell injects. Replaces
+  hand-editing `temlet.env`.
+- [ ] 🟠 ⏱M **First-run setup wizard** — choose working directory, enter required
+  keys, test Nexrender connectivity before the dashboard loads.
+- [ ] 🔴 ⏱M **Secure secret storage** — move secrets out of plaintext `temlet.env`
+  into the OS keychain (`tauri-plugin-stronghold` or a keyring crate). Tokens like
+  `YOUTUBE_TOKEN_JSON`, `TIKTOK_*` should not sit in a readable file.
+- [ ] 🟠 ⏱S **Per-install `CRON_SECRET`** — generate a random secret per install
+  instead of the hardcoded `"temlet-desktop-local"` in `lib.rs`.
+- [ ] 🟡 ⏱S **Wire `lib/config.ts` default** — the `C:/Users/youruser/Documents`
+  placeholder should resolve to the app-data working dir set by the shell.
+- [ ] 🟡 ⏱S **Startup self-check** — verify ffmpeg/Chrome/Nexrender availability and
+  surface a clear status panel.
+
+---
+
+## Phase E — OAuth flows for desktop 🟠
+*Current YouTube/TikTok auth assumes a web redirect; `get_youtube_token.js` is a
+manual CLI step.*
+
+- [ ] 🟠 ⏱L **Deep-link OAuth callbacks** (`tauri-plugin-deep-link`) — register a
+  custom scheme (e.g. `temlet://oauth/callback`) and handle YouTube + TikTok
+  redirects in-app, replacing the manual token script and localhost redirect.
+- [ ] 🟡 ⏱M **In-app YouTube auth** — fold `get_youtube_token.js` into a real
+  flow; persist the token via secure storage (Phase D).
+- [ ] 🟡 ⏱S **Loopback fallback** — if deep links are unavailable, spin a transient
+  loopback listener for the OAuth code (the app already depends on `server-destroy`).
+
+---
+
+## Phase F — Security hardening 🟡
+
+- [ ] 🟠 ⏱S **Tighten Tauri capabilities + CSP** — `app.security.csp` is `null`;
+  define a CSP and restrict webview navigation to the local server origin only.
+- [ ] 🟡 ⏱S **Disable devtools in release** and lock down remote-content allowlist.
+- [ ] 🟡 ⏱S **Bind server to 127.0.0.1 only** (already done via `HOSTNAME`) — keep
+  it loopback-only; never expose the embedded API on a routable interface.
+- [ ] 🟡 ⏱S **Validate inputs at the shell boundary** — any Rust↔JS commands added
+  later must validate paths (reuse `app/lib/file-utils.ts` allowlist patterns).
+
+---
+
+## Phase G — Distribution 🟠
+*The "full distributable" milestone deferred from the POC.*
+
+- [ ] 🟠 ⏱M **macOS signing + notarization** — Developer ID, hardened runtime,
+  notarize the `.dmg`.
+- [ ] 🟠 ⏱M **Windows signing** — sign the `.msi`/NSIS installer.
+- [ ] 🟡 ⏱M **Installers** — configure `.dmg` (mac) and `.msi`/`.exe` (win) targets
+  in `tauri.conf.json` (currently `"targets": "all"`).
+- [ ] 🟡 ⏱M **Auto-update** (`tauri-plugin-updater`) — update endpoint, signing
+  keys, and an in-app "check for updates" action.
+
+---
+
+## Phase H — CI/CD & testing 🟡
+
+- [ ] 🟠 ⏱M **Build matrix** — GitHub Actions to build/sign macOS (arm64 + x64) and
+  Windows (x64) artifacts on tag (`tauri-action`).
+- [ ] 🟡 ⏱M **Packaged smoke test** — drive the built app (tauri-driver / WebDriver)
+  to confirm boot → dashboard → a DB round-trip.
+- [ ] 🟡 ⏱S **Sidecar lifecycle test** — assert the server child starts and is
+  reaped on quit (no orphan).
+- [ ] 🟡 ⏱S **SQLite migration test** — verify upgrade-in-place from an older DB.
+
+---
+
+## Suggested order
+
+1. **Phase A** (self-contained) + **D secret storage** + **B migrations-on-update**
+   — these three are the true blockers for shipping to anyone.
+2. **Phase C** native UX + **D settings/wizard** — the biggest perceived "desktop"
+   upgrade for users.
+3. **Phase E** OAuth, **F** security, then **G** distribution + **H** CI to release.
+
+> Keep `DESKTOP.md` (how it works) and this file (what's left) in sync as items land.
