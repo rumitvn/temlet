@@ -42,6 +42,25 @@ mkdirSync(serverDest, { recursive: true });
 // 1. The standalone server (server.js + traced node_modules + app code).
 cpSync(standaloneDir, serverDest, { recursive: true });
 
+// 1b. Defensive prune: Next's tracer can over-copy project-root files into the
+//     standalone output. None of these are needed to run the server — drop them
+//     so the shipped bundle stays lean (and never includes src-tauri/target).
+for (const junk of [
+  "src-tauri",
+  "Dockerfile",
+  "Dockerfile.dev",
+  "docker-compose.yml",
+  "docker-compose.dev.yml",
+  "docker-compose.prod.yml",
+  "postman",
+  "loading",
+  "nginx.conf",
+  "vercel.json",
+  "get_youtube_token.js",
+]) {
+  rmSync(path.join(serverDest, junk), { recursive: true, force: true });
+}
+
 // 2. Static assets — Next does not copy these into standalone automatically.
 if (existsSync(staticDir)) {
   cpSync(staticDir, path.join(serverDest, ".next", "static"), { recursive: true });

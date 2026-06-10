@@ -15,9 +15,12 @@ const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: projectRoot,
 
-  // The Rust shell lives under src-tauri/ and its build artifacts (target/) are
+  // The Rust shell lives under src-tauri/ and its build artifacts (target/) and
+  // staged bundle (resources/, which contains a copy of this very output) are
   // gigabytes — never needed by the Node server. Exclude them from the trace so
-  // the standalone bundle stays lean.
+  // the standalone bundle stays lean and the build doesn't recursively copy
+  // itself. Patterns are matched both at the tracing root and anywhere in the
+  // tree as a safeguard.
   outputFileTracingExcludes: {
     "*": ["src-tauri/**"],
   },

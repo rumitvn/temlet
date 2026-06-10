@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
-import { CheckCircleIcon } from "@heroicons/react/24/solid";
+import { CheckCircleIcon, FolderOpenIcon } from "@heroicons/react/24/solid";
 import { Button, Badge } from "@/app/components/ui";
+import { useIsDesktop } from "@/app/hooks/useIsDesktop";
+import { revealPath } from "@/app/lib/desktop";
 import { formatDate } from "../utils";
 import type { RenderItem } from "../../types/render";
 
@@ -48,6 +50,10 @@ export default function RenderCard({
   onMetadataDetails,
   onRequestSingleUpload,
 }: RenderCardProps) {
+  const desktop = useIsDesktop();
+  const localVideoPath =
+    item.mp4Link && !/^https?:/i.test(item.mp4Link) ? item.mp4Link : null;
+
   return (
     <motion.div
       layout
@@ -130,32 +136,48 @@ export default function RenderCard({
           </button>
         )}
         {RENDERED_STATUSES.includes(item.status) && (
-          <button
-            className="mt-2 w-full px-3 py-1 text-sm bg-success-bg text-success hover:bg-success-bg/80 rounded flex items-center justify-center gap-2"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Open the video file in a new tab (restore old behavior)
-              if (item.mp4Link) {
-                window.open(item.mp4Link, "_blank");
-              } else {
-                window.open(`/api/renders/${item.id}/video`, "_blank");
-              }
-            }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill="currentColor"
+          <div className="mt-2 flex gap-2">
+            <button
+              className="flex-1 px-3 py-1 text-sm bg-success-bg text-success hover:bg-success-bg/80 rounded flex items-center justify-center gap-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Open the video file in a new tab (restore old behavior)
+                if (item.mp4Link) {
+                  window.open(item.mp4Link, "_blank");
+                } else {
+                  window.open(`/api/renders/${item.id}/video`, "_blank");
+                }
+              }}
             >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Open Video
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Open Video
+            </button>
+            {/* Desktop-only: reveal the rendered file in Finder / Explorer. */}
+            {desktop && localVideoPath && (
+              <button
+                title="Reveal in file manager"
+                className="px-3 py-1 text-sm bg-surface-raised text-text-muted hover:text-text rounded flex items-center justify-center gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void revealPath(localVideoPath);
+                }}
+              >
+                <FolderOpenIcon className="h-4 w-4" />
+                Reveal
+              </button>
+            )}
+          </div>
         )}
       </div>
 

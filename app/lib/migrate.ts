@@ -4,6 +4,11 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { logger } from "@/app/lib/logger";
 
+// The migrations directory is supplied at runtime by the desktop shell
+// (TEMLET_MIGRATIONS_DIR). It is intentionally NOT derived from process.cwd()
+// here: a cwd-rooted dynamic fs read causes Next's file tracer to bundle the
+// entire project directory into the standalone output.
+
 /**
  * Apply any pending Prisma migrations to the live SQLite database on startup.
  *
@@ -40,12 +45,13 @@ CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
 );
 `;
 
-/** Resolve the on-disk database path from a `file:`-style DATABASE_URL. */
+/**
+ * Resolve the on-disk database path from a `file:`-style DATABASE_URL. A relative
+ * path is returned as-is — better-sqlite3 resolves it against the cwd itself.
+ * (Deliberately avoids `process.cwd()` so Next's tracer doesn't bundle the cwd.)
+ */
 function resolveDatabasePath(databaseUrl: string): string {
-  const withoutScheme = databaseUrl.replace(/^file:/, "");
-  return path.isAbsolute(withoutScheme)
-    ? withoutScheme
-    : path.resolve(process.cwd(), withoutScheme);
+  return databaseUrl.replace(/^file:/, "");
 }
 
 /** Read migration folders (sorted) from the bundled `prisma/migrations` dir. */
@@ -70,9 +76,11 @@ export async function applyMigrations(): Promise<void> {
     return;
   }
 
-  const migrationsDir = path.join(process.cwd(), "prisma", "migrations");
-  if (!existsSync(migrationsDir)) {
-    logger.warn(`[migrate] no migrations dir at ${migrationsDir}; skipping`);
+  const migrationsDir = process.env.TEMLET_MIGRATIONS_DIR;
+  if (!migrationsDir || !existsSync(migrationsDir)) {
+    logger.warn(
+      `[migrate] migrations dir unset/missing (${migrationsDir ?? "unset"}); skipping`,
+    );
     return;
   }
 

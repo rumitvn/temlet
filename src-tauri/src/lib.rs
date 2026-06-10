@@ -9,6 +9,9 @@ struct Backend(Mutex<Option<Child>>);
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(Backend(Mutex::new(None)))
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -89,6 +92,10 @@ mod backend {
             .env("WORKING_DIRECTORY", working_dir.display().to_string())
             // Upgrade the existing DB in place on startup (see instrumentation.ts).
             .env("TEMLET_APPLY_MIGRATIONS", "1")
+            .env(
+                "TEMLET_MIGRATIONS_DIR",
+                server_dir.join("prisma").join("migrations"),
+            )
             // Drive the render monitor in-process (see instrumentation.ts).
             .env("TEMLET_RUN_MONITOR", "1")
             .env("CRON_SECRET", "temlet-desktop-local");

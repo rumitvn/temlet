@@ -65,13 +65,18 @@ ffmpeg + Chrome. This is the gap between "POC" and "ships to a user."*
 ## Phase C — Desktop-native UX 🟠
 *What makes it feel like an app instead of a tab.*
 
-- [ ] 🟠 ⏱S **Native folder/file pickers** (`tauri-plugin-dialog`) for
-  `WORKING_DIRECTORY`, template `.aep` selection, and output folders — replace
-  typed paths in the create/template/output-folder dialogs.
-- [ ] 🟠 ⏱S **Reveal in file manager** (`tauri-plugin-opener`) — open rendered
-  videos / asset folders in Finder/Explorer from the render cards.
-- [ ] 🟠 ⏱S **Native notifications** (`tauri-plugin-notification`) — render
-  complete, upload done/failed. High value given the long-running monitor loop.
+- [~] 🟠 **Native folder/file pickers** (`tauri-plugin-dialog`) — added
+  `pickDirectory()` in `app/lib/desktop.ts` and wired an "Add Folder" picker into
+  `OutputFolderManagerDialog` (native on desktop, typed-path prompt on web).
+  **Remaining:** template `.aep` selection and `WORKING_DIRECTORY` picker (the
+  latter pairs with the Settings screen, Phase D).
+- [x] 🟠 **Reveal in file manager** (`tauri-plugin-opener`) — `revealPath()` +
+  a desktop-only "Reveal" button on rendered cards (`RenderCard.tsx`) opens the
+  output file in Finder/Explorer. Gated by `useIsDesktop()`.
+- [~] 🟠 **Native notifications** (`tauri-plugin-notification`) — `notify()` helper
+  added (requests permission, no-ops on web). **Remaining:** call it on
+  render/upload completion (needs a client-side status-transition hook in the
+  dashboard) — the high-value wiring.
 - [ ] 🟡 ⏱S **System tray** (`tauri-plugin-tray` / core tray) — let the monitor run
   in the background with a tray icon + quick status; close-to-tray.
 - [ ] 🟡 ⏱S **Window state persistence** (`tauri-plugin-window-state`) — remember
