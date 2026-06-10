@@ -3,6 +3,15 @@ use std::sync::Mutex;
 
 use tauri::{Manager, RunEvent};
 
+mod secrets;
+
+/// Restart the whole app. Used by the Settings UI to apply config changes — the
+/// embedded server reads secrets/config from the keychain at startup.
+#[tauri::command]
+fn restart_app(app: tauri::AppHandle) {
+    app.restart();
+}
+
 /// Holds the spawned backend process so it can be terminated when the app exits.
 struct Backend(Mutex<Option<Child>>);
 
@@ -12,6 +21,13 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .invoke_handler(tauri::generate_handler![
+            restart_app,
+            secrets::get_secret,
+            secrets::set_secret,
+            secrets::get_managed_config,
+            secrets::list_managed_keys,
+        ])
         .manage(Backend(Mutex::new(None)))
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -98,10 +114,13 @@ mod backend {
             )
             // Drive the render monitor in-process (see instrumentation.ts).
             .env("TEMLET_RUN_MONITOR", "1")
-            .env("CRON_SECRET", "temlet-desktop-local");
+            // Per-install cron secret (generated + persisted in the keychain).
+            .env("CRON_SECRET", super::secrets::cron_secret());
 
-        // Layer in user-supplied secrets (API keys, OAuth creds) if present.
+        // Layer in user config: the legacy temlet.env file first, then the
+        // keychain (which the Settings UI writes), so the keychain is authoritative.
         apply_user_env(app, &mut command);
+        apply_keychain_env(&mut command);
 
         let child = command.spawn()?;
         if let Some(backend) = app.try_state::<Backend>() {
@@ -178,6 +197,16 @@ mod backend {
                 if !key.is_empty() {
                     command.env(key, value.trim().trim_matches('"'));
                 }
+            }
+        }
+    }
+
+    /// Inject keychain-stored config (API keys, OAuth creds, working dir) into
+    /// the server environment. Overrides the legacy temlet.env file.
+    fn apply_keychain_env(command: &mut Command) {
+        for key in super::secrets::MANAGED_KEYS {
+            if let Some(value) = super::secrets::read(key).filter(|v| !v.is_empty()) {
+                command.env(key, value);
             }
         }
     }

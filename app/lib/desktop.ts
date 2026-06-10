@@ -61,6 +61,34 @@ export async function openPath(path: string): Promise<void> {
 }
 
 /**
+ * Read all managed config values stored in the OS keychain. Returns an empty
+ * object on the web (where config comes from environment variables instead).
+ */
+export async function getManagedConfig(): Promise<Record<string, string>> {
+  if (!isDesktop()) return {};
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<Record<string, string>>("get_managed_config");
+  } catch {
+    return {};
+  }
+}
+
+/** Store a single config value in the OS keychain. An empty value clears it. */
+export async function setSecret(key: string, value: string): Promise<void> {
+  if (!isDesktop()) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("set_secret", { key, value });
+}
+
+/** Restart the app so the embedded server reloads config from the keychain. */
+export async function restartApp(): Promise<void> {
+  if (!isDesktop()) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("restart_app");
+}
+
+/**
  * Send a native OS notification, requesting permission on first use. No-op on
  * the web (callers should keep their existing in-app feedback as the primary UX).
  */

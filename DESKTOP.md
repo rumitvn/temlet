@@ -73,8 +73,15 @@ producing a bundle for the current platform under
 
 ## Runtime secrets
 
-The packaged app reads `temlet.env` from the OS app-config directory and injects
-each `KEY=VALUE` into the embedded server. Copy `temlet.env.example` there:
+Open **Settings** (gear icon in the dashboard header, desktop only) to enter API
+keys, Nexrender/YouTube/TikTok credentials, and the working directory. Values are
+stored in the **OS keychain** (macOS Keychain / Windows Credential Manager) via
+`src-tauri/src/secrets.rs`, not in a plaintext file. "Save & Restart" applies them
+(the embedded server reads config from the keychain at startup). `CRON_SECRET` is
+generated and persisted per install.
+
+Legacy fallback: the shell also reads `temlet.env` from the OS app-config dir
+(keychain values take precedence). Copy `temlet.env.example` there if preferred:
 
 - macOS: `~/Library/Application Support/com.rumitx.temlet/temlet.env`
 - Windows: `%APPDATA%\com.rumitx.temlet\temlet.env`

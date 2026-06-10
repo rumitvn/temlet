@@ -21,6 +21,8 @@ import {
   channels as filterChannels,
 } from "@/app/data/filters";
 import { useRenderActions } from "./renders/useRenderActions";
+import { useIsDesktop } from "./hooks/useIsDesktop";
+import SettingsDialog from "./components/SettingsDialog";
 import RenderHeader from "./renders/components/RenderHeader";
 import RenderStatusBar from "./renders/components/RenderStatusBar";
 import RenderFilterBar from "./renders/components/RenderFilterBar";
@@ -49,6 +51,8 @@ export default function Page() {
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const isDesktop = useIsDesktop();
   const [templates, setTemplates] = useState<{ id: string; path: string }[]>(
     [],
   );
@@ -462,7 +466,10 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-bg text-text p-8">
       {/* Header - Sticky */}
-      <RenderHeader onCreate={() => setIsCreateDialogOpen(true)} />
+      <RenderHeader
+        onCreate={() => setIsCreateDialogOpen(true)}
+        onSettings={isDesktop ? () => setShowSettings(true) : undefined}
+      />
 
       {/* Status Counts Bar (not sticky) */}
       <RenderStatusBar
@@ -562,6 +569,12 @@ export default function Page() {
         onDeselectAll={handleDeselectAll}
         onAction={handleActionClick}
         onDelete={handleDeleteSelected}
+      />
+
+      {/* Settings (desktop only) */}
+      <SettingsDialog
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
       />
 
       {/* Create Render Dialog */}

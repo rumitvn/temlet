@@ -92,18 +92,19 @@ ffmpeg + Chrome. This is the gap between "POC" and "ships to a user."*
 ## Phase D — Configuration, secrets & onboarding 🟠
 *Desktop users don't edit env files in app-config dirs by hand.*
 
-- [ ] 🟠 ⏱M **In-app Settings screen** — edit API keys, Nexrender URL/secret,
-  working directory; write through to the config the shell injects. Replaces
-  hand-editing `temlet.env`.
+- [x] 🟠 **In-app Settings screen** — `SettingsDialog` (desktop-only, in the
+  dashboard header) edits API keys, Nexrender, YouTube/TikTok creds, and the
+  working directory (native folder picker); "Save & Restart" applies changes.
+- [x] 🔴 **Secure secret storage** — secrets live in the **OS keychain** via the
+  `keyring` crate (`src-tauri/src/secrets.rs`), not plaintext. The shell loads
+  them into the server env on startup; `temlet.env` remains a legacy fallback.
+- [x] 🟠 **Per-install `CRON_SECRET`** — generated and persisted in the keychain
+  on first use (`secrets::cron_secret`), replacing the hardcoded value.
+- [~] 🟡 **Wire working dir** — the Settings screen sets `WORKING_DIRECTORY` (shell
+  default = app-data/working). **Remaining:** drop the `C:/Users/youruser/...`
+  placeholder default in `lib/config.ts`.
 - [ ] 🟠 ⏱M **First-run setup wizard** — choose working directory, enter required
   keys, test Nexrender connectivity before the dashboard loads.
-- [ ] 🔴 ⏱M **Secure secret storage** — move secrets out of plaintext `temlet.env`
-  into the OS keychain (`tauri-plugin-stronghold` or a keyring crate). Tokens like
-  `YOUTUBE_TOKEN_JSON`, `TIKTOK_*` should not sit in a readable file.
-- [ ] 🟠 ⏱S **Per-install `CRON_SECRET`** — generate a random secret per install
-  instead of the hardcoded `"temlet-desktop-local"` in `lib.rs`.
-- [ ] 🟡 ⏱S **Wire `lib/config.ts` default** — the `C:/Users/youruser/Documents`
-  placeholder should resolve to the app-data working dir set by the shell.
 - [ ] 🟡 ⏱S **Startup self-check** — verify ffmpeg/Chrome/Nexrender availability and
   surface a clear status panel.
 
