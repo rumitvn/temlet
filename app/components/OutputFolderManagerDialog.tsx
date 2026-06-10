@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button, Dialog } from '@/app/components/ui';
+import { isDesktop, pickDirectory } from '@/app/lib/desktop';
 
 interface OutputFolderManagerDialogProps {
   isOpen: boolean;
@@ -14,6 +15,25 @@ export default function OutputFolderManagerDialog({
   outputFolders,
   onOutputFoldersChange,
 }: OutputFolderManagerDialogProps) {
+  const handleAdd = async () => {
+    // Native folder picker on desktop; typed-path fallback on the web.
+    const path = isDesktop()
+      ? await pickDirectory({ title: 'Choose an output folder' })
+      : window.prompt('Output folder path:')?.trim() || null;
+    if (!path) return;
+    try {
+      const res = await fetch('/api/output-folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      });
+      if (!res.ok) throw new Error('Failed to add output folder');
+      onOutputFoldersChange();
+    } catch (err) {
+      alert('Failed to add output folder.');
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this output folder?')) return;
     try {
@@ -32,9 +52,14 @@ export default function OutputFolderManagerDialog({
       title="Manage Output Folders"
       size="md"
       footer={
-        <Button variant="primary" onClick={onClose}>
-          Close
-        </Button>
+        <div className="flex justify-between gap-2 w-full">
+          <Button variant="secondary" onClick={handleAdd}>
+            Add Folder
+          </Button>
+          <Button variant="primary" onClick={onClose}>
+            Close
+          </Button>
+        </div>
       }
     >
       <ul className="space-y-2">

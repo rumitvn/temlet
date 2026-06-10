@@ -2,6 +2,13 @@
 
 A video rendering and upload management system for After Effects projects. Made by **rumitx** (author/creator).
 
+> **Desktop migration (in progress):** Temlet is being adapted into a **Tauri v2
+> desktop app** (Windows/macOS), not just a web app. The React UI runs in a native
+> webview; the existing Next.js backend runs as an **embedded local sidecar server**;
+> data is a **local SQLite file** (migrated off PostgreSQL). When changing the
+> backend, DB, build, or env handling, keep the desktop path working — see
+> **`DESKTOP.md`** (how it works) and **`DESKTOP_ROADMAP.md`** (what's left to do).
+
 > **Brand note:** The product/app brand is **Temlet** (renamed from "RumitX Studio").
 > "RumitX" remains the author/creator identity — keep "made by rumitx" attribution as-is.
 > The **YouTube content channels** ("RumitX Studio", "RumitX Shorts", "RumitX Nature",
@@ -11,25 +18,32 @@ A video rendering and upload management system for After Effects projects. Made 
 
 ## Stack
 
-- **Next.js 15** (App Router) + **React 19** + **TypeScript** (strict)
+- **Next.js 16** (App Router) + **React 19** + **TypeScript** (strict)
 - **Tailwind CSS v4** (PostCSS), **Framer Motion**
-- **Prisma 6** + **PostgreSQL**
+- **Prisma 7** + **SQLite** (local file, via `@prisma/adapter-better-sqlite3`) —
+  migrated off PostgreSQL for self-contained desktop use
+- **Tauri v2** (Rust shell in `src-tauri/`) for the desktop build
 - **Puppeteer** (crawlers), **fluent-ffmpeg** / `ffmpeg-static`, **sharp**
 - **googleapis** (YouTube), TikTok upload, **OpenAI** / Grok image generation
-- Dev server runs on **port 3001**
+- Dev server runs on **port 3001**; the packaged desktop server runs on `127.0.0.1:38211`
 
 ## Commands
 
 ```bash
-npm run dev      # next dev --port 3001
-npm run build    # next build
-npm run start    # next start
-npm run lint     # next lint
-npm run monitor  # node scripts/monitor.js (render monitor)
+npm run dev              # next dev --port 3001
+npm run build            # next build (output: "standalone" for the sidecar)
+npm run start            # next start
+npm run lint             # next lint
+npm run monitor          # node scripts/monitor.js (render monitor, web/dev)
+npm run tauri:dev        # desktop window wrapping next dev
+npm run tauri:build      # build the desktop app (runs build + prepare:sidecar)
+npm run prepare:sidecar  # stage standalone build + seed DB into src-tauri/resources
 ```
 
-Prisma: `npx prisma generate`, `npx prisma migrate dev`, `npx prisma studio`.
-Docker: see `README-DOCKER.md` (`docker-compose.dev.yml` / `.prod.yml`).
+Prisma (SQLite): export `DATABASE_URL="file:./prisma/temlet.db"`, then
+`npx prisma generate`, `npx prisma migrate dev`, `npx prisma studio`.
+Prisma 7 does not auto-load `.env` — set `DATABASE_URL` in the shell.
+Docker: see `README-DOCKER.md` (web deployment; uses its own DB config).
 
 ## Layout
 
@@ -55,10 +69,14 @@ app/
 ├── layout.tsx           # Root layout + metadata
 ├── assets/ crawlers/ ae_render_jobs/ render_* /  callback/ tiktok-callback/
 lib/
-├── prisma.ts            # Prisma client singleton
+├── prisma.ts            # Prisma client singleton (better-sqlite3 adapter)
 └── config.ts            # WORKING_DIRECTORY + channel/topic path helpers
-prisma/schema.prisma     # Models: RenderFormat, RenderItem, Template, OutputFolder, CrawlerJob
-scripts/monitor.js       # Render monitor entrypoint
+prisma/schema.prisma     # provider = sqlite. Models: RenderFormat, RenderItem, Template, OutputFolder, CrawlerJob
+instrumentation.ts       # In-process render monitor (when TEMLET_RUN_MONITOR=1; packaged app)
+scripts/monitor.js       # Render monitor entrypoint (web/dev)
+scripts/prepare-sidecar.mjs # Stage standalone build + seed DB for the desktop bundle
+loading/index.html       # Desktop startup splash (shown until the sidecar is ready)
+src-tauri/               # Tauri v2 Rust shell (lib.rs spawns/seeds/manages the sidecar)
 postman/                 # Temlet.postman_collection.json (API collection)
 ```
 
@@ -69,13 +87,25 @@ Path alias: `@/*` → project root (see `tsconfig.json`).
 - **Channels → folders**: `lib/config.ts` builds asset paths from `WORKING_DIRECTORY/<channel>/<topic>/<category>` using lowercased names. Channel/topic strings are functional, not just labels.
 - **Render pipeline**: render items (`RenderItem`) created from templates → rendered via nexrender → metadata generated → uploaded to YouTube/TikTok. Scheduling distributes uploads across days/time slots (see `README.md`).
 - **AI image generation**: `app/api/assets/generate-image` supports OpenAI DALL·E 3, Grok-2 Image, and local ComfyUI.
+- **Desktop sidecar**: `src-tauri/src/lib.rs` — in **dev** the window wraps `next dev`
+  (no sidecar); in **release** it boots the bundled standalone server, seeds
+  `temlet.db` into the app-data dir on first run, injects secrets from
+  `<app-config>/temlet.env`, waits for the port, then navigates the window to it.
+  The child process is killed on app exit.
 
 ## Conventions
 
 - Follow repo TypeScript style: explicit types on exported/public APIs, avoid `any`, immutable updates, no `console.log` in production code.
 - Validate input at API boundaries; never trust external data (crawled content, API responses).
-- Secrets via env only (see `env.example`): `DATABASE_URL`, `OPENAI_API_KEY`, `GROK_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`, `NEXTAUTH_SECRET`. Never hardcode.
+- Secrets via env only — never hardcode. Web/dev: `env.example` (`DATABASE_URL` is a
+  SQLite `file:` URL, `OPENAI_API_KEY`, `GROK_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`).
+  Desktop: `temlet.env.example` (loaded from the OS app-config dir by the shell).
+- When migrating the schema, remember the packaged app seeds the DB only on first
+  run — schema changes shipped in a new app version need a migration-on-update path
+  (see `DESKTOP_ROADMAP.md`, Phase B).
 
 ## Setup docs
 
-`README.md`, `README-DOCKER.md`, `DATABASE_SETUP.md`, `CRAWLERS_README.md`, `TIKTOK_SETUP.md`, `WORKING_DIRECTORY_SETUP.md`.
+`README.md`, `DESKTOP.md` (desktop build), `DESKTOP_ROADMAP.md` (desktop TODO),
+`README-DOCKER.md`, `DATABASE_SETUP.md`, `CRAWLERS_README.md`, `TIKTOK_SETUP.md`,
+`WORKING_DIRECTORY_SETUP.md`.

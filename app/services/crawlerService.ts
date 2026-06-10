@@ -190,9 +190,11 @@ export class CrawlerService {
       const where: any = {};
       
       if (filters.q) {
+        // SQLite `contains` (LIKE) is ASCII case-insensitive by default and
+        // does not accept Prisma's `mode` argument.
         where.OR = [
-          { name: { contains: filters.q, mode: 'insensitive' } },
-          { keyword: { contains: filters.q, mode: 'insensitive' } }
+          { name: { contains: filters.q } },
+          { keyword: { contains: filters.q } }
         ];
       }
       
@@ -352,9 +354,12 @@ export class CrawlerService {
 
       logger.debug(`Starting real crawl for: ${keyword} on ${site}, type: ${type}`);
 
-      // Configure browser with stealth mode
+      // Configure browser with stealth mode. In the packaged desktop app the
+      // shell sets PUPPETEER_EXECUTABLE_PATH to the bundled Chromium so the
+      // crawler works without a separately-downloaded browser.
       browser = await puppeteer.launch({
         headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',

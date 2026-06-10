@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Temlet</title>
+    <style>
+      :root {
+        --bg: oklch(16% 0.02 265);
+        --bg-glow: oklch(28% 0.09 265);
+        --text: oklch(96% 0.01 265);
+        --muted: oklch(70% 0.03 265);
+        --accent: oklch(72% 0.17 265);
+      }
+
+      * {
+        margin: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        font-family:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(
+            120% 120% at 50% 0%,
+            var(--bg-glow) 0%,
+            var(--bg) 55%
+          );
+        overflow: hidden;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      .stage {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.75rem;
+        text-align: center;
+      }
+
+      .mark {
+        font-size: clamp(2.5rem, 1.5rem + 4vw, 4rem);
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 1;
+        background: linear-gradient(
+          180deg,
+          var(--text) 0%,
+          var(--muted) 130%
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .mark span {
+        color: var(--accent);
+        -webkit-text-fill-color: var(--accent);
+      }
+
+      .ring {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 50%;
+        border: 3px solid oklch(100% 0 0 / 0.12);
+        border-top-color: var(--accent);
+        animation: spin 0.9s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+      }
+
+      .status {
+        font-size: 0.875rem;
+        letter-spacing: 0.02em;
+        color: var(--muted);
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .ring {
+          animation-duration: 2s;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="stage" aria-label="Temlet is starting">
+      <h1 class="mark">Temlet<span>.</span></h1>
+      <div class="ring" role="status" aria-live="polite"></div>
+      <p class="status">Starting local engine…</p>
+    </main>
+  </body>
+</html>

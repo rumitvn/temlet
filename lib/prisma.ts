@@ -1,17 +1,22 @@
 import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
 // Prisma 7 connects through a driver adapter instead of a schema-level `url`.
-// PrismaPg manages its own pg connection pool. The pool connects lazily (on the
-// first query), so constructing it at import time is safe even when
-// DATABASE_URL is unset — e.g. during `next build`, which imports route modules
-// to collect page data. A missing URL surfaces as a clear error on first query
-// rather than crashing the build.
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+// The desktop build uses a local SQLite file rather than a remote Postgres
+// server, so the app is fully self-contained.
+//
+// The file location comes from DATABASE_URL when set (the Tauri shell injects an
+// absolute `file:` path under the app-data dir in the packaged app). When unset
+// — e.g. `next dev` or `next build` collecting route data — it falls back to a
+// project-local file. SQLite opens the file lazily on first query, so
+// constructing the adapter at import time is safe even before the DB exists.
+const databaseUrl = process.env.DATABASE_URL ?? 'file:./prisma/temlet.db';
+
+const adapter = new PrismaBetterSqlite3({ url: databaseUrl });
 
 export const prisma =
   globalForPrisma.prisma ??
