@@ -86,9 +86,16 @@ Legacy fallback: the shell also reads `temlet.env` from the OS app-config dir
 - macOS: `~/Library/Application Support/com.rumitx.temlet/temlet.env`
 - Windows: `%APPDATA%\com.rumitx.temlet\temlet.env`
 
+## Bundled runtimes
+
+The build stages everything the app needs into `src-tauri/resources/` so it runs
+on a clean machine (~600MB total): the Node runtime (`fetch:node`), the Next.js
+server + seed DB (`prepare:sidecar`), and **Chromium for the crawler**
+(`fetch:chromium` → `PUPPETEER_EXECUTABLE_PATH`). **ffmpeg** ships via
+`ffmpeg-static` in the server bundle (`FFMPEG_PATH`). Cross-build with the
+`TARGET_*` env vars before each `fetch:*`.
+
 ## Not yet done (distributable milestone)
 
-- Bundle ffmpeg + a Chromium for Puppeteer (set `PUPPETEER_EXECUTABLE_PATH` /
-  ffmpeg path) so the crawler and YouTube-thumbnail features work on a clean machine.
 - Code signing, notarization, installers, and auto-update.
 - OAuth redirect handling for a signed app (custom scheme / deep link).

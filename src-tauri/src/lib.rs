@@ -122,6 +122,23 @@ mod backend {
         apply_user_env(app, &mut command);
         apply_keychain_env(&mut command);
 
+        // Point the crawler at the bundled Chromium and the YouTube thumbnail
+        // extractor at the bundled ffmpeg, so both work without separate installs.
+        let chromium_dir = resource_dir.join("chromium");
+        if let Ok(relative) = fs::read_to_string(chromium_dir.join("executable.txt")) {
+            let exe = chromium_dir.join(relative.trim());
+            if exe.exists() {
+                command.env("PUPPETEER_EXECUTABLE_PATH", exe);
+            }
+        }
+        let ffmpeg = server_dir
+            .join("node_modules")
+            .join("ffmpeg-static")
+            .join(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" });
+        if ffmpeg.exists() {
+            command.env("FFMPEG_PATH", ffmpeg);
+        }
+
         let child = command.spawn()?;
         if let Some(backend) = app.try_state::<Backend>() {
             if let Ok(mut guard) = backend.0.lock() {

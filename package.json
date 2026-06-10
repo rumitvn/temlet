@@ -35,6 +35,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "fetch:node": "node scripts/fetch-node-runtime.mjs",
+    "fetch:chromium": "node scripts/fetch-chromium.mjs",
     "prepare:sidecar": "node scripts/prepare-sidecar.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
@@ -69,6 +70,7 @@
     "sharp": "^0.34.5"
   },
   "devDependencies": {
+    "@puppeteer/browsers": "^3.0.4",
     "@tailwindcss/postcss": "^4",
     "@tauri-apps/cli": "^2.11.2",
     "@types/better-sqlite3": "^7.6.13",

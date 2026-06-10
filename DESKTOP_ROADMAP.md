@@ -23,13 +23,13 @@ ffmpeg + Chrome. This is the gap between "POC" and "ships to a user."*
   bundled node with an empty environment. **Remaining:** drive
   `TARGET_PLATFORM/ARCH/NODE_VERSION` from CI to cross-stage Windows/macOS-x64
   binaries (see Phase H), and rebuild native modules per target.
-- [ ] 🔴 ⏱M **Bundle ffmpeg** — `ffmpeg-static` ships a binary, but verify it's
-  packaged and resolvable in `app/api/youtube-upload/route.ts`; set the path
-  explicitly via `ffmpeg.setFfmpegPath(...)` from a bundled resource.
-- [ ] 🔴 ⏱L **Handle Chromium for Puppeteer** (`app/services/crawlerService.ts`)
-  - Options: bundle a browser + set `PUPPETEER_EXECUTABLE_PATH`; OR detect the
-    user's installed Chrome; OR download-on-first-run with progress UI.
-  - Largest single size cost (~150–300MB) — decide per product need.
+- [x] 🔴 **Bundle ffmpeg** — `youtube-upload/route.ts` now invokes the bundled
+  `ffmpeg-static` binary (FFMPEG_PATH override set by the shell), not system
+  ffmpeg. Verified the bundled binary runs (ffmpeg 6.0).
+- [x] 🔴 **Bundle Chromium for Puppeteer** — `scripts/fetch-chromium.mjs` installs
+  Chrome-for-Testing into `resources/chromium`; the shell sets
+  `PUPPETEER_EXECUTABLE_PATH` and `crawlerService.ts` honors it. Verified
+  Puppeteer launches the bundled Chromium. Adds ~350MB/platform to the bundle.
 - [ ] 🟠 ⏱M **Native-module ABI matrix** — `sharp`, `better-sqlite3` prebuilds must
   match the bundled Node ABI for each target (macOS arm64 + x64, Windows x64).
   Verify staged `node_modules` carry the right `.node` binaries per platform build.

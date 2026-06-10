@@ -8,9 +8,14 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { exec } from "child_process";
 import { promisify } from "util";
+import ffmpegStatic from "ffmpeg-static";
 import { logger } from "@/app/lib/logger";
 
 const execAsync = promisify(exec);
+
+// Prefer the bundled ffmpeg binary (ships with the desktop app) so thumbnail
+// extraction works on a machine with no system ffmpeg. FFMPEG_PATH overrides.
+const FFMPEG_BIN = process.env.FFMPEG_PATH || ffmpegStatic || "ffmpeg";
 
 function toScheduledISO(input?: string): string | undefined {
   if (!input) return undefined;
@@ -26,10 +31,10 @@ async function extractFrameFromVideo(videoBuffer: Buffer, timestamp: string = "0
     // Write video buffer to temp file
     await writeFile(tempVideoPath, videoBuffer);
     
-    // Try to use system ffmpeg if available
+    // Use the bundled ffmpeg (falls back to a generated thumbnail on failure).
     try {
-      logger.debug(`Extracting frame at ${timestamp}...`);
-      await execAsync(`ffmpeg -i "${tempVideoPath}" -ss ${timestamp} -vframes 1 -q:v 2 "${tempFramePath}"`);
+      logger.debug(`Extracting frame at ${timestamp} via ${FFMPEG_BIN}...`);
+      await execAsync(`"${FFMPEG_BIN}" -i "${tempVideoPath}" -ss ${timestamp} -vframes 1 -q:v 2 "${tempFramePath}"`);
       
       // Read the extracted frame and get its dimensions
       const frameImage = sharp(tempFramePath);
@@ -73,7 +78,7 @@ async function extractFrameFromVideo(videoBuffer: Buffer, timestamp: string = "0
       
       return frameBuffer;
     } catch (ffmpegError) {
-      logger.warn('System ffmpeg not available, creating custom thumbnail...');
+      logger.warn('ffmpeg frame extraction failed, creating custom thumbnail...');
       
       // Create a more attractive fallback thumbnail with video info
       const fallbackThumbnail = await sharp({
