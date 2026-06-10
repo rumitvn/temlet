@@ -78,7 +78,7 @@ mod backend {
         let working_dir = app_data.join("working");
         fs::create_dir_all(&working_dir)?;
 
-        let mut command = Command::new(resolve_node());
+        let mut command = Command::new(resolve_node(&resource_dir));
         command
             .arg("server.js")
             .current_dir(&server_dir)
@@ -118,10 +118,16 @@ mod backend {
         Ok(())
     }
 
-    /// Resolve a `node` executable. GUI launches (Finder/Explorer) do not inherit
-    /// the shell PATH, so probe an override env var and common install locations
-    /// before falling back to PATH resolution.
-    fn resolve_node() -> PathBuf {
+    /// Resolve a `node` executable. Prefer the Node runtime bundled with the app
+    /// (so it runs on a machine with no Node installed and regardless of PATH),
+    /// then an override env var, common install locations, and finally PATH.
+    fn resolve_node(resource_dir: &std::path::Path) -> PathBuf {
+        let exe = if cfg!(windows) { "node.exe" } else { "node" };
+        let bundled = resource_dir.join("runtime").join(exe);
+        if bundled.exists() {
+            return bundled;
+        }
+
         if let Ok(path) = std::env::var("TEMLET_NODE_PATH") {
             let candidate = PathBuf::from(path);
             if candidate.exists() {

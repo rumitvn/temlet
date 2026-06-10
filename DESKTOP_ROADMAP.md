@@ -16,12 +16,13 @@ desktop product (not just the web app in a window).
 *Without this, `tauri:build` output only runs on a machine that already has Node +
 ffmpeg + Chrome. This is the gap between "POC" and "ships to a user."*
 
-- [ ] 🔴 ⏱M **Bundle a Node runtime as a Tauri sidecar binary**
-  - Ship `node` as `externalBin` named `node-<target-triple>`; spawn via the
-    bundled path instead of `resolve_node()` PATH probing in `src-tauri/src/lib.rs`.
-  - Fixes the Finder/Explorer launch (no inherited `PATH`).
-  - Alt: compile server to a single binary (Node SEA / `@yao-pkg/pkg`) — harder
-    with native modules; sidecar-node is the safer first step.
+- [x] 🔴 **Bundle a Node runtime** — `scripts/fetch-node-runtime.mjs` downloads the
+  official Node binary (host platform/version by default; ABI-matched to the
+  native modules) into `src-tauri/resources/runtime/`; `resolve_node()` in
+  `lib.rs` now prefers it. Verified: server boots + better-sqlite3 loads under the
+  bundled node with an empty environment. **Remaining:** drive
+  `TARGET_PLATFORM/ARCH/NODE_VERSION` from CI to cross-stage Windows/macOS-x64
+  binaries (see Phase H), and rebuild native modules per target.
 - [ ] 🔴 ⏱M **Bundle ffmpeg** — `ffmpeg-static` ships a binary, but verify it's
   packaged and resolvable in `app/api/youtube-upload/route.ts`; set the path
   explicitly via `ffmpeg.setFfmpegPath(...)` from a bundled resource.

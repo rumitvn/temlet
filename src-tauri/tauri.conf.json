@@ -7,7 +7,7 @@
     "frontendDist": "../loading",
     "devUrl": "http://localhost:3001",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build && npm run prepare:sidecar"
+    "beforeBuildCommand": "npm run build && npm run fetch:node && npm run prepare:sidecar"
   },
   "app": {
     "windows": [
@@ -30,7 +30,8 @@
     "targets": "all",
     "resources": {
       "resources/server": "server",
-      "resources/seed": "seed"
+      "resources/seed": "seed",
+      "resources/runtime": "runtime"
     },
     "icon": [
       "icons/32x32.png",

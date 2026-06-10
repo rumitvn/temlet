@@ -60,13 +60,16 @@ classic way (`npm run monitor`) in dev.
 npm run tauri:build
 ```
 
-This runs `next build` → `prepare:sidecar` (staging) → `tauri build`, producing a
-bundle for the current platform under `src-tauri/target/release/bundle/`.
+This runs `next build` → `fetch:node` → `prepare:sidecar` (staging) → `tauri build`,
+producing a bundle for the current platform under
+`src-tauri/target/release/bundle/`.
 
-> Launch the built binary from a terminal during the POC: GUI launches (Finder /
-> Explorer) don't inherit the shell `PATH`, so the shell probes common Node
-> locations and the `TEMLET_NODE_PATH` env override. Bundling a Node runtime (so
-> end users need nothing installed) is the next milestone — see below.
+> The app **bundles its own Node runtime** (`scripts/fetch-node-runtime.mjs` stages
+> the official binary into `src-tauri/resources/runtime/`), so it runs on a machine
+> with no Node installed and regardless of how it's launched. `resolve_node()`
+> prefers the bundled runtime, then `TEMLET_NODE_PATH`, then PATH. For cross-builds,
+> set `TARGET_PLATFORM` / `TARGET_ARCH` / `TARGET_NODE_VERSION` before `fetch:node`
+> (and rebuild native modules for that target).
 
 ## Runtime secrets
 
@@ -78,7 +81,6 @@ each `KEY=VALUE` into the embedded server. Copy `temlet.env.example` there:
 
 ## Not yet done (distributable milestone)
 
-- Bundle a Node runtime so end users don't need Node installed.
 - Bundle ffmpeg + a Chromium for Puppeteer (set `PUPPETEER_EXECUTABLE_PATH` /
   ffmpeg path) so the crawler and YouTube-thumbnail features work on a clean machine.
 - Code signing, notarization, installers, and auto-update.
