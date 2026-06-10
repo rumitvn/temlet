@@ -18,10 +18,11 @@ export async function GET(req: NextRequest) {
             return apiError('Search query is required', 400);
         }
 
+        // SQLite `contains` (LIKE) is ASCII case-insensitive by default and does
+        // not accept Prisma's `mode` argument.
         const where: Prisma.RenderItemWhereInput = {
             fileName: {
-                contains: query,
-                mode: 'insensitive'
+                contains: query
             }
         };
 

@@ -29,19 +29,40 @@ The `CrawlerJob` model is already available in your Prisma client and the databa
 - **Real Data**: All data persists across app restarts
 - **Live Updates**: Job status and progress updates in real-time
 
+## 🗄️ **Database: local SQLite**
+
+Temlet uses a **local SQLite file** (via Prisma's `better-sqlite3` driver adapter),
+so there is no separate database server to install or run. In the packaged desktop
+app the Tauri shell points the database at a writable app-data path automatically.
+
+For local development, set a project-relative file URL:
+
+```env
+DATABASE_URL="file:./prisma/temlet.db"
+```
+
+Then create/sync the schema and generate the client:
+
+```bash
+# create or update the local SQLite DB from prisma/schema.prisma
+DATABASE_URL="file:./prisma/temlet.db" npx prisma migrate dev
+
+# (re)generate the Prisma client
+npx prisma generate
+```
+
+> Note: Prisma 7 no longer auto-loads `.env`. Populate the shell env (as shown
+> above) or use `dotenv -e .env -- prisma ...` when running Prisma CLI commands.
+
 ## 🔧 **If You Encounter Issues**
 
-If you get any database connection errors:
+If you get any database errors:
 
-1. **Check your `.env` file**:
-   ```env
-   DATABASE_URL="postgresql://username:password@localhost:5432/render_manager"
-   ```
+1. **Check your `.env` file** has a SQLite `file:` URL (see above).
 
-2. **Verify PostgreSQL is running**:
+2. **Inspect the database** with Prisma Studio:
    ```bash
-   # Check if PostgreSQL is accessible
-   psql -h localhost -U your_username -d render_manager
+   DATABASE_URL="file:./prisma/temlet.db" npx prisma studio
    ```
 
 3. **Restart your development server**:
@@ -58,4 +79,4 @@ Your crawler system is now fully functional with:
 - ✅ Real-time statistics
 - ✅ Job lifecycle management
 
-Go ahead and start creating crawler jobs - everything will be saved to your PostgreSQL database! 
+Go ahead and start creating crawler jobs - everything will be saved to your local SQLite database! 

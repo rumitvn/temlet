@@ -190,9 +190,11 @@ export class CrawlerService {
       const where: any = {};
       
       if (filters.q) {
+        // SQLite `contains` (LIKE) is ASCII case-insensitive by default and
+        // does not accept Prisma's `mode` argument.
         where.OR = [
-          { name: { contains: filters.q, mode: 'insensitive' } },
-          { keyword: { contains: filters.q, mode: 'insensitive' } }
+          { name: { contains: filters.q } },
+          { keyword: { contains: filters.q } }
         ];
       }
       
