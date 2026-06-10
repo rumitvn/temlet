@@ -12,6 +12,14 @@ const DEFAULT_MONITOR_INTERVAL_MS = 5000;
 
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+
+  // Upgrade the user's existing SQLite DB in place before serving requests.
+  // Desktop-only (the shell sets this); dev/web uses `prisma migrate dev`.
+  if (process.env.TEMLET_APPLY_MIGRATIONS === "1") {
+    const { applyMigrations } = await import("@/app/lib/migrate");
+    await applyMigrations();
+  }
+
   if (process.env.TEMLET_RUN_MONITOR !== "1") return;
 
   const port = process.env.PORT ?? "3001";

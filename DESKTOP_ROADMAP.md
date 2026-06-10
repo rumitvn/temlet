@@ -52,10 +52,13 @@ ffmpeg + Chrome. This is the gap between "POC" and "ships to a user."*
   to hit `/api/health` so we navigate only when the app (not just the port) is ready.
 - [ ] 🟡 ⏱S **Orphan prevention** — ensure the child dies if the shell is SIGKILLed
   or panics (process group / job object), not only on clean `ExitRequested`.
-- [ ] 🔴 ⏱M **DB migrations on app update** — the seed-copy only runs on *first*
-  launch. When a new app version ships a schema change, the user's existing
-  `<app-data>/temlet.db` must be migrated. Bundle migrations + run
-  `prisma migrate deploy` (or an embedded migrator) on startup against the live DB.
+- [x] 🔴 **DB migrations on app update** — `app/lib/migrate.ts` applies pending
+  migrations to the live DB on startup (gated by `TEMLET_APPLY_MIGRATIONS`, set by
+  the shell). It's a minimal `migrate deploy` equivalent over better-sqlite3,
+  compatible with Prisma's `_prisma_migrations` ledger (the seeded baseline is
+  recognized, not re-run). Migrations are staged into the bundle by
+  `prepare-sidecar.mjs`. Verified: baseline DB → applies only the new migration →
+  idempotent on second boot.
 
 ---
 

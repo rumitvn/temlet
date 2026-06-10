@@ -87,6 +87,8 @@ mod backend {
             .env("HOSTNAME", "127.0.0.1")
             .env("DATABASE_URL", format!("file:{}", db_path.display()))
             .env("WORKING_DIRECTORY", working_dir.display().to_string())
+            // Upgrade the existing DB in place on startup (see instrumentation.ts).
+            .env("TEMLET_APPLY_MIGRATIONS", "1")
             // Drive the render monitor in-process (see instrumentation.ts).
             .env("TEMLET_RUN_MONITOR", "1")
             .env("CRON_SECRET", "temlet-desktop-local");

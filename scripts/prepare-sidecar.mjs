@@ -54,6 +54,17 @@ if (existsSync(publicDir)) {
   cpSync(publicDir, path.join(serverDest, "public"), { recursive: true });
 }
 
+// 3b. Prisma migrations — applied in place on startup to upgrade an existing DB
+//     (see app/lib/migrate.ts). Not traced by Next, so copy them explicitly.
+const migrationsDir = path.join(root, "prisma", "migrations");
+if (existsSync(migrationsDir)) {
+  cpSync(migrationsDir, path.join(serverDest, "prisma", "migrations"), {
+    recursive: true,
+  });
+} else {
+  fail("missing prisma/migrations — run `npx prisma migrate dev` first.");
+}
+
 // 4. Safety net: ensure the ffmpeg packages are present even if tracing missed
 //    them (their binary resolution is dynamic).
 for (const mod of ["ffmpeg-static", "fluent-ffmpeg"]) {
